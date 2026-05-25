@@ -1,21 +1,29 @@
-#include "audio/QtAudioEngine.h"
-#include "ui/MainWindow.h"
-
-#include <QApplication>
-#include <memory>
+#include "core/MusicPlayer.h"
+#include <QGuiApplication>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QUrl>
 
 int main(int argc, char* argv[]) {
-    QApplication app(argc, argv);
-    QApplication::setApplicationName("Calyx");
-    QApplication::setApplicationVersion("0.1.0");
-    QApplication::setOrganizationName("Calyx");
+    QGuiApplication app(argc, argv);
+    QGuiApplication::setApplicationName("Calyx");
+    QGuiApplication::setApplicationVersion("0.1.0");
+    QGuiApplication::setOrganizationName("Calyx");
 
-    // Create the audio engine (owned by the application scope).
-    auto engine = std::make_unique<calyx::audio::QtAudioEngine>();
+    // Register C++ MusicPlayer to QML
+    qmlRegisterType<calyx::core::MusicPlayer>("Calyx", 1, 0, "MusicPlayer");
 
-    // Create and show the main window.
-    calyx::ui::MainWindow mainWindow(engine.get());
-    mainWindow.show();
+    QQmlApplicationEngine engine;
+
+    // Load the main QML interface from the compiled resources
+    const QUrl url(u"qrc:/main.qml"_qs);
+    QObject::connect(
+        &engine,
+        &QQmlApplicationEngine::objectCreationFailed,
+        &app,
+        []() { QCoreApplication::exit(-1); },
+        Qt::QueuedConnection);
+    engine.load(url);
 
     return app.exec();
 }

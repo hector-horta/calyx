@@ -6,8 +6,10 @@ target_link_libraries(test_track
     PRIVATE
         calyx_core
         calyx_audio
+        calyx_network
         GTest::gtest_main
         Qt6::Core
+        Qt6::Network
 )
 add_test(NAME TrackTests COMMAND test_track)
 
@@ -17,8 +19,10 @@ target_link_libraries(test_library_manager
     PRIVATE
         calyx_core
         calyx_audio
+        calyx_network
         GTest::gtest_main
         Qt6::Core
+        Qt6::Network
 )
 add_test(NAME LibraryManagerTests COMMAND test_library_manager)
 
@@ -28,8 +32,10 @@ target_link_libraries(test_player
     PRIVATE
         calyx_core
         calyx_audio
+        calyx_network
         GTest::gtest_main
         Qt6::Core
+        Qt6::Network
         Qt6::Multimedia
 )
 add_test(NAME PlayerTests COMMAND test_player)

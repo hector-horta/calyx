@@ -41,7 +41,7 @@ private:
     int64_t        m_nextId{1};
 
     static inline const QStringList s_supportedExtensions{
-        "*.mp3", "*.flac", "*.m4a", "*.ogg", "*.wav", "*.aac"
+        "*.mp3", "*.flac", "*.m4a", "*.m4p", "*.ogg", "*.wav", "*.aac"
     };
 };
 

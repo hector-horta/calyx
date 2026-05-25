@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/">
+        <file>main.qml</file>
+        <file>Sidebar.qml</file>
+        <file>PlaybackBar.qml</file>
+        <file>MainContent.qml</file>
+        <file>ApiView.qml</file>
+    </qresource>
+</RCC>
