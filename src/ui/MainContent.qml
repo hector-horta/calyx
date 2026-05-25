@@ -383,6 +383,7 @@ Item {
                             title: modelData.albumName
                             artist: modelData.artistName
                             colorCode: modelData.colorCode
+                            coverSource: modelData.tracks && modelData.tracks.length > 0 ? "image://covers/" + encodeURIComponent(modelData.tracks[0].filePath) : ""
                             onPlayRequested: {
                                 root.playerBridge.playAlbumTracks(modelData.tracks)
                             }
@@ -537,6 +538,7 @@ Item {
         property string title: ""
         property string artist: ""
         property string colorCode: "#ffffff"
+        property string coverSource: ""
         signal playRequested()
 
         width: 160
@@ -546,12 +548,30 @@ Item {
             anchors.fill: parent
             spacing: 8
 
-            // Album cover artwork mock
+            // Album cover artwork
             Rectangle {
                 width: 160
                 height: 160
                 radius: 10
-                color: card.colorCode
+                color: "#1e1e24" // Dark placeholder background
+                clip: true
+
+                // Colorful fallback/placeholder card
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 10
+                    color: card.colorCode
+                    visible: albumImage.status !== Image.Ready
+                }
+
+                Image {
+                    id: albumImage
+                    anchors.fill: parent
+                    source: card.coverSource
+                    fillMode: Image.PreserveAspectCrop
+                    asynchronous: true
+                    visible: status === Image.Ready
+                }
                 
                 // Hover overlay to show a play button
                 Rectangle {

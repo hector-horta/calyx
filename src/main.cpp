@@ -1,4 +1,5 @@
 #include "core/MusicPlayer.h"
+#include "ui/CoverImageProvider.h"
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -14,6 +15,7 @@ int main(int argc, char* argv[]) {
     qmlRegisterType<calyx::core::MusicPlayer>("Calyx", 1, 0, "MusicPlayer");
 
     QQmlApplicationEngine engine;
+    engine.addImageProvider(QStringLiteral("covers"), new CoverImageProvider());
 
     // Load the main QML interface from the compiled resources
     const QUrl url(u"qrc:/main.qml"_qs);

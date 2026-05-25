@@ -390,6 +390,148 @@ static Metadata readMp4Metadata(QFile& file) {
     return meta;
 }
 
+static QByteArray readMp3CoverArt(QFile& file) {
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+
+    char header[10];
+    if (file.read(header, 10) == 10 && strncmp(header, "ID3", 3) == 0) {
+        int majorVersion = header[3];
+        uint32_t tagSize = readUint32Synchsafe(header + 6);
+
+        QByteArray tagData = file.read(tagSize);
+        int offset = 0;
+        while (offset + 10 < tagData.size()) {
+            QString frameId;
+            int frameSize = 0;
+            int headerSize = 10;
+
+            if (majorVersion == 2) {
+                frameId = QString::fromLatin1(tagData.mid(offset, 3));
+                frameSize = readUint24BE(tagData.constData() + offset + 3);
+                headerSize = 6;
+            } else {
+                frameId = QString::fromLatin1(tagData.mid(offset, 4));
+                if (majorVersion == 4) {
+                    frameSize = readUint32Synchsafe(tagData.constData() + offset + 4);
+                } else {
+                    frameSize = readUint32BE(tagData.constData() + offset + 4);
+                }
+                headerSize = 10;
+            }
+
+            if (frameId.isEmpty() || frameId[0] == '\0' || frameSize <= 0 || offset + headerSize + frameSize > tagData.size()) {
+                break;
+            }
+
+            QByteArray frameContent = tagData.mid(offset + headerSize, frameSize);
+            offset += headerSize + frameSize;
+
+            if (frameId == "APIC" || frameId == "PIC") {
+                int imgIndex = -1;
+                for (int i = 0; i < frameContent.size() - 4; ++i) {
+                    // Check JPEG
+                    if (static_cast<unsigned char>(frameContent[i]) == 0xFF &&
+                        static_cast<unsigned char>(frameContent[i+1]) == 0xD8 &&
+                        static_cast<unsigned char>(frameContent[i+2]) == 0xFF) {
+                        imgIndex = i;
+                        break;
+                    }
+                    // Check PNG
+                    if (static_cast<unsigned char>(frameContent[i]) == 0x89 &&
+                        frameContent[i+1] == 'P' &&
+                        frameContent[i+2] == 'N' &&
+                        frameContent[i+3] == 'G') {
+                        imgIndex = i;
+                        break;
+                    }
+                }
+                if (imgIndex != -1) {
+                    file.close();
+                    return frameContent.mid(imgIndex);
+                }
+            }
+        }
+    }
+    file.close();
+    return {};
+}
+
+static QByteArray readMp4CoverArt(QFile& file) {
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+
+    qint64 fileSize = file.size();
+    QByteArray imgData;
+
+    auto parseBox = [&](auto& self, qint64 offset, qint64 limit, const QList<QByteArray>& path, int pathIndex) -> void {
+        if (pathIndex >= path.size()) return;
+        qint64 currentOffset = offset;
+        while (currentOffset + 8 <= limit) {
+            if (!file.seek(currentOffset)) return;
+            char header[8];
+            if (file.read(header, 8) != 8) return;
+
+            quint32 boxSize = readUint32BE(header);
+            QByteArray boxType(header + 4, 4);
+
+            qint64 actualSize = boxSize;
+            qint64 headerSize = 8;
+            if (boxSize == 1) {
+                char extHeader[8];
+                if (file.read(extHeader, 8) != 8) return;
+                actualSize = 0;
+                const auto* uext = reinterpret_cast<const unsigned char*>(extHeader);
+                for (int i = 0; i < 8; ++i) {
+                    actualSize = (actualSize << 8) | uext[i];
+                }
+                headerSize = 16;
+            } else if (boxSize == 0) {
+                actualSize = fileSize - currentOffset;
+            }
+
+            if (actualSize < headerSize) return;
+
+            if (boxType == path[pathIndex]) {
+                qint64 contentOffset = currentOffset + headerSize;
+                qint64 contentSize = actualSize - headerSize;
+
+                if (pathIndex == path.size() - 1) {
+                    qint64 subOffset = contentOffset;
+                    while (subOffset + 8 <= contentOffset + contentSize) {
+                        if (!file.seek(subOffset)) break;
+                        char subHeader[8];
+                        if (file.read(subHeader, 8) != 8) break;
+                        quint32 subSize = readUint32BE(subHeader);
+                        QByteArray subType(subHeader + 4, 4);
+
+                        if (subType == "data") {
+                            if (subSize >= 16 && file.seek(subOffset + 16)) {
+                                imgData = file.read(subSize - 16);
+                            }
+                            break;
+                        }
+                        subOffset += subSize;
+                    }
+                    return;
+                } else {
+                    self(self, contentOffset, contentOffset + contentSize, path, pathIndex + 1);
+                    if (!imgData.isEmpty()) return;
+                }
+            }
+            currentOffset += actualSize;
+        }
+    };
+
+    QList<QByteArray> path = {"moov", "udta", "meta", "ilst", "covr"};
+    parseBox(parseBox, 0, fileSize, path, 0);
+
+    file.close();
+    return imgData;
+}
+
 Metadata MetadataReader::readMetadata(const QString& filePath) {
     QFileInfo fi(filePath);
     QString ext = fi.suffix().toLower();
@@ -399,6 +541,49 @@ Metadata MetadataReader::readMetadata(const QString& filePath) {
         return readMp3Metadata(file);
     } else if (ext == "m4a" || ext == "m4p" || ext == "m4b" || ext == "mp4") {
         return readMp4Metadata(file);
+    }
+
+    return {};
+}
+
+QByteArray MetadataReader::readCoverArt(const QString& filePath) {
+    QFileInfo fi(filePath);
+    QString ext = fi.suffix().toLower();
+    QFile file(filePath);
+    QByteArray imgData;
+
+    if (ext == "mp3") {
+        imgData = readMp3CoverArt(file);
+    } else if (ext == "m4a" || ext == "m4p" || ext == "m4b" || ext == "mp4") {
+        imgData = readMp4CoverArt(file);
+    }
+
+    if (!imgData.isEmpty()) {
+        return imgData;
+    }
+
+    // Fallback: search directory for cover files
+    QDir dir = fi.dir();
+    QStringList filters = {"cover.jpg", "cover.png", "folder.jpg", "folder.png",
+                           "front.jpg", "front.png", "album.jpg", "album.png"};
+    for (const auto& name : filters) {
+        QFile dirFile(dir.filePath(name));
+        if (dirFile.exists() && dirFile.open(QIODevice::ReadOnly)) {
+            imgData = dirFile.readAll();
+            dirFile.close();
+            return imgData;
+        }
+    }
+
+    // Fallback 2: look for any .jpg or .png file in the same directory
+    QStringList imageFiles = dir.entryList({"*.jpg", "*.jpeg", "*.png"}, QDir::Files);
+    if (!imageFiles.isEmpty()) {
+        QFile dirFile(dir.filePath(imageFiles.first()));
+        if (dirFile.open(QIODevice::ReadOnly)) {
+            imgData = dirFile.readAll();
+            dirFile.close();
+            return imgData;
+        }
     }
 
     return {};

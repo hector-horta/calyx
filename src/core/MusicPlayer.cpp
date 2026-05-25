@@ -35,6 +35,7 @@ MusicPlayer::MusicPlayer(QObject* parent)
     : QObject(parent)
     , m_currentTrackTitle("No Track Playing")
     , m_currentTrackArtist("Unknown Artist")
+    , m_currentTrackPath("")
     , m_isPlaying(false)
     , m_jsonResponse("{}")
     , m_isFetching(false)
@@ -91,6 +92,7 @@ MusicPlayer::MusicPlayer(QObject* parent)
 
 QString MusicPlayer::currentTrackTitle() const { return m_currentTrackTitle; }
 QString MusicPlayer::currentTrackArtist() const { return m_currentTrackArtist; }
+QString MusicPlayer::currentTrackPath() const { return m_currentTrackPath; }
 bool MusicPlayer::isPlaying() const { return m_isPlaying; }
 QString MusicPlayer::jsonResponse() const { return m_jsonResponse; }
 bool MusicPlayer::isFetching() const { return m_isFetching; }
@@ -142,6 +144,8 @@ void MusicPlayer::stop() {
     m_player->stop();
     setCurrentTrackTitle("No Track Playing");
     setCurrentTrackArtist("Unknown Artist");
+    m_currentTrackPath = "";
+    emit currentTrackPathChanged("");
 }
 
 void MusicPlayer::next() {
@@ -151,6 +155,8 @@ void MusicPlayer::next() {
         auto details = getTrackDisplayDetails(*cur);
         setCurrentTrackTitle(details.title);
         setCurrentTrackArtist(details.artistAlbum);
+        m_currentTrackPath = cur->filePath.toString();
+        emit currentTrackPathChanged(m_currentTrackPath);
     }
 }
 
@@ -161,6 +167,8 @@ void MusicPlayer::previous() {
         auto details = getTrackDisplayDetails(*cur);
         setCurrentTrackTitle(details.title);
         setCurrentTrackArtist(details.artistAlbum);
+        m_currentTrackPath = cur->filePath.toString();
+        emit currentTrackPathChanged(m_currentTrackPath);
     }
 }
 
@@ -178,6 +186,8 @@ void MusicPlayer::playLocalTrack(int trackId) {
             auto details = getTrackDisplayDetails(t);
             setCurrentTrackTitle(details.title);
             setCurrentTrackArtist(details.artistAlbum);
+            m_currentTrackPath = t.filePath.toString();
+            emit currentTrackPathChanged(m_currentTrackPath);
             break;
         }
     }
@@ -208,6 +218,8 @@ void MusicPlayer::playAlbumTracks(const QVariantList& tracks) {
         auto details = getTrackDisplayDetails(*cur);
         setCurrentTrackTitle(details.title);
         setCurrentTrackArtist(details.artistAlbum);
+        m_currentTrackPath = cur->filePath.toString();
+        emit currentTrackPathChanged(m_currentTrackPath);
     }
 }
 

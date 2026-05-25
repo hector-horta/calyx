@@ -17,6 +17,7 @@ class MusicPlayer : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString currentTrackTitle READ currentTrackTitle WRITE setCurrentTrackTitle NOTIFY currentTrackTitleChanged)
     Q_PROPERTY(QString currentTrackArtist READ currentTrackArtist WRITE setCurrentTrackArtist NOTIFY currentTrackArtistChanged)
+    Q_PROPERTY(QString currentTrackPath READ currentTrackPath NOTIFY currentTrackPathChanged)
     Q_PROPERTY(bool isPlaying READ isPlaying WRITE setIsPlaying NOTIFY isPlayingChanged)
     Q_PROPERTY(QString jsonResponse READ jsonResponse NOTIFY jsonResponseChanged)
     Q_PROPERTY(bool isFetching READ isFetching NOTIFY isFetchingChanged)
@@ -33,6 +34,7 @@ public:
     // ── Property Getters ────────────────────────────────────────────────
     QString currentTrackTitle() const;
     QString currentTrackArtist() const;
+    QString currentTrackPath() const;
     bool isPlaying() const;
     QString jsonResponse() const;
     bool isFetching() const;
@@ -69,6 +71,7 @@ public:
 signals:
     void currentTrackTitleChanged(const QString& title);
     void currentTrackArtistChanged(const QString& artist);
+    void currentTrackPathChanged(const QString& path);
     void isPlayingChanged(bool playing);
     void jsonResponseChanged(const QString& json);
     void isFetchingChanged(bool fetching);
@@ -81,6 +84,7 @@ signals:
 private:
     QString m_currentTrackTitle;
     QString m_currentTrackArtist;
+    QString m_currentTrackPath;
     bool m_isPlaying;
     QString m_jsonResponse;
     bool m_isFetching;

@@ -42,23 +42,34 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12
                 
-                // Track Artwork Placeholder
+                // Track Artwork Container
                 Rectangle {
                     width: 48
                     height: 48
                     radius: 6
                     color: "#1e1e24"
-                    
+                    border.color: "#ff2d55"
+                    border.width: 1
+                    clip: true
+                    visible: root.playerBridge.isPlaying
+
+                    // Fallback emoji icon when cover is not loaded
                     Text {
                         text: "🎵"
                         anchors.centerIn: parent
                         font.pointSize: 18
                         opacity: 0.6
+                        visible: coverImage.status !== Image.Ready
                     }
-                    
-                    border.color: "#ff2d55"
-                    border.width: 1
-                    visible: root.playerBridge.isPlaying
+
+                    Image {
+                        id: coverImage
+                        anchors.fill: parent
+                        source: root.playerBridge.currentTrackPath ? "image://covers/" + encodeURIComponent(root.playerBridge.currentTrackPath) : ""
+                        fillMode: Image.PreserveAspectCrop
+                        asynchronous: true
+                        visible: status === Image.Ready
+                    }
                 }
                 
                 // Track info text

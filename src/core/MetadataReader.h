@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QByteArray>
 #include <chrono>
 
 namespace calyx::core {
@@ -19,6 +20,7 @@ struct Metadata {
 class MetadataReader {
 public:
     static Metadata readMetadata(const QString& filePath);
+    static QByteArray readCoverArt(const QString& filePath);
 };
 
 } // namespace calyx::core

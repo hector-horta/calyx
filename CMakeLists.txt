@@ -42,6 +42,8 @@ add_subdirectory(src/network)
 # ── Main executable ──────────────────────────────────────────────────────────
 add_executable(calyx
     src/main.cpp
+    src/ui/CoverImageProvider.h
+    src/ui/CoverImageProvider.cpp
     src/ui/resources.qrc
 )
 
