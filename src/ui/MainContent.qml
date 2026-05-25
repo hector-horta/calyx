@@ -418,9 +418,8 @@ Item {
                             anchors.leftMargin: 12
                             anchors.rightMargin: 12
 
-                            Text { text: qsTr("Title"); color: "#6e6e73"; font.pointSize: 9; font.bold: true; width: parent.width * 0.4 }
-                            Text { text: qsTr("Artist"); color: "#6e6e73"; font.pointSize: 9; font.bold: true; width: parent.width * 0.25 }
-                            Text { text: qsTr("Album"); color: "#6e6e73"; font.pointSize: 9; font.bold: true; width: parent.width * 0.25 }
+                            Text { text: qsTr("Title"); color: "#6e6e73"; font.pointSize: 9; font.bold: true; width: parent.width * 0.5 }
+                            Text { text: qsTr("Artist — Album"); color: "#6e6e73"; font.pointSize: 9; font.bold: true; width: parent.width * 0.4 }
                             Text { text: qsTr("Duration"); color: "#6e6e73"; font.pointSize: 9; font.bold: true; width: parent.width * 0.1; horizontalAlignment: Text.AlignRight }
                         }
                     }
@@ -457,25 +456,16 @@ Item {
                                         color: "#ffffff"
                                         font.pointSize: 10
                                         font.bold: true
+                                        width: parent.width * 0.5
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    Text {
+                                        text: modelData.artistAlbum
+                                        color: "#8e8e93"
+                                        font.pointSize: 9.5
                                         width: parent.width * 0.4
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        text: modelData.artist
-                                        color: "#8e8e93"
-                                        font.pointSize: 9.5
-                                        width: parent.width * 0.25
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        elide: Text.ElideRight
-                                    }
-
-                                    Text {
-                                        text: modelData.album
-                                        color: "#8e8e93"
-                                        font.pointSize: 9.5
-                                        width: parent.width * 0.25
                                         anchors.verticalCenter: parent.verticalCenter
                                         elide: Text.ElideRight
                                     }

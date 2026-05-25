@@ -3,6 +3,7 @@ add_library(calyx_core STATIC
     Player.h        Player.cpp
     LibraryManager.h LibraryManager.cpp
     MusicPlayer.h   MusicPlayer.cpp
+    MetadataReader.h MetadataReader.cpp
 )
 
 target_include_directories(calyx_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..)

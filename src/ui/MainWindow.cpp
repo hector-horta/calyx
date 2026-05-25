@@ -53,10 +53,12 @@ void MainWindow::buildUi() {
     mainLayout->addLayout(searchLayout);
 
     // Track table
-    m_trackTable = new QTableWidget(0, 4, this);
-    m_trackTable->setHorizontalHeaderLabels({tr("Title"), tr("Artist"), tr("Album"), tr("Duration")});
-    m_trackTable->horizontalHeader()->setStretchLastSection(true);
+    m_trackTable = new QTableWidget(0, 3, this);
+    m_trackTable->setHorizontalHeaderLabels({tr("Title"), tr("Artist — Album"), tr("Duration")});
+    m_trackTable->horizontalHeader()->setStretchLastSection(false);
     m_trackTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    m_trackTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+    m_trackTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
     m_trackTable->setSelectionBehavior(QAbstractItemView::SelectRows);
     m_trackTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_trackTable->verticalHeader()->hide();
@@ -141,6 +143,30 @@ void MainWindow::connectSignals() {
 
     // Library events
     connect(m_library.get(), &core::LibraryManager::scanFinished, this, &MainWindow::onScanFinished);
+
+    // Player events
+    connect(m_player.get(), &core::Player::currentTrackChanged, this, [this](const core::Track& t) {
+        QString displayTitle;
+        QString displaySub;
+
+        if (t.hasMetadata) {
+            displayTitle = t.title.isEmpty() ? QFileInfo(t.filePath.toLocalFile()).completeBaseName() : t.title;
+            QStringList subParts;
+            if (!t.artist.isEmpty()) subParts << t.artist;
+            if (!t.album.isEmpty()) subParts << t.album;
+            displaySub = subParts.join(" — ");
+        } else {
+            QFileInfo fi(t.filePath.toLocalFile());
+            displayTitle = fi.completeBaseName();
+            displaySub = fi.dir().dirName();
+        }
+
+        if (displaySub.isEmpty()) {
+            m_lblNowPlaying->setText(displayTitle);
+        } else {
+            m_lblNowPlaying->setText(QString("%1\n%2").arg(displayTitle, displaySub));
+        }
+    });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -222,10 +248,25 @@ void MainWindow::populateTrackTable(const QVector<core::Track>& tracks) {
     for (const auto& t : tracks) {
         int row = m_trackTable->rowCount();
         m_trackTable->insertRow(row);
-        m_trackTable->setItem(row, 0, new QTableWidgetItem(t.title));
-        m_trackTable->setItem(row, 1, new QTableWidgetItem(t.artist));
-        m_trackTable->setItem(row, 2, new QTableWidgetItem(t.album));
-        m_trackTable->setItem(row, 3, new QTableWidgetItem(t.durationFormatted()));
+
+        QString displayTitle;
+        QString displaySub;
+
+        if (t.hasMetadata) {
+            displayTitle = t.title.isEmpty() ? QFileInfo(t.filePath.toLocalFile()).completeBaseName() : t.title;
+            QStringList subParts;
+            if (!t.artist.isEmpty()) subParts << t.artist;
+            if (!t.album.isEmpty()) subParts << t.album;
+            displaySub = subParts.join(" — ");
+        } else {
+            QFileInfo fi(t.filePath.toLocalFile());
+            displayTitle = fi.completeBaseName();
+            displaySub = fi.dir().dirName();
+        }
+
+        m_trackTable->setItem(row, 0, new QTableWidgetItem(displayTitle));
+        m_trackTable->setItem(row, 1, new QTableWidgetItem(displaySub));
+        m_trackTable->setItem(row, 2, new QTableWidgetItem(t.durationFormatted()));
     }
 }
 

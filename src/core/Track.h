@@ -18,6 +18,7 @@ struct Track {
     uint32_t    year{0};
     std::chrono::milliseconds duration{0};
     QUrl        filePath;
+    bool        hasMetadata{false};
 
     [[nodiscard]] bool isValid() const noexcept {
         return !filePath.isEmpty();

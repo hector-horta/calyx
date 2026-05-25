@@ -5,6 +5,30 @@
 #include <QDir>
 #include <QVariantMap>
 
+namespace {
+struct TrackDisplay {
+    QString title;
+    QString artistAlbum;
+};
+
+TrackDisplay getTrackDisplayDetails(const calyx::core::Track& t) {
+    QString displayTitle;
+    QString displaySub;
+    if (t.hasMetadata) {
+        displayTitle = t.title.isEmpty() ? QFileInfo(t.filePath.toLocalFile()).completeBaseName() : t.title;
+        QStringList subParts;
+        if (!t.artist.isEmpty()) subParts << t.artist;
+        if (!t.album.isEmpty()) subParts << t.album;
+        displaySub = subParts.join(" — ");
+    } else {
+        QFileInfo fi(t.filePath.toLocalFile());
+        displayTitle = fi.completeBaseName();
+        displaySub = fi.dir().dirName();
+    }
+    return {displayTitle, displaySub};
+}
+} // namespace
+
 namespace calyx::core {
 
 MusicPlayer::MusicPlayer(QObject* parent)
@@ -124,8 +148,9 @@ void MusicPlayer::next() {
     m_player->next();
     auto cur = m_player->currentTrack();
     if (cur.has_value()) {
-        setCurrentTrackTitle(cur->title);
-        setCurrentTrackArtist(cur->artist.isEmpty() ? "Local File" : cur->artist);
+        auto details = getTrackDisplayDetails(*cur);
+        setCurrentTrackTitle(details.title);
+        setCurrentTrackArtist(details.artistAlbum);
     }
 }
 
@@ -133,8 +158,9 @@ void MusicPlayer::previous() {
     m_player->previous();
     auto cur = m_player->currentTrack();
     if (cur.has_value()) {
-        setCurrentTrackTitle(cur->title);
-        setCurrentTrackArtist(cur->artist.isEmpty() ? "Local File" : cur->artist);
+        auto details = getTrackDisplayDetails(*cur);
+        setCurrentTrackTitle(details.title);
+        setCurrentTrackArtist(details.artistAlbum);
     }
 }
 
@@ -149,8 +175,9 @@ void MusicPlayer::playLocalTrack(int trackId) {
     for (const auto& t : tracks) {
         if (t.id == trackId) {
             m_player->playTrack(t);
-            setCurrentTrackTitle(t.title);
-            setCurrentTrackArtist(t.artist.isEmpty() ? "Local File" : t.artist);
+            auto details = getTrackDisplayDetails(t);
+            setCurrentTrackTitle(details.title);
+            setCurrentTrackArtist(details.artistAlbum);
             break;
         }
     }
@@ -178,8 +205,9 @@ void MusicPlayer::playAlbumTracks(const QVariantList& tracks) {
     m_player->next();
     auto cur = m_player->currentTrack();
     if (cur.has_value()) {
-        setCurrentTrackTitle(cur->title);
-        setCurrentTrackArtist(cur->artist.isEmpty() ? "Local File" : cur->artist);
+        auto details = getTrackDisplayDetails(*cur);
+        setCurrentTrackTitle(details.title);
+        setCurrentTrackArtist(details.artistAlbum);
     }
 }
 
@@ -233,9 +261,11 @@ void MusicPlayer::updateLocalTracks() {
     m_localTracks.clear();
     auto tracks = m_library->allTracks();
     for (const auto& t : tracks) {
+        auto details = getTrackDisplayDetails(t);
         QVariantMap map;
         map["id"] = static_cast<int>(t.id);
-        map["title"] = t.title;
+        map["title"] = details.title;
+        map["artistAlbum"] = details.artistAlbum;
         map["artist"] = t.artist.isEmpty() ? "Local File" : t.artist;
         map["album"] = t.album.isEmpty() ? "Unknown Album" : t.album;
         map["durationFormatted"] = t.durationFormatted();
@@ -291,9 +321,11 @@ void MusicPlayer::updateLocalAlbums() {
         
         QString key = artist + "|" + album;
         
+        auto details = getTrackDisplayDetails(t);
         QVariantMap trackMap;
         trackMap["id"] = static_cast<int>(t.id);
-        trackMap["title"] = t.title;
+        trackMap["title"] = details.title;
+        trackMap["artistAlbum"] = details.artistAlbum;
         trackMap["artist"] = artist;
         trackMap["album"] = album;
         trackMap["durationFormatted"] = t.durationFormatted();

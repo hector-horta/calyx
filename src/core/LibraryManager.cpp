@@ -2,7 +2,7 @@
 
 #include <QDirIterator>
 #include <QFileInfo>
-#include <QMediaMetaData>
+#include "core/MetadataReader.h"
 
 namespace calyx::core {
 
@@ -58,8 +58,22 @@ Track LibraryManager::trackFromFile(const QString& filePath) {
     QFileInfo fi(filePath);
     Track t;
     t.id       = m_nextId++;
-    t.title    = fi.completeBaseName();   // Fallback: filename as title
     t.filePath = QUrl::fromLocalFile(filePath);
+
+    Metadata meta = MetadataReader::readMetadata(filePath);
+    if (meta.hasMetadata) {
+        t.hasMetadata = true;
+        t.title       = meta.title;
+        t.artist      = meta.artist;
+        t.album       = meta.album;
+        t.genre       = meta.genre;
+        t.trackNumber = meta.trackNumber;
+        t.year        = meta.year;
+        t.duration    = meta.duration;
+    } else {
+        t.hasMetadata = false;
+        t.title       = fi.completeBaseName();
+    }
     return t;
 }
 
