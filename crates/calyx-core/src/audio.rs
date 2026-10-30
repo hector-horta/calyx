@@ -96,6 +96,8 @@ impl NativeAudioEngine {
                 continue;
             }
 
+            let prev_hook = std::panic::take_hook();
+            std::panic::set_hook(Box::new(|_| {}));
             let decoded_samples = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 match decoder.decode(&packet) {
                     Ok(decoded) => {
@@ -107,6 +109,8 @@ impl NativeAudioEngine {
                     Err(_) => None,
                 }
             }));
+            std::panic::set_hook(prev_hook);
+
             match decoded_samples {
                 Ok(Some((ch, rate, samples))) => {
                     channels = ch.max(1);
@@ -169,5 +173,22 @@ impl NativeAudioEngine {
             STATE_PAUSED => PlaybackStatus::Paused,
             _ => PlaybackStatus::Stopped,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_empty_audio_buffer_returns_error() {
+        let engine = NativeAudioEngine {
+            _stream: None,
+            _handle: None,
+            sink: None,
+            state: AtomicU8::new(STATE_STOPPED),
+        };
+        let res = engine.play_encoded_bytes(Vec::new());
+        assert!(res.is_err());
     }
 }
