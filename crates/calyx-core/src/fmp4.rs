@@ -70,8 +70,8 @@ pub fn decrypt_apple_fmp4_stream(
     while idx < boxes.len() {
         if &boxes[idx].box_type == b"moof" && idx + 1 < boxes.len() && &boxes[idx + 1].box_type == b"mdat" {
             let moof_slice = &stream[boxes[idx].offset..boxes[idx].offset + boxes[idx].size];
-            let (desc_index, sizes, ivs) = parse_moof_cenc_meta(moof_slice);
-            let key = if desc_index <= 1 { &DEFAULT_PREFETCH_KEY } else { track_key };
+            let (_desc_index, sizes, ivs) = parse_moof_cenc_meta(moof_slice);
+            let key = track_key;
             let mdat_start = boxes[idx + 1].payload_offset;
             let mdat_end = boxes[idx + 1].offset + boxes[idx + 1].size;
             if mdat_start < mdat_end && mdat_end <= stream.len() {
@@ -148,16 +148,20 @@ fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>) {
     let mut ivs = Vec::with_capacity(sizes.len());
     if let Some(senc) = raw_senc {
         if senc.len() >= 8 {
-            let count = u32::from_be_bytes(senc[4..8].try_into().unwrap_or([0; 4])) as usize;
+            let flags = u32::from_be_bytes([0, senc[1], senc[2], senc[3]]);
+            let has_sub = (flags & 0x02) != 0;
             let body = &senc[8..];
-            let iv_len = if count > 0 && body.len() / count >= 16 { 16 } else { 8 };
             let mut off = 0usize;
-            for _ in 0..count.min(sizes.len()) {
-                if off + iv_len > body.len() { break; }
+            for _ in 0..sizes.len() {
+                if off + 8 > body.len() { break; }
                 let mut iv = [0u8; 16];
-                iv[..iv_len].copy_from_slice(&body[off..off + iv_len]);
+                iv[..8].copy_from_slice(&body[off..off + 8]);
                 ivs.push(iv);
-                off += iv_len;
+                off += 8;
+                if has_sub && off + 2 <= body.len() {
+                    let sub_cnt = u16::from_be_bytes([body[off], body[off + 1]]) as usize;
+                    off += 2 + sub_cnt * 6;
+                }
             }
         }
     }
@@ -194,10 +198,11 @@ pub fn decrypt_fmp4_segment_in_place(
 }
 
 pub fn strip_enca_protection_atoms(buffer: &mut [u8]) {
-    if buffer.len() < 8 {
+    let limit = buffer.windows(4).position(|w| w == b"mdat").unwrap_or(buffer.len());
+    if limit < 8 {
         return;
     }
-    for i in 0..=(buffer.len() - 4) {
+    for i in 0..limit.saturating_sub(4) {
         if &buffer[i..i + 4] == b"enca" {
             buffer[i..i + 4].copy_from_slice(b"mp4a");
         } else if &buffer[i..i + 4] == b"sinf" || &buffer[i..i + 4] == b"senc" {

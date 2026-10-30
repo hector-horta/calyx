@@ -96,13 +96,27 @@ impl NativeAudioEngine {
                 continue;
             }
 
-            if let Ok(decoded) = decoder.decode(&packet) {
-                let spec = *decoded.spec();
-                channels = (spec.channels.count() as u16).max(1);
-                sample_rate = spec.rate.max(8_000);
-                let mut sample_buf = SampleBuffer::<i16>::new(decoded.capacity() as u64, spec);
-                sample_buf.copy_interleaved_ref(decoded);
-                pcm_samples.extend_from_slice(sample_buf.samples());
+            let decoded_samples = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                match decoder.decode(&packet) {
+                    Ok(decoded) => {
+                        let spec = *decoded.spec();
+                        let mut sample_buf = SampleBuffer::<i16>::new(decoded.capacity() as u64, spec);
+                        sample_buf.copy_interleaved_ref(decoded);
+                        Some((spec.channels.count() as u16, spec.rate, sample_buf.samples().to_vec()))
+                    }
+                    Err(_) => None,
+                }
+            }));
+            match decoded_samples {
+                Ok(Some((ch, rate, samples))) => {
+                    channels = ch.max(1);
+                    sample_rate = rate.max(8_000);
+                    pcm_samples.extend_from_slice(&samples);
+                }
+                Ok(None) => {}
+                Err(_) => {
+                    decoder.reset();
+                }
             }
         }
 
