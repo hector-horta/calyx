@@ -1,5 +1,7 @@
 use std::io::Cursor;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
+use std::sync::Mutex;
+use std::time::Duration;
 use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
 use symphonia::core::{
     audio::SampleBuffer,
@@ -20,8 +22,10 @@ const STATE_PAUSED: u8 = 2;
 
 pub struct NativeAudioEngine {
     _stream: Option<OutputStream>,
-    _handle: Option<OutputStreamHandle>,
-    sink: Option<Sink>,
+    handle: Option<OutputStreamHandle>,
+    sink: Mutex<Option<Sink>>,
+    volume: Mutex<f32>,
+    duration_secs: AtomicU64,
     state: AtomicU8,
 }
 
@@ -29,12 +33,12 @@ impl NativeAudioEngine {
     pub fn new() -> CalyxResult<Self> {
         match OutputStream::try_default() {
             Ok((stream, handle)) => {
-                let sink = Sink::try_new(&handle)
-                    .map_err(|e| CalyxError::Audio(format!("Failed to create audio sink: {e}")))?;
                 Ok(Self {
                     _stream: Some(stream),
-                    _handle: Some(handle),
-                    sink: Some(sink),
+                    handle: Some(handle),
+                    sink: Mutex::new(None),
+                    volume: Mutex::new(0.85),
+                    duration_secs: AtomicU64::new(0),
                     state: AtomicU8::new(STATE_STOPPED),
                 })
             }
@@ -42,8 +46,10 @@ impl NativeAudioEngine {
                 info!("Audio output device unavailable ({e}), running in headless mode");
                 Ok(Self {
                     _stream: None,
-                    _handle: None,
-                    sink: None,
+                    handle: None,
+                    sink: Mutex::new(None),
+                    volume: Mutex::new(0.85),
+                    duration_secs: AtomicU64::new(0),
                     state: AtomicU8::new(STATE_STOPPED),
                 })
             }
@@ -128,43 +134,59 @@ impl NativeAudioEngine {
             return Err(CalyxError::Audio("Decoded 0 PCM samples from stream".to_string()));
         }
 
-        if let Some(sink) = &self.sink {
-            sink.stop();
+        let dur_s = pcm_samples.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
+        self.duration_secs.store(dur_s, Ordering::Relaxed);
+
+        if let Some(handle) = &self.handle {
+            let new_sink = Sink::try_new(handle)
+                .map_err(|e| CalyxError::Audio(format!("Failed to create audio sink: {e}")))?;
+            let vol = *self.volume.lock().unwrap();
+            new_sink.set_volume(vol);
             let source = SamplesBuffer::new(channels, sample_rate, pcm_samples);
-            sink.append(source);
-            sink.play();
+            new_sink.append(source);
+            new_sink.play();
+
+            let mut guard = self.sink.lock().unwrap();
+            if let Some(old) = guard.take() {
+                old.stop();
+            }
+            *guard = Some(new_sink);
         }
+
         self.state.store(STATE_PLAYING, Ordering::Relaxed);
         Ok(())
     }
 
     pub fn toggle_pause(&self) {
         let current = self.state.load(Ordering::Relaxed);
+        let guard = self.sink.lock().unwrap();
         if current == STATE_PLAYING {
-            if let Some(sink) = &self.sink {
-                sink.pause();
-            }
+            if let Some(sink) = guard.as_ref() { sink.pause(); }
             self.state.store(STATE_PAUSED, Ordering::Relaxed);
         } else if current == STATE_PAUSED {
-            if let Some(sink) = &self.sink {
-                sink.play();
-            }
+            if let Some(sink) = guard.as_ref() { sink.play(); }
             self.state.store(STATE_PLAYING, Ordering::Relaxed);
         }
     }
 
     pub fn stop(&self) {
-        if let Some(sink) = &self.sink {
-            sink.stop();
-        }
+        if let Some(sink) = self.sink.lock().unwrap().take() { sink.stop(); }
         self.state.store(STATE_STOPPED, Ordering::Relaxed);
     }
 
     pub fn set_volume(&self, volume: f32) {
         let clamped = volume.clamp(0.0, 1.0);
-        if let Some(sink) = &self.sink {
-            sink.set_volume(clamped);
-        }
+        *self.volume.lock().unwrap() = clamped;
+        if let Some(sink) = self.sink.lock().unwrap().as_ref() { sink.set_volume(clamped); }
+    }
+
+    pub fn progress(&self) -> (Duration, Duration) {
+        let dur = Duration::from_secs(self.duration_secs.load(Ordering::Relaxed));
+        let elapsed = self.sink.lock().unwrap()
+            .as_ref()
+            .map(|s| s.get_pos())
+            .unwrap_or(Duration::ZERO);
+        (elapsed, dur)
     }
 
     pub fn status(&self) -> PlaybackStatus {
@@ -184,8 +206,10 @@ mod tests {
     fn test_empty_audio_buffer_returns_error() {
         let engine = NativeAudioEngine {
             _stream: None,
-            _handle: None,
-            sink: None,
+            handle: None,
+            sink: Mutex::new(None),
+            volume: Mutex::new(0.85),
+            duration_secs: AtomicU64::new(0),
             state: AtomicU8::new(STATE_STOPPED),
         };
         let res = engine.play_encoded_bytes(Vec::new());

@@ -116,11 +116,28 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
         app.drm_mode
     );
 
+    let (elapsed, total) = app.playback_progress();
+    let elap_s = elapsed.as_secs();
+    let tot_s = if total.as_secs() > 0 {
+        total.as_secs()
+    } else {
+        app.current_track.as_ref().map(|t| (t.duration_ms / 1000) as u64).unwrap_or(0)
+    };
+    let rem_s = tot_s.saturating_sub(elap_s);
+    let ratio = if tot_s > 0 { (elap_s as f64 / tot_s as f64).clamp(0.0, 1.0) } else { 0.0 };
+    let bar_w = 26usize;
+    let filled = (ratio * bar_w as f64) as usize;
+    let bar_str: String = (0..bar_w).map(|i| if i < filled { '━' } else if i == filled { '╸' } else { '─' }).collect();
+    let progress_line = format!(
+        "[{:02}:{:02} / {:02}:{:02} (-{:02}:{:02})] ┫{}┣ {:>3}%",
+        elap_s / 60, elap_s % 60, tot_s / 60, tot_s % 60, rem_s / 60, rem_s % 60, bar_str, (ratio * 100.0) as u8
+    );
+
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(Span::styled(now_playing, Style::default().fg(Color::Green).add_modifier(Modifier::BOLD))),
             Line::from(Span::styled(meta_line, Style::default().fg(Color::Cyan))),
-            Line::from(Span::raw("")),
+            Line::from(Span::styled(progress_line, Style::default().fg(Color::Yellow))),
             Line::from(Span::styled(&app.status_message, Style::default().fg(Color::Gray))),
         ])
         .block(Block::default()

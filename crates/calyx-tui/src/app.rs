@@ -185,16 +185,16 @@ impl TuiApp {
         }
     }
 
-    pub async fn toggle_pause(&mut self) {
-        self.audio.toggle_pause();
-    }
+    pub async fn toggle_pause(&mut self) { self.audio.toggle_pause(); }
 
     pub async fn adjust_volume(&mut self, delta: f32) {
         self.volume = (self.volume + delta).clamp(0.0, 1.0);
         self.audio.set_volume(self.volume);
     }
 
-    pub fn playback_status(&self) -> PlaybackStatus {
-        self.audio.status()
+    pub fn playback_status(&self) -> PlaybackStatus { self.audio.status() }
+
+    pub fn playback_progress(&self) -> (std::time::Duration, std::time::Duration) {
+        self.audio.progress()
     }
 }
