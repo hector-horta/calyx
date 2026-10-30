@@ -1,56 +1,35 @@
-# C++ objects and libs
-*.slo
-*.lo
-*.o
-*.a
-*.la
-*.lai
-*.so
-*.so.*
-*.dll
-*.dylib
+# Ignore Rust build artifacts
+target/
+**/*.rs.bk
 
-# Qt-es
-object_script.*.Release
-object_script.*.Debug
-*_plugin_import.cpp
-/.qmake.cache
-/.qmake.stash
-*.pro.user
-*.pro.user.*
-*.qbs.user
-*.qbs.user.*
-*.moc
-moc_*.cpp
-moc_*.h
-qrc_*.cpp
-ui_*.h
-*.qmlc
-*.jsc
-Makefile*
-*build-*
-build/
-*.qm
-*.prl
-*.qmlls.ini
+# Windows debug symbols
+*.pdb
 
-# Qt unit tests
-target_wrapper.*
+# Environment and auth files
+.env
+.*.env
+calyx_auth.json
+calyx_cache.db*
 
-# QtCreator
-*.autosave
+# Widevine secrets and certificates
+*.wvd
+*.pem
+*.key
 
-# QtCreator Qml
-*.qmlproject.user
-*.qmlproject.user.*
+# Database files
+*.db
+*.db-wal
+*.db-shm
 
-# QtCreator CMake
-CMakeLists.txt.user*
+# Project-specific directories
+GEMINI.md
+AGENTS.md
+.agents/
+code-reviews/
+scratch/
 
-# QtCreator 4.8< compilation database
-compile_commands.json
+# Node.js dependencies (if applicable)
+node_modules/
 
-# QtCreator local machine specific files for imported projects
-*creator.user*
-
-*_qmlcache.qrc
+# Tauri build artifacts
+dist/

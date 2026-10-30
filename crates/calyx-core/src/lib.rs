@@ -1,0 +1,43 @@
+//! Core library for the Calyx music player.
+
+/// Public API module.
+pub mod api;
+/// Audio processing and playback engine.
+pub mod audio;
+/// Authentication and session management.
+pub mod auth;
+/// Minimal Chrome DevTools Protocol transport.
+pub mod cdp;
+/// Database operations and catalog management.
+pub mod db;
+/// DRM-related functionality (Widevine, Cenc, etc.).
+pub mod drm;
+/// Custom error types and utilities.
+pub mod error;
+/// MP4 file format processing.
+pub mod fmp4;
+/// HLS streaming support.
+pub mod hls;
+/// Interactive zero-friction Apple Music Sign-In.
+pub mod login;
+/// Data models for tracks, playlists, and metadata.
+pub mod models;
+/// Pure-Rust Widevine L3 cryptographic primitives.
+pub mod wv_crypto;
+/// Built-in Android 9 L3 WVD device credentials.
+pub mod wvd_builtin;
+
+/// Re-exported public items from the library's modules.
+pub use api::AppleMusicClient;
+pub use audio::NativeAudioEngine;
+pub use auth::{fetch_apple_developer_token, SessionConfig};
+pub use db::CatalogStore;
+pub use drm::{CbcsDecryptor, PsshBox, WidevineDeviceL3};
+pub use error::{CalyxError, CalyxResult};
+pub use fmp4::{
+    decrypt_apple_fmp4_stream, decrypt_fmp4_segment_in_place, scan_mp4_boxes,
+    strip_enca_protection_atoms,
+};
+pub use hls::HlsStreamPlan;
+pub use login::LoginBrowserGuard;
+pub use models::{DrmMode, PlaybackStatus, Track};

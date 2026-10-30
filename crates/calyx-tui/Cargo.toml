@@ -1,0 +1,20 @@
+[package]
+name = "calyx-tui"
+version = "0.1.0"
+edition = "2024"
+authors = ["Hector Horta"]
+license = "MIT"
+
+[[bin]]
+name = "calyx"
+path = "src/main.rs"
+
+[dependencies]
+calyx-core = { path = "../calyx-core" }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+image = { workspace = true }

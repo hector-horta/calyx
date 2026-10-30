@@ -1,9 +1,0 @@
-{
-  "name": "calyx",
-  "version-string": "0.1.0",
-  "description": "Calyx — A high-performance music player for Windows and Linux",
-  "dependencies": [
-    "nlohmann-json",
-    "gtest"
-  ]
-}
