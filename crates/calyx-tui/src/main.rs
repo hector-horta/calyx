@@ -1,5 +1,6 @@
 mod app;
 mod artwork;
+mod playback;
 mod ui;
 
 use std::io;
@@ -19,27 +20,24 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    let default_panic = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = disable_raw_mode();
-        let _ = execute!(io::stdout(), LeaveAlternateScreen);
-        default_panic(info);
-    }));
-
+    let storefront = args.get(1).map(|s| s.as_str()).unwrap_or("us");
     enable_raw_mode().context("Failed to enable raw mode")?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen).context("Failed to enter alternate screen")?;
-
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = Terminal::new(backend).context("Failed to create Ratatui terminal")?;
 
-    let mut app = app::TuiApp::new("cl")?;
+    let mut app = app::TuiApp::new(storefront).context("Failed to initialize TuiApp")?;
     let res = run_event_loop(&mut terminal, &mut app).await;
-    disable_raw_mode().context("Failed to restore terminal mode")?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen).context("Failed to leave alternate screen")?;
+
+    disable_raw_mode()?;
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
-    res
+    if let Err(err) = res {
+        eprintln!("Calyx encountered an error: {err:?}");
+    }
+    Ok(())
 }
 
 async fn run_event_loop(
@@ -47,6 +45,7 @@ async fn run_event_loop(
     app: &mut app::TuiApp,
 ) -> Result<()> {
     while !app.should_quit {
+        app.check_auto_advance().await;
         terminal.draw(|f| ui::render(f, app))?;
 
         if event::poll(Duration::from_millis(50))? {
@@ -70,7 +69,13 @@ async fn run_event_loop(
                     match key_event.code {
                         KeyCode::Char('q') => app.should_quit = true,
                         KeyCode::Char('/') => app.is_editing = true,
-                        KeyCode::Char('a') => app.sync_apple_auth().await,
+                        KeyCode::Char('t') => app.sync_apple_auth().await,
+                        KeyCode::Char('a') => app.enqueue_selected_back(),
+                        KeyCode::Char('n') => app.enqueue_selected_next(),
+                        KeyCode::Char('d') => app.remove_selected_from_queue(),
+                        KeyCode::Char('s') => { app.toggle_shuffle(); },
+                        KeyCode::Char('r') => { app.toggle_repeat(); },
+                        KeyCode::Tab => app.toggle_view(),
                         KeyCode::Char('u') => {
                             app.status_message = "Abriendo ventana Apple Sign-In... Inicia sesión y la ventana se cerrará sola.".to_string();
                             terminal.draw(|f| ui::render(f, app))?;
@@ -79,7 +84,6 @@ async fn run_event_loop(
                         KeyCode::Down | KeyCode::Char('j') => app.next_track(),
                         KeyCode::Up | KeyCode::Char('k') => app.previous_track(),
                         KeyCode::Enter => {
-                            app.status_message = "Iniciando reproducción + Cover Art (Modo Híbrido)...".to_string();
                             terminal.draw(|f| ui::render(f, app))?;
                             app.play_selected().await;
                         }

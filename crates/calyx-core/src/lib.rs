@@ -22,6 +22,8 @@ pub mod hls;
 pub mod login;
 /// Data models for tracks, playlists, and metadata.
 pub mod models;
+/// Playback queue management with repeat and shuffle support.
+pub mod queue;
 /// Pure-Rust Widevine L3 cryptographic primitives.
 pub mod wv_crypto;
 /// Built-in Android 9 L3 WVD device credentials.
@@ -41,3 +43,4 @@ pub use fmp4::{
 pub use hls::HlsStreamPlan;
 pub use login::LoginBrowserGuard;
 pub use models::{DrmMode, PlaybackStatus, Track};
+pub use queue::{PlaybackQueue, RepeatMode};

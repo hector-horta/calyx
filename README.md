@@ -1,6 +1,6 @@
-# Calyx - Apple Music Client for Tauri Console UI
+# Calyx - Apple Music Native Terminal UI (TUI)
 
-**Tauri v2 + Rust (Widevine L3 CENC/CBCS Support)**
+**Cliente de consola ultra-rápido en Rust para Apple Music con soporte Widevine L3 CENC/CBCS**
 
 ---
 
@@ -8,126 +8,59 @@
 
 ### Workspace Cargo (`Cargo.toml`)
 
-```toml
-[workspace]
-resolver = "2"
-members = [
-    "crates/calyx-core",
-    "crates/calyx-tui",
-]
-
-dependencies = {
-    # Common dependencies
-    calyx-core = { path = "./crates/calyx-core" }
-}
-```
-
-### Estructura de Crates
-
 ```
 crates/
-├── calyx-core          # Lógica principal (APIs, decodificación, Widevine)
-│   ├── src/
-│   │   ├── audio.rs    # Decodificador de audio y gestión de streams
-│   │   ├── widevine.rs # Soporte para CENC/CBCS (L3)
-│   │   └── playback.rs # Control de reproducción nativo
-│   └── Cargo.toml
-└── calyx-tui           # Interfaz de consola (TUI)
-    ├── src/
-    │   ├── main.rs      # Entrada principal (Tauri + TUI)
-    │   ├── ui.rs        # Renderizado y eventos
-    │   └── controls.rs  # Manejo de teclas
-    └── Cargo.toml
+├── calyx-core          # Motor de audio nativo (Symphonia/Rodio), APIs de Apple Music, SQLite WAL, Widevine L3
+└── calyx-tui           # Interfaz de consola (Ratatui), colas de reproducción y render de Cover Art ASCII/Unicode
 ```
 
 ---
 
 ## 🚀 Instalación y Ejecución
 
-### Dependencias
-
 ```sh
 # Clonar repositorio
-git clone https://github.com/calyx-dev/calyx.git
+git clone https://github.com/hector-horta/calyx.git
 cd calyx
 
-# Instalar dependencias (Rust + Tauri)
-cargo install --workspace --features "widevine"  # Para soporte L3
-```
-
-### Ejecutar en Consola
-
-```sh
+# Compilar y ejecutar
 cargo run -p calyx-tui
 ```
-*(Usa `Ctrl+C` para detener la ejecución)*
 
 ---
 
-## 🎵 Controladores de Consola (TUI)
+## 🎵 Atajos de Teclado (TUI)
 
-| **Tecla**       | **Acción**                          |
-|-----------------|-------------------------------------|
-| `/`             | Buscar canciones                    |
-| `j`/`k`/`↑`/`↓` | Navegar lista de reproducción        |
-| `Enter`         | Reproducir canción actual           |
-| `Espacio`       | Pausar/Reanudar                     |
-| `+`/`-`         | Aumentar/Reducir volumen            |
-| `q`             | Salir del cliente                   |
+| **Tecla** | **Acción** |
+|:---:|:---|
+| `/` | **Buscar** canciones en el catálogo de Apple Music |
+| `j` / `k` o `↑` / `↓` | **Navegar** arriba/abajo en la lista activa |
+| `Enter` | **Reproducir** la canción seleccionada |
+| `Espacio` | **Pausar / Reanudar** la reproducción |
+| `a` | **Encolar al final** (*Add to queue*) |
+| `n` | **Encolar a continuación** (*Play Next*) |
+| `Tab` | **Alternar vista** entre *Catálogo* y *Cola de Reproducción* |
+| `d` | **Eliminar** la canción seleccionada de la cola (en vista Cola) |
+| `s` | **Alternar Shuffle** (Aleatorio `🔀 ON` / `OFF`) |
+| `r` | **Alternar Repeat** (Repetición `🔁 Off` ➔ `🔁 All` ➔ `🔂 One`) |
+| `+` / `-` | **Ajustar volumen** (+5% / -5%) |
+| `u` | **Login Apple Music** (Abre navegador temporal para extraer `media-user-token`) |
+| `t` | **Sincronizar Developer Token** de Apple Music |
+| `q` | **Salir** de Calyx |
 
 ---
 
-## 🧪 Pruebas
+## 🧪 Pruebas Unitarias
 
 ```sh
 # Ejecutar tests en el workspace completo
-cargo test --workspace --release
-
-# Para pruebas específicas de decodificación (ejemplo)
-cd crates/calyx-core && cargo test -p calyx-core
+cargo test
 ```
 
 ---
 
-## 🔐 Soporte para Widevine L3 CENC/CBCS
+## 🔐 Soporte de Audio y Streaming
 
-Calyx incluye soporte nativo para:
-- **Decodificación de streams cifrados** (L3).
-- **Autenticación y desbloqueo** con CBCS.
-- Integración con Tauri para manejo seguro en consola.
-
-*(Requiere configuración adicional en `tauri.conf.json` para permisos de audio.)*
-
----
-
-## 📜 Configuración Recomendada
-
-1. **Tauri Config (`tauri.conf.json`)**
-   ```json
-   {
-     "tauri": {
-       "build": {
-         "cargoArgs": ["--features", "widevine"],
-         "targetDir": "./target"
-       }
-     },
-     "appId": "com.calyx.dev",
-     "version": "0.1.0"
-   }
-   ```
-
-2. **Variables de Entorno (Opcional)**
-   ```sh
-   export CALYX_API_KEY="tu_api_key_here"  # Para autenticación en API externa
-   ```
-
----
-
-## 📌 Notas Adicionales
-
-- **Soporte Multiplataforma**: Funciona en Linux/macOS con consolas TUI (como `alacritty` o `wezterm`).
-- **Actualizaciones**: Usa `cargo update --workspace` para mantener dependencias al día.
-- **Logs**: Verifica errores en terminal o directorio de logs (`./target/debug/`).
-
----
-**Contribuciones**: Abre un *Pull Request* con mejoras en la arquitectura TUI o soporte para nuevas funciones (ej: playlist personalizable).
+- **Playback Híbrido**: Reproducción de pistas completas en streaming mediante desencriptación CBCS subsample con Widevine L3, y fallback automático a previews oficiales AAC de 30s.
+- **Renderizado de Cover Art**: Mapeo matricial de portadas en la terminal mediante bloques Unicode de medio bloque (`▀`) y paleta RGB de 24-bit.
+- **Cola en Memoria y Auto-Advance**: Reproducción secuencial ininterrumpida con cola reactiva y soporte para repetición y mezcla aleatoria.

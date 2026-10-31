@@ -195,6 +195,14 @@ impl NativeAudioEngine {
         (elapsed, dur)
     }
 
+    pub fn is_finished(&self) -> bool {
+        if self.state.load(Ordering::Relaxed) != STATE_PLAYING {
+            return false;
+        }
+        let guard = self.sink.lock().unwrap();
+        guard.as_ref().map(|s| s.empty()).unwrap_or(false)
+    }
+
     pub fn status(&self) -> PlaybackStatus {
         match self.state.load(Ordering::Relaxed) {
             STATE_PLAYING => PlaybackStatus::Playing,
