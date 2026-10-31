@@ -60,7 +60,8 @@ pub fn decrypt_apple_fmp4_stream(
     track_key: &[u8; 16],
     use_cenc: bool,
 ) -> CalyxResult<usize> {
-    if !use_cenc {
+    let is_cenc = use_cenc || stream.windows(4).any(|w| w == b"senc" || w == b"cenc");
+    if !is_cenc {
         let cbcs = CbcsDecryptor::new(*track_key, [0u8; 16]);
         return decrypt_fmp4_segment_in_place(stream, &cbcs);
     }
@@ -70,7 +71,7 @@ pub fn decrypt_apple_fmp4_stream(
     while idx < boxes.len() {
         if &boxes[idx].box_type == b"moof" && idx + 1 < boxes.len() && &boxes[idx + 1].box_type == b"mdat" {
             let moof_slice = &stream[boxes[idx].offset..boxes[idx].offset + boxes[idx].size];
-            let (_desc_index, sizes, ivs) = parse_moof_cenc_meta(moof_slice);
+            let (_desc_index, sizes, ivs, all_subs) = parse_moof_cenc_meta(moof_slice);
             let key = track_key;
             let mdat_start = boxes[idx + 1].payload_offset;
             let mdat_end = boxes[idx + 1].offset + boxes[idx + 1].size;
@@ -78,13 +79,21 @@ pub fn decrypt_apple_fmp4_stream(
                 let mdat = &mut stream[mdat_start..mdat_end];
                 let mut pos = 0usize;
                 for (s_idx, &sz) in sizes.iter().enumerate() {
-                    if sz == 0 || pos + sz > mdat.len() {
-                        break;
-                    }
+                    if sz == 0 || pos + sz > mdat.len() { break; }
+                    let sample_start = pos;
                     let iv = ivs.get(s_idx).copied().unwrap_or([0u8; 16]);
                     let mut cipher = Aes128Ctr::new(key.into(), (&iv).into());
-                    cipher.apply_keystream(&mut mdat[pos..pos + sz]);
-                    pos += sz;
+                    if let Some(subs) = all_subs.get(s_idx).filter(|s| !s.is_empty()) {
+                        let mut sub_pos = sample_start;
+                        for &(clear, prot) in subs {
+                            sub_pos += clear as usize;
+                            let p = prot as usize;
+                            if sub_pos + p <= mdat.len() { cipher.apply_keystream(&mut mdat[sub_pos..sub_pos + p]); sub_pos += p; }
+                        }
+                    } else {
+                        cipher.apply_keystream(&mut mdat[sample_start..sample_start + sz]);
+                    }
+                    pos = sample_start + sz;
                     decrypted_samples += 1;
                 }
             }
@@ -97,7 +106,7 @@ pub fn decrypt_apple_fmp4_stream(
     Ok(decrypted_samples)
 }
 
-fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>) {
+fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>, Vec<Vec<(u16, u32)>>) {
     let mut desc_index = 2u32;
     let mut default_size = 0usize;
     let mut sizes = Vec::new();
@@ -146,6 +155,7 @@ fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>) {
         }
     }
     let mut ivs = Vec::with_capacity(sizes.len());
+    let mut all_subs = Vec::with_capacity(sizes.len());
     if let Some(senc) = raw_senc {
         if senc.len() >= 8 {
             let flags = u32::from_be_bytes([0, senc[1], senc[2], senc[3]]);
@@ -158,14 +168,21 @@ fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>) {
                 iv[..8].copy_from_slice(&body[off..off + 8]);
                 ivs.push(iv);
                 off += 8;
+                let mut subs = Vec::new();
                 if has_sub && off + 2 <= body.len() {
                     let sub_cnt = u16::from_be_bytes([body[off], body[off + 1]]) as usize;
-                    off += 2 + sub_cnt * 6;
+                    off += 2;
+                    for _ in 0..sub_cnt {
+                        if off + 6 > body.len() { break; }
+                        subs.push((u16::from_be_bytes([body[off], body[off + 1]]), u32::from_be_bytes([body[off + 2], body[off + 3], body[off + 4], body[off + 5]])));
+                        off += 6;
+                    }
                 }
+                all_subs.push(subs);
             }
         }
     }
-    (desc_index, sizes, ivs)
+    (desc_index, sizes, ivs, all_subs)
 }
 
 pub fn decrypt_fmp4_segment_in_place(

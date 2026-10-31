@@ -47,19 +47,11 @@ impl TuiApp {
     }
 
     pub fn next_track(&mut self) {
-        if !self.tracks.is_empty() {
-            self.selected_index = (self.selected_index + 1) % self.tracks.len();
-        }
+        if !self.tracks.is_empty() { self.selected_index = (self.selected_index + 1) % self.tracks.len(); }
     }
 
     pub fn previous_track(&mut self) {
-        if !self.tracks.is_empty() {
-            self.selected_index = if self.selected_index == 0 {
-                self.tracks.len() - 1
-            } else {
-                self.selected_index - 1
-            };
-        }
+        if !self.tracks.is_empty() { self.selected_index = if self.selected_index == 0 { self.tracks.len() - 1 } else { self.selected_index - 1 }; }
     }
 
     pub async fn execute_search(&mut self) {
@@ -195,6 +187,11 @@ impl TuiApp {
     pub fn playback_status(&self) -> PlaybackStatus { self.audio.status() }
 
     pub fn playback_progress(&self) -> (std::time::Duration, std::time::Duration) {
-        self.audio.progress()
+        let (elapsed, pcm_dur) = self.audio.progress();
+        let total = self.current_track.as_ref()
+            .map(|t| std::time::Duration::from_millis(t.duration_ms))
+            .filter(|&d| d > std::time::Duration::ZERO)
+            .unwrap_or(pcm_dur);
+        (elapsed, total)
     }
 }

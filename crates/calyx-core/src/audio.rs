@@ -87,15 +87,21 @@ impl NativeAudioEngine {
         let mut channels: u16 = 2;
         let mut sample_rate: u32 = 44_100;
 
+        let mut consecutive_errs = 0usize;
         loop {
             let packet = match format.next_packet() {
-                Ok(p) => p,
+                Ok(p) => { consecutive_errs = 0; p }
                 Err(SymphoniaError::IoError(_)) => break,
                 Err(SymphoniaError::ResetRequired) => {
                     decoder.reset();
                     continue;
                 }
-                Err(_) => break,
+                Err(_) => {
+                    consecutive_errs += 1;
+                    if consecutive_errs > 50 { break; }
+                    decoder.reset();
+                    continue;
+                }
             };
 
             if packet.track_id() != track_id {

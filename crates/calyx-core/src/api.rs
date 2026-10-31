@@ -44,7 +44,7 @@ impl AppleMusicClient {
         }
 
         let http = Client::builder()
-            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Calyx/0.1")
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
             .build()?;
 
         Ok(Self {
@@ -185,10 +185,11 @@ impl AppleMusicClient {
         let resp = self.http.post("https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/webPlayback")
             .header("Authorization", format!("Bearer {dev_token}"))
             .header("Media-User-Token", user_token)
+            .header("Accept", "application/json, text/plain, */*")
             .header("Origin", "https://music.apple.com")
             .header("Referer", "https://music.apple.com/")
             .json(&serde_json::json!({ "salableAdamId": track_id })).send().await?;
-        let val: serde_json::Value = resp.json().await?;
+        let val = self.parse_apple_json(resp, "webPlayback").await?;
         let song = val.pointer("/songList/0").ok_or_else(|| CalyxError::Drm("webPlayback sin activos".to_string()))?;
         let ctrp_url = song.get("assets").and_then(|v| v.as_array()).and_then(|arr| {
             arr.iter().find(|a| a.get("flavor").and_then(|f| f.as_str()) == Some("28:ctrp256"))
@@ -212,12 +213,26 @@ impl AppleMusicClient {
         let resp = self.http.post(license_url)
             .header("Authorization", format!("Bearer {dev_token}"))
             .header("Media-User-Token", user_token)
+            .header("Accept", "application/json, text/plain, */*")
             .header("Origin", "https://music.apple.com")
             .header("Referer", "https://music.apple.com/")
             .json(&body).send().await?;
-        let val: serde_json::Value = resp.json().await?;
+        let val = self.parse_apple_json(resp, "acquireLicense").await?;
         val.get("license").and_then(|v| v.as_str()).map(|s| s.to_string())
             .ok_or_else(|| CalyxError::Drm("Licencia Widevine rechazada o vacía".to_string()))
+    }
+
+    async fn parse_apple_json(&self, resp: reqwest::Response, endpoint: &str) -> CalyxResult<serde_json::Value> {
+        let status = resp.status();
+        let text = resp.text().await?;
+        if !status.is_success() {
+            if status.as_u16() == 401 || status.as_u16() == 403 {
+                return Err(CalyxError::Auth(format!("Sesión Apple expirada (HTTP {status}). Presiona 'u' para login.")));
+            }
+            return Err(CalyxError::Drm(format!("Apple {endpoint} HTTP {status}: {text}")));
+        }
+        let val: serde_json::Value = serde_json::from_str(&text)?;
+        Ok(val)
     }
 
     async fn verify_user_storefront(&self, dev_token: &str, user_token: &str) -> Option<String> {
@@ -279,8 +294,6 @@ mod tests {
     #[tokio::test]
     async fn test_rejects_empty_search_term() {
         let client = AppleMusicClient::new("cl").expect("client");
-        let res = client.search_catalog("   ", 10).await;
-        assert!(res.is_err());
+        assert!(client.search_catalog("   ", 10).await.is_err());
     }
-
 }
