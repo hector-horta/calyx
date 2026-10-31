@@ -10,6 +10,7 @@ pub const ART_HEIGHT_PIXELS: usize = 20;
 #[derive(Debug, Clone)]
 pub struct TerminalCoverArt {
     pub grid: Vec<Vec<(u8, u8, u8)>>,
+    #[allow(dead_code)]
     pub is_real_image: bool,
 }
 

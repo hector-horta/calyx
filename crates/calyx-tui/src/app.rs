@@ -2,6 +2,7 @@ use calyx_core::{
     AppleMusicClient, CalyxResult, CatalogStore, DrmMode, NativeAudioEngine,
     PlaybackStatus, SessionConfig, Track,
 };
+use ratatui::widgets::ListState;
 use crate::artwork::TerminalCoverArt;
 
 pub struct TuiApp {
@@ -9,9 +10,11 @@ pub struct TuiApp {
     pub is_editing: bool,
     pub tracks: Vec<Track>,
     pub selected_index: usize,
+    pub list_state: ListState,
     pub current_track: Option<Track>,
     pub current_artwork: Option<TerminalCoverArt>,
     pub status_message: String,
+    #[allow(dead_code)]
     pub drm_mode: DrmMode,
     pub session: SessionConfig,
     pub volume: f32,
@@ -28,14 +31,17 @@ impl TuiApp {
         client.set_tokens(session.developer_token.clone(), session.media_user_token.clone());
         let store = CatalogStore::open_path("calyx_cache.db")?;
         let cached = store.search_tracks("", 50).unwrap_or_default();
+        let mut list_state = ListState::default();
+        list_state.select(Some(0));
         Ok(Self {
             search_input: String::with_capacity(1024),
             is_editing: false,
             tracks: cached,
             selected_index: 0,
+            list_state,
             current_track: None,
             current_artwork: None,
-            status_message: "Listo. '/' buscar | 'Enter' reproducir | 'a' DevToken | 'u' Login Apple ID | 'Space' pausa | 'q' salir.".to_string(),
+            status_message: "Listo. '/' Buscar │ '↑/↓' o 'j/k' Navegar │ 'Enter' Reproducir │ 'Espacio' Pausa │ 'u' Login Apple │ 'q' Salir".to_string(),
             drm_mode: DrmMode::WidevineL3Cbcs,
             session,
             volume: 0.85,
@@ -47,11 +53,17 @@ impl TuiApp {
     }
 
     pub fn next_track(&mut self) {
-        if !self.tracks.is_empty() { self.selected_index = (self.selected_index + 1) % self.tracks.len(); }
+        if !self.tracks.is_empty() {
+            self.selected_index = (self.selected_index + 1) % self.tracks.len();
+            self.list_state.select(Some(self.selected_index));
+        }
     }
 
     pub fn previous_track(&mut self) {
-        if !self.tracks.is_empty() { self.selected_index = if self.selected_index == 0 { self.tracks.len() - 1 } else { self.selected_index - 1 }; }
+        if !self.tracks.is_empty() {
+            self.selected_index = if self.selected_index == 0 { self.tracks.len() - 1 } else { self.selected_index - 1 };
+            self.list_state.select(Some(self.selected_index));
+        }
     }
 
     pub async fn execute_search(&mut self) {
@@ -68,15 +80,14 @@ impl TuiApp {
                 self.status_message = format!("{} pistas encontradas y cacheadas en SQLite WAL.", results.len());
                 self.tracks = results;
                 self.selected_index = 0;
+                self.list_state.select(Some(0));
             }
             Err(e) => self.status_message = format!("Error de búsqueda: {}", e),
         }
     }
 
     pub async fn play_selected(&mut self) {
-        let Some(mut track) = self.tracks.get(self.selected_index).cloned() else {
-            return;
-        };
+        let Some(mut track) = self.tracks.get(self.selected_index).cloned() else { return; };
         if track.artwork_url.is_none() {
             if let Some(resolved_url) = self.client.resolve_artwork_url(&track).await {
                 track.artwork_url = Some(resolved_url);
@@ -102,12 +113,7 @@ impl TuiApp {
                         Ok(full_bytes) => match self.audio.play_encoded_bytes(full_bytes) {
                             Ok(()) => {
                                 self.audio.set_volume(self.volume);
-                                self.status_message = format!(
-                                    "Reproduciendo PISTA COMPLETA ({}) — {} - {} [100% Nativo Rust + .wvd L3]",
-                                    track.formatted_duration(),
-                                    track.artist,
-                                    track.title
-                                );
+                                self.status_message = String::new();
                                 self.current_track = Some(track);
                                 return;
                             }
@@ -131,10 +137,10 @@ impl TuiApp {
                 Ok(()) => {
                     self.audio.set_volume(self.volume);
                     let hint = match drm_note {
-                        Some(note) => format!("[Preview 30s Nativo | {note}]"),
+                        Some(note) => format!("[Preview 30s | {note}]"),
                         None => "[Preview 30s — Presiona 'u' para Login Apple]".to_string(),
                     };
-                    self.status_message = format!("Reproduciendo: {} — {} {hint}", track.artist, track.title);
+                    self.status_message = hint;
                     self.current_track = Some(track);
                 }
                 Err(e) => self.status_message = format!("Error de audio: {}", e),
@@ -178,7 +184,6 @@ impl TuiApp {
     }
 
     pub async fn toggle_pause(&mut self) { self.audio.toggle_pause(); }
-
     pub async fn adjust_volume(&mut self, delta: f32) {
         self.volume = (self.volume + delta).clamp(0.0, 1.0);
         self.audio.set_volume(self.volume);
@@ -187,11 +192,8 @@ impl TuiApp {
     pub fn playback_status(&self) -> PlaybackStatus { self.audio.status() }
 
     pub fn playback_progress(&self) -> (std::time::Duration, std::time::Duration) {
-        let (elapsed, pcm_dur) = self.audio.progress();
-        let total = self.current_track.as_ref()
-            .map(|t| std::time::Duration::from_millis(t.duration_ms))
-            .filter(|&d| d > std::time::Duration::ZERO)
-            .unwrap_or(pcm_dur);
-        (elapsed, total)
+        let (elap, pcm) = self.audio.progress();
+        let tot = self.current_track.as_ref().map(|t| std::time::Duration::from_millis(t.duration_ms)).filter(|&d| d > std::time::Duration::ZERO).unwrap_or(pcm);
+        (elap, tot)
     }
 }
