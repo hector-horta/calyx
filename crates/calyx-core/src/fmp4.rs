@@ -223,33 +223,6 @@ pub fn strip_enca_protection_atoms(buffer: &mut [u8]) {
     }
 }
 
-pub fn extract_progressive_fmp4_batch(buffer: &mut Vec<u8>, init: &mut Vec<u8>, min_pairs: usize, key: &[u8; 16], is_cenc: bool) -> Option<Vec<u8>> {
-    if init.is_empty() {
-        let boxes = scan_mp4_boxes(buffer);
-        if let Some(moof) = boxes.iter().find(|b| &b.box_type == b"moof") {
-            if moof.offset > 0 { init.extend_from_slice(&buffer[..moof.offset]); buffer.drain(..moof.offset); }
-        } else { return None; }
-    }
-    let boxes = scan_mp4_boxes(buffer);
-    let (mut pairs, mut cut_end, mut i) = (0usize, 0usize, 0usize);
-    while i + 1 < boxes.len() {
-        if &boxes[i].box_type == b"moof" && &boxes[i + 1].box_type == b"mdat" {
-            let mdat = &boxes[i + 1];
-            if u32::from_be_bytes(buffer[mdat.offset..mdat.offset + 4].try_into().unwrap_or([0; 4])) != 0 {
-                pairs += 1; cut_end = mdat.offset + mdat.size;
-            }
-            i += 2;
-        } else { i += 1; }
-    }
-    if pairs >= min_pairs && cut_end > 0 {
-        let mut out = Vec::with_capacity(init.len() + cut_end);
-        out.extend_from_slice(init); out.extend_from_slice(&buffer[..cut_end]); buffer.drain(..cut_end);
-        let _ = decrypt_apple_fmp4_stream(&mut out, key, is_cenc);
-        return Some(out);
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

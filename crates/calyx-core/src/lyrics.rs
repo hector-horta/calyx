@@ -33,7 +33,11 @@ pub fn parse_lrc(raw: &str) -> Vec<LyricLine> {
 pub async fn fetch_track_lyrics(http: &Client, title: &str, artist: &str) -> Vec<LyricLine> {
     let clean_title = title.split(['(', '[']).next().unwrap_or(title).trim();
     let q = format!("{artist} {clean_title}");
-    if let Ok(resp) = http.get("https://lrclib.net/api/search").query(&[("q", &q)]).send().await {
+    if let Ok(resp) = http.get("https://lrclib.net/api/search")
+        .query(&[("q", &q)])
+        .timeout(std::time::Duration::from_secs(4))
+        .send().await
+    {
         if let Ok(val) = resp.json::<Value>().await {
             if let Some(arr) = val.as_array() {
                 // First pass: check syncedLyrics

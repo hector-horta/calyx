@@ -52,53 +52,74 @@ pub async fn play_track(&mut self, mut track: Track) {
 
     let (client, session, tx) = (self.client.clone(), self.session.clone(), self.bg_tx.clone());
     self.play_task = Some(tokio::spawn(async move {
-        let clean_title = track.title.split(['(', '[']).next().unwrap_or(&track.title).trim();
-        let q = format!("{} {}", track.artist, clean_title);
         let mut candidates = vec![orig_id.clone()];
         if let Some(lib_id) = track.hls_manifest_url.clone().filter(|id| !candidates.contains(id)) {
             candidates.push(lib_id);
         }
-        if let Ok(found) = client.search_catalog(&q, 5).await {
-            for cat in found {
-                if track.preview_url.is_none() { track.preview_url = cat.preview_url; }
-                if track.artwork_url.is_none() { track.artwork_url = cat.artwork_url; }
-                if !candidates.contains(&cat.id) { candidates.push(cat.id); }
+        if orig_id.starts_with("i.") || track.preview_url.is_none() || track.artwork_url.is_none() {
+            let clean_title = track.title.split(['(', '[']).next().unwrap_or(&track.title).trim();
+            if let Ok(found) = client.search_catalog(&format!("{} {}", track.artist, clean_title), 2).await {
+                for cat in found {
+                    if track.preview_url.is_none() { track.preview_url = cat.preview_url; }
+                    if track.artwork_url.is_none() { track.artwork_url = cat.artwork_url; }
+                    if candidates.len() < 2 && !candidates.contains(&cat.id) { candidates.push(cat.id); }
+                }
             }
         }
         let mut sent = false;
         let mut drm_note: Option<String> = None;
 
-        // Pre-fetch artwork and lyrics
-        if let Some(art_url) = track.artwork_url.as_deref() {
-            if let Ok(ab) = client.fetch_stream_bytes(art_url).await {
-                let _ = tx.send(BgEvent::ArtworkReady(track.id.clone(), TerminalCoverArt::from_jpeg_or_seed(Some(&ab), &seed)));
-            }
+        if let Some(art_url) = track.artwork_url.clone() {
+            let (c2, tx2, tid2, s2) = (client.clone(), tx.clone(), track.id.clone(), seed.clone());
+            tokio::spawn(async move {
+                if let Ok(ab) = c2.fetch_stream_bytes(&art_url).await {
+                    let _ = tx2.send(BgEvent::ArtworkReady(tid2, TerminalCoverArt::from_jpeg_or_seed(Some(&ab), &s2)));
+                }
+            });
         }
 
-        let lyrics = calyx_core::fetch_track_lyrics(client.http(), &track.title, &track.artist).await;
-
-if session.has_full_stream_credentials() {
-    match session.load_wvd_device() {
-        Ok(wvd) => {
-            let hint_ok = format!("Widevine L3 Activo: {} — {}", track.artist, track.title);
-            for cid in &candidates {
-                if let Err(e) = client.fetch_full_track_stream(cid, &wvd).await {
-                    drm_note = Some(e.to_string());
-                    continue;
-                }
-                match client.fetch_full_track_stream(cid, &wvd).await {
-                    Ok(full_bytes) => {
-                        sent = true;
-                        let _ = tx.send(BgEvent::AudioReady(track.clone(), Ok(full_bytes), lyrics.clone(), hint_ok.clone()));
-                        break;
-                    },
-                    Err(e) => drm_note = Some(e.to_string()),
+        let lyrics_fut = calyx_core::fetch_track_lyrics(client.http(), &track.title, &track.artist);
+        let wvd_fut = async {
+            let mut local_note: Option<String> = None;
+            if session.has_full_stream_credentials() {
+                match session.load_wvd_device() {
+                    Ok(wvd) => {
+                        let hint_ok = format!("Widevine L3 Activo: {} — {}", track.artist, track.title);
+                        for cid in &candidates {
+                            match client.fetch_full_track_stream(cid, &wvd).await {
+                                Ok(full_bytes) => return Ok((full_bytes, hint_ok)),
+                                Err(e) => local_note = Some(e.to_string()),
+                            }
+                        }
+                        let clean_title = track.title.split(['(', '[']).next().unwrap_or(&track.title).trim();
+                        let q = format!("{} {}", track.artist, clean_title);
+                        if let Ok(found) = client.search_catalog(&q, 4).await {
+                            for cat in found {
+                                if !candidates.contains(&cat.id) {
+                                    match client.fetch_full_track_stream(&cat.id, &wvd).await {
+                                        Ok(full_bytes) => return Ok((full_bytes, hint_ok)),
+                                        Err(e) => local_note = Some(e.to_string()),
+                                    }
+                                }
+                            }
+                        } else {
+                            local_note = Some("No results found in catalog search".to_string());
+                        }
+                    }
+                    Err(_) => local_note = Some("Falta device.wvd L3 en carpeta".to_string()),
                 }
             }
-        },
-        Err(_) => drm_note = Some("Falta device.wvd L3 en carpeta".to_string()),
-    }
-}
+            Err(local_note)
+        };
+
+        let (wvd_res, lyrics) = tokio::join!(wvd_fut, lyrics_fut);
+        match wvd_res {
+            Ok((full_bytes, hint_ok)) => {
+                sent = true;
+                let _ = tx.send(BgEvent::AudioReady(track.clone(), Ok(full_bytes), lyrics.clone(), hint_ok));
+            }
+            Err(note) => drm_note = note,
+        }
 
 if !sent {
     match track.preview_url.as_deref() {
@@ -120,48 +141,50 @@ if !sent {
     }));
 }
 
-pub async fn play_selected(&mut self) -> () {
-    match self.active_view {
-        crate::app::ActiveView::Playlists => {
-            if let Some(pl) = self.playlists.get(self.playlist_state.selected().unwrap_or(0)).cloned() {
-                let dev_tok = self.session.developer_token.as_deref().unwrap_or("");
-                let user_tok = self.session.media_user_token.as_deref().unwrap_or("");
-                match calyx_core::fetch_playlist_tracks(self.client.http(), dev_tok, user_tok, &pl.id, &self.session.storefront).await {
-                    Ok(tracks) => {
-                        self.tracks = tracks;
-                        self.selected_index = 0;
-                        self.list_state.select(Some(0));
-                        self.active_view = crate::app::ActiveView::Library;
-                        self.status_message = format!("Playlist '{}' cargada ({} canciones). Presiona 'p' para reproducir toda.", pl.name, self.tracks.len());
-                    }
-                    Err(e) => self.status_message = format!("Error cargando playlist '{}': {e}", pl.name),
+pub async fn play_selected(&mut self) {
+    let (dev, usr) = (
+        self.session.developer_token.as_deref().unwrap_or(""),
+        self.session.media_user_token.as_deref().unwrap_or("")
+    );
+
+    if self.active_view == crate::app::ActiveView::Playlists {
+        if let Some(pl) = self.playlists.get(self.playlist_state.selected().unwrap_or(0)).cloned() {
+            match calyx_core::fetch_playlist_tracks(
+                self.client.http(),
+                dev,
+                usr,
+                &pl.id,
+                &self.session.storefront
+            ).await {
+                Ok(t) => {
+                    self.tracks = t;
+                    self.selected_index = 0;
+                    self.list_state.select(Some(0));
+                    self.active_view = crate::app::ActiveView::Library;
+                    self.status_message = format!("Playlist '{}' cargada ({} canciones). Presiona 'p' para reproducir toda.", pl.name, self.tracks.len());
                 }
-            }
-        },
-        _ => {
-            if let Some(track) = self.selected_track() {
-                self.play_track(track).await;
+                Err(e) => self.status_message = format!("Error cargando playlist '{}': {e}", pl.name),
             }
         }
+    } else if let Some(track) = self.selected_track() {
+        self.play_track(track).await;
     }
 }
 
-    pub async fn play_next(&mut self) {
-        if let Some(next) = self.queue.next_track(self.current_track.clone()) {
-            self.play_track(next).await;
-        }
+pub async fn play_next(&mut self) {
+    if let Some(next) = self.queue.next_track(self.current_track.clone()) {
+        self.play_track(next).await;
     }
+}
 
-    pub async fn play_previous(&mut self) {
-        if let Some(prev) = self.queue.previous_track(self.current_track.clone()) {
-            self.play_track(prev).await;
-        }
+pub async fn play_previous(&mut self) {
+    if let Some(prev) = self.queue.previous_track(self.current_track.clone()) {
+        self.play_track(prev).await;
     }
+}
 
 pub async fn check_auto_advance(&mut self) {
-    if self.audio.is_finished() {
-        self.play_next().await;
-    }
+    if self.audio.is_finished() { self.play_next().await; }
 }
 
     pub async fn play_all(&mut self) {

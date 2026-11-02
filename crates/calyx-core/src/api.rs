@@ -46,6 +46,8 @@ impl AppleMusicClient {
 
         let http = Client::builder()
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
+            .connect_timeout(std::time::Duration::from_secs(6))
+            .timeout(std::time::Duration::from_secs(18))
             .build()?;
 
         Ok(Self {
@@ -218,7 +220,10 @@ async fn resolve_webplay_manifest(&self, track_id: &str, dev_token: &str, user_t
         .json(&payload).send().await?;
 
     let val = self.parse_apple_json(resp, "webPlayback").await?;
-    let song = val.pointer("/songList/0").ok_or_else(|| CalyxError::Drm("webPlayback sin activos".to_string()))?;
+    let song = val.pointer("/songList/0").ok_or_else(|| {
+        let detail = val.get("customerMessage").or_else(|| val.get("failureType")).and_then(|v| v.as_str()).unwrap_or("sin activos");
+        CalyxError::Drm(format!("webPlayback: {detail}"))
+    })?;
     let ctrp_url = song.get("assets").and_then(|v| v.as_array()).and_then(|arr| {
         arr.iter().find(|a| a.get("flavor").and_then(|f| f.as_str()) == Some("28:ctrp256"))
             .or_else(|| arr.iter().find(|a| a.get("flavor").and_then(|f| f.as_str()) == Some("32:ctrp64")))

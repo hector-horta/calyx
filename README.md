@@ -57,8 +57,8 @@ cargo run -p calyx-tui
 
 ## 🔐 Soporte de Audio y Streaming
 
-- **Buffer Progresivo fMP4 (Gapless Streaming)**: Inicio de reproducción tras los primeros 2 fragmentos `moof + mdat` (~160 KB) con encolado en segundo plano (`rodio::Sink::append`) y desencriptación Widevine L3 CENC/CBCS al vuelo.
-- **Resolución Multi-Candidato (`amp-api` + `universalLibraryId`)**: Soporte nativo para canciones de Biblioteca/Playlists (`i.xxxx`) y fallback automático en el catálogo de streaming de Apple Music.
-- **Letras Sincronizadas en Vivo (`🎤 Letra en Vivo`)**: Panel lateral tipo karaoke con parser `.lrc`, auto-scroll y resaltado en tiempo real mediante reloj monotónico.
-- **Pipeline Asíncrono No Bloqueante**: Descarga de audio, portadas TrueColor (`▀`) y letras en hilos dedicados (`tokio::spawn` + canal `BgEvent`) manteniendo la TUI a 60 FPS.
+- **Streaming Completo fMP4 Widevine L3 (`cbcs` / `cenc`)**: Descarga y desencriptación en memoria de pistas completas AAC-LC 256kbps (`28:ctrp256`), preservando los punteros `sidx` y `tfhd.base_data_offset` para decodificación continua en `Symphonia` + `Rodio`.
+- **Relinking Oficial de Catálogo (`?include=catalog` estilo Cider)**: Sincronización de Biblioteca y Playlists resolviendo el `salableAdamId` activo en tu *storefront*, con fallback automático contra `amp-api.music.apple.com` y `universalLibraryId` (`i.xxxx`).
+- **Paquete Unificado Audio + Letra (`tokio::join!`)**: Descarga concurrente del stream de audio y letras sincronizadas (`.lrc`) con timeouts de red estrictos, entregados en un único evento atómico (`BgEvent::AudioReady`) junto al render asíncrono de portadas TrueColor (`▀`).
+- **Letras Sincronizadas en Vivo (`🎤 Letra en Vivo`)**: Panel lateral tipo karaoke con auto-scroll y resaltado en tiempo real guiado por reloj monotónico (`Instant`).
 

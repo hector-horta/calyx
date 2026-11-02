@@ -14,9 +14,12 @@ pub fn parse_library_songs_json(raw_json: &str, storefront: &str) -> CalyxResult
     let mut tracks = Vec::with_capacity(items.len());
     for item in items {
         let id_str = item
-            .pointer("/attributes/playParams/catalogId")
+            .pointer("/relationships/catalog/data/0/attributes/playParams/id")
+            .or_else(|| item.pointer("/relationships/catalog/data/0/id"))
+            .or_else(|| item.pointer("/attributes/playParams/catalogId"))
             .and_then(|v| v.as_str().map(String::from).or_else(|| v.as_u64().map(|n| n.to_string())))
             .or_else(|| item.pointer("/attributes/playParams/purchasedId").and_then(|v| v.as_str().map(String::from)))
+            .or_else(|| item.pointer("/attributes/playParams/id").and_then(|v| v.as_str().map(String::from)))
             .or_else(|| item.get("id").and_then(|v| v.as_str().map(String::from)))
             .ok_or_else(|| CalyxError::Validation("Missing track ID".into()))?;
 
@@ -41,6 +44,7 @@ pub fn parse_library_songs_json(raw_json: &str, storefront: &str) -> CalyxResult
             .map(|u| u.replace("{w}", "200").replace("{h}", "200"));
 
         let preview_url = item.pointer("/attributes/previews/0/url")
+            .or_else(|| item.pointer("/relationships/catalog/data/0/attributes/previews/0/url"))
             .and_then(|v| v.as_str())
             .map(String::from);
 
@@ -78,7 +82,7 @@ pub async fn fetch_user_library_songs(
     }
 
     let url = format!(
-        "https://amp-api.music.apple.com/v1/me/library/songs?limit={}",
+        "https://amp-api.music.apple.com/v1/me/library/songs?include=catalog&limit={}",
         limit.clamp(1, 100)
     );
 
@@ -148,7 +152,7 @@ pub async fn fetch_playlist_tracks(
     playlist_id: &str,
     storefront: &str,
 ) -> CalyxResult<Vec<Track>> {
-    let url = format!("https://amp-api.music.apple.com/v1/me/library/playlists/{playlist_id}/tracks");
+    let url = format!("https://amp-api.music.apple.com/v1/me/library/playlists/{playlist_id}/tracks?include=catalog");
     let resp = http.get(&url)
         .header("Authorization", format!("Bearer {dev_token}"))
         .header("Media-User-Token", user_token)
