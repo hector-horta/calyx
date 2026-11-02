@@ -43,6 +43,16 @@ impl CatalogStore {
         Ok(())
     }
 
+    pub fn delete_track(&self, id: &str) -> CalyxResult<()> {
+        self.conn.execute("DELETE FROM tracks WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn clear_all_tracks(&self) -> CalyxResult<()> {
+        self.conn.execute("DELETE FROM tracks", [])?;
+        Ok(())
+    }
+
     pub fn upsert_track(&self, track: &Track) -> CalyxResult<()> {
         track.validate()?;
         self.conn.execute(

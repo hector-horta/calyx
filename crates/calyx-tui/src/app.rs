@@ -1,14 +1,19 @@
 use calyx_core::{
     AppleMusicClient, CalyxResult, CatalogStore, DrmMode, NativeAudioEngine,
-    PlaybackQueue, PlaybackStatus, RepeatMode, SessionConfig, Track,
+    PlaybackQueue, PlaybackStatus, RepeatMode, SessionConfig, Track, UserPlaylist,
 };
 use ratatui::widgets::ListState;
 use crate::artwork::TerminalCoverArt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveView {
-    Catalog,
+    Home,
+    New,
+    Radio,
+    Library,
+    Playlists,
     Queue,
+    Help,
 }
 
 pub struct TuiApp {
@@ -19,9 +24,12 @@ pub struct TuiApp {
     pub list_state: ListState,
     pub queue: PlaybackQueue,
     pub queue_state: ListState,
+    pub playlists: Vec<UserPlaylist>,
+    pub playlist_state: ListState,
     pub active_view: ActiveView,
     pub current_track: Option<Track>,
     pub current_artwork: Option<TerminalCoverArt>,
+    pub current_lyrics: Vec<calyx_core::LyricLine>,
     pub status_message: String,
     #[allow(dead_code)]
     pub drm_mode: DrmMode,
@@ -31,6 +39,9 @@ pub struct TuiApp {
     pub(crate) client: AppleMusicClient,
     pub(crate) store: CatalogStore,
     pub(crate) audio: NativeAudioEngine,
+    pub(crate) bg_tx: tokio::sync::mpsc::UnboundedSender<crate::playback::BgEvent>,
+    pub(crate) bg_rx: tokio::sync::mpsc::UnboundedReceiver<crate::playback::BgEvent>,
+    pub(crate) play_task: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl TuiApp {
@@ -44,19 +55,23 @@ impl TuiApp {
         list_state.select(Some(0));
         let mut queue_state = ListState::default();
         queue_state.select(Some(0));
+        let (bg_tx, bg_rx) = tokio::sync::mpsc::unbounded_channel();
 
         Ok(Self {
             search_input: String::with_capacity(1024),
             is_editing: false,
             tracks: cached,
             selected_index: 0,
+            playlists: Vec::new(),
+            playlist_state: ListState::default(),
             list_state,
             queue: PlaybackQueue::new(),
             queue_state,
-            active_view: ActiveView::Catalog,
+            active_view: ActiveView::Home,
             current_track: None,
             current_artwork: None,
-            status_message: "Listo. '/' Buscar │ 'a' Encolar │ 'n' Siguiente │ 'Tab' Ver Cola │ 'Espacio' Pausa".to_string(),
+            current_lyrics: Vec::new(),
+            status_message: "Listo. [1-5 - Navegar] ─── [/ - Buscar] ─── [? - Ayuda] ─── [Tab - Ver Cola]".to_string(),
             drm_mode: DrmMode::WidevineL3Cbcs,
             session,
             volume: 0.85,
@@ -64,62 +79,58 @@ impl TuiApp {
             client,
             store,
             audio: NativeAudioEngine::new()?,
+            bg_tx,
+            bg_rx,
+            play_task: None,
         })
     }
 
-    pub fn selected_track(&self) -> Option<Track> {
-        match self.active_view {
-            ActiveView::Catalog => self.tracks.get(self.selected_index).cloned(),
-            ActiveView::Queue => {
-                let idx = self.queue_state.selected().unwrap_or(0);
-                self.queue.upcoming().get(idx).cloned()
-            }
-        }
+pub fn selected_track(&self) -> Option<Track> {
+    match self.active_view {
+        ActiveView::Help | ActiveView::Playlists => None,
+        ActiveView::Queue => self.queue.upcoming().get(self.queue_state.selected().unwrap_or(0)).cloned(),
+        _ => self.tracks.get(self.selected_index).cloned(),
     }
+}
 
     pub fn next_track(&mut self) {
         match self.active_view {
-            ActiveView::Catalog => {
-                if !self.tracks.is_empty() {
-                    self.selected_index = (self.selected_index + 1) % self.tracks.len();
-                    self.list_state.select(Some(self.selected_index));
-                }
-            }
-            ActiveView::Queue => {
-                let len = self.queue.len();
-                if len > 0 {
-                    let cur = self.queue_state.selected().unwrap_or(0);
-                    let next = (cur + 1) % len;
-                    self.queue_state.select(Some(next));
-                }
-            }
+            ActiveView::Help => {}
+            ActiveView::Playlists => if !self.playlists.is_empty() {
+                let next = (self.playlist_state.selected().unwrap_or(0) + 1) % self.playlists.len();
+                self.playlist_state.select(Some(next));
+            },
+            ActiveView::Queue => if !self.queue.is_empty() {
+                let next = (self.queue_state.selected().unwrap_or(0) + 1) % self.queue.len();
+                self.queue_state.select(Some(next));
+            },
+            _ => if !self.tracks.is_empty() {
+                self.selected_index = (self.selected_index + 1) % self.tracks.len();
+                self.list_state.select(Some(self.selected_index));
+            },
         }
     }
 
     pub fn previous_track(&mut self) {
         match self.active_view {
-            ActiveView::Catalog => {
-                if !self.tracks.is_empty() {
-                    self.selected_index = if self.selected_index == 0 { self.tracks.len() - 1 } else { self.selected_index - 1 };
-                    self.list_state.select(Some(self.selected_index));
-                }
-            }
-            ActiveView::Queue => {
-                let len = self.queue.len();
-                if len > 0 {
-                    let cur = self.queue_state.selected().unwrap_or(0);
-                    let prev = if cur == 0 { len - 1 } else { cur - 1 };
-                    self.queue_state.select(Some(prev));
-                }
-            }
+            ActiveView::Help => {}
+            ActiveView::Playlists => if !self.playlists.is_empty() {
+                let cur = self.playlist_state.selected().unwrap_or(0);
+                self.playlist_state.select(Some(if cur == 0 { self.playlists.len() - 1 } else { cur - 1 }));
+            },
+            ActiveView::Queue => if !self.queue.is_empty() {
+                let cur = self.queue_state.selected().unwrap_or(0);
+                self.queue_state.select(Some(if cur == 0 { self.queue.len() - 1 } else { cur - 1 }));
+            },
+            _ => if !self.tracks.is_empty() {
+                self.selected_index = if self.selected_index == 0 { self.tracks.len() - 1 } else { self.selected_index - 1 };
+                self.list_state.select(Some(self.selected_index));
+            },
         }
     }
 
     pub fn toggle_view(&mut self) {
-        self.active_view = match self.active_view {
-            ActiveView::Catalog => ActiveView::Queue,
-            ActiveView::Queue => ActiveView::Catalog,
-        };
+        self.active_view = if self.active_view == ActiveView::Queue { ActiveView::Home } else { ActiveView::Queue };
     }
 
     pub fn enqueue_selected_back(&mut self) {
@@ -148,6 +159,31 @@ impl TuiApp {
                     }
                 }
             }
+        } else if self.active_view == ActiveView::Home && !self.tracks.is_empty() {
+            let removed = self.tracks.remove(self.selected_index);
+            let _ = self.store.delete_track(&removed.id);
+            if self.tracks.is_empty() {
+                self.selected_index = 0;
+                self.list_state.select(None);
+            } else if self.selected_index >= self.tracks.len() {
+                self.selected_index = self.tracks.len() - 1;
+                self.list_state.select(Some(self.selected_index));
+            }
+            self.status_message = format!("Eliminada de Recientes: {}", removed.title);
+        }
+    }
+
+    pub fn clear_current_list(&mut self) {
+        if self.active_view == ActiveView::Queue {
+            self.queue.clear();
+            self.queue_state.select(None);
+            self.status_message = "Cola de reproducción vaciada ('c').".to_string();
+        } else if self.active_view == ActiveView::Home {
+            let _ = self.store.clear_all_tracks();
+            self.tracks.clear();
+            self.selected_index = 0;
+            self.list_state.select(None);
+            self.status_message = "Historial de Recientes (SQLite) vaciado por completo ('c').".to_string();
         }
     }
 
@@ -174,7 +210,7 @@ impl TuiApp {
                 self.tracks = results;
                 self.selected_index = 0;
                 self.list_state.select(Some(0));
-                self.active_view = ActiveView::Catalog;
+                self.active_view = ActiveView::Home;
             }
             Err(e) => self.status_message = format!("Error de búsqueda: {e}"),
         }

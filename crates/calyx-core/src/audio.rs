@@ -26,37 +26,30 @@ pub struct NativeAudioEngine {
     sink: Mutex<Option<Sink>>,
     volume: Mutex<f32>,
     duration_secs: AtomicU64,
+    started_at: Mutex<Option<std::time::Instant>>,
+    accumulated_ms: AtomicU64,
     state: AtomicU8,
 }
 
 impl NativeAudioEngine {
     pub fn new() -> CalyxResult<Self> {
-        match OutputStream::try_default() {
-            Ok((stream, handle)) => {
-                Ok(Self {
-                    _stream: Some(stream),
-                    handle: Some(handle),
-                    sink: Mutex::new(None),
-                    volume: Mutex::new(0.85),
-                    duration_secs: AtomicU64::new(0),
-                    state: AtomicU8::new(STATE_STOPPED),
-                })
-            }
-            Err(e) => {
-                info!("Audio output device unavailable ({e}), running in headless mode");
-                Ok(Self {
-                    _stream: None,
-                    handle: None,
-                    sink: Mutex::new(None),
-                    volume: Mutex::new(0.85),
-                    duration_secs: AtomicU64::new(0),
-                    state: AtomicU8::new(STATE_STOPPED),
-                })
-            }
-        }
+        let (_stream, handle) = match OutputStream::try_default() {
+            Ok((s, h)) => (Some(s), Some(h)),
+            Err(e) => { info!("Audio output device unavailable ({e}), running in headless mode"); (None, None) }
+        };
+        Ok(Self {
+            _stream,
+            handle,
+            sink: Mutex::new(None),
+            volume: Mutex::new(0.85),
+            duration_secs: AtomicU64::new(0),
+            started_at: Mutex::new(None),
+            accumulated_ms: AtomicU64::new(0),
+            state: AtomicU8::new(STATE_STOPPED),
+        })
     }
 
-    pub fn play_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
+    fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
         if bytes.is_empty() {
             return Err(CalyxError::Audio("Empty audio buffer".to_string()));
         }
@@ -139,7 +132,11 @@ impl NativeAudioEngine {
         if pcm_samples.is_empty() {
             return Err(CalyxError::Audio("Decoded 0 PCM samples from stream".to_string()));
         }
+        Ok((channels, sample_rate, pcm_samples))
+    }
 
+    pub fn play_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
+        let (channels, sample_rate, pcm_samples) = Self::decode_m4a_to_pcm(bytes)?;
         let dur_s = pcm_samples.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
         self.duration_secs.store(dur_s, Ordering::Relaxed);
 
@@ -148,18 +145,26 @@ impl NativeAudioEngine {
                 .map_err(|e| CalyxError::Audio(format!("Failed to create audio sink: {e}")))?;
             let vol = *self.volume.lock().unwrap();
             new_sink.set_volume(vol);
-            let source = SamplesBuffer::new(channels, sample_rate, pcm_samples);
-            new_sink.append(source);
+            new_sink.append(SamplesBuffer::new(channels, sample_rate, pcm_samples));
             new_sink.play();
 
             let mut guard = self.sink.lock().unwrap();
-            if let Some(old) = guard.take() {
-                old.stop();
-            }
+            if let Some(old) = guard.take() { old.stop(); }
             *guard = Some(new_sink);
         }
-
+        self.accumulated_ms.store(0, Ordering::Relaxed);
+        *self.started_at.lock().unwrap() = Some(std::time::Instant::now());
         self.state.store(STATE_PLAYING, Ordering::Relaxed);
+        Ok(())
+    }
+
+    pub fn append_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
+        let (channels, sample_rate, pcm_samples) = Self::decode_m4a_to_pcm(bytes)?;
+        let add_s = pcm_samples.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
+        self.duration_secs.fetch_add(add_s, Ordering::Relaxed);
+        if let Some(sink) = self.sink.lock().unwrap().as_ref() {
+            sink.append(SamplesBuffer::new(channels, sample_rate, pcm_samples));
+        }
         Ok(())
     }
 
@@ -168,14 +173,20 @@ impl NativeAudioEngine {
         let guard = self.sink.lock().unwrap();
         if current == STATE_PLAYING {
             if let Some(sink) = guard.as_ref() { sink.pause(); }
+            if let Some(t) = self.started_at.lock().unwrap().take() {
+                self.accumulated_ms.fetch_add(t.elapsed().as_millis() as u64, Ordering::Relaxed);
+            }
             self.state.store(STATE_PAUSED, Ordering::Relaxed);
         } else if current == STATE_PAUSED {
             if let Some(sink) = guard.as_ref() { sink.play(); }
+            *self.started_at.lock().unwrap() = Some(std::time::Instant::now());
             self.state.store(STATE_PLAYING, Ordering::Relaxed);
         }
     }
 
     pub fn stop(&self) {
+        *self.started_at.lock().unwrap() = None;
+        self.accumulated_ms.store(0, Ordering::Relaxed);
         if let Some(sink) = self.sink.lock().unwrap().take() { sink.stop(); }
         self.state.store(STATE_STOPPED, Ordering::Relaxed);
     }
@@ -186,22 +197,27 @@ impl NativeAudioEngine {
         if let Some(sink) = self.sink.lock().unwrap().as_ref() { sink.set_volume(clamped); }
     }
 
-    pub fn progress(&self) -> (Duration, Duration) {
-        let dur = Duration::from_secs(self.duration_secs.load(Ordering::Relaxed));
-        let elapsed = self.sink.lock().unwrap()
-            .as_ref()
-            .map(|s| s.get_pos())
-            .unwrap_or(Duration::ZERO);
-        (elapsed, dur)
-    }
+pub fn progress(&self) -> (Duration, Duration) {
+    let dur = Duration::from_secs(self.duration_secs.load(Ordering::Relaxed));
+    let live_ms = if self.state.load(Ordering::Relaxed) == STATE_PLAYING {
+        self.started_at.lock().unwrap().map(|t| t.elapsed().as_millis() as u64).unwrap_or(0)
+    } else { 0 };
+    let elapsed = Duration::from_millis(self.accumulated_ms.load(Ordering::Relaxed) + live_ms);
+    (elapsed, dur)
+}
 
-    pub fn is_finished(&self) -> bool {
-        if self.state.load(Ordering::Relaxed) != STATE_PLAYING {
-            return false;
-        }
-        let guard = self.sink.lock().unwrap();
-        guard.as_ref().map(|s| s.empty()).unwrap_or(false)
+pub fn is_finished(&self) -> bool {
+    if self.state.load(Ordering::Relaxed) != STATE_PLAYING {
+        return false;
     }
+    let guard = self.sink.lock().unwrap();
+    let finished = guard.as_ref().map(|s| s.empty()).unwrap_or(false);
+    if finished {
+        *self.started_at.lock().unwrap() = None;
+        self.state.store(STATE_STOPPED, Ordering::Relaxed);
+    }
+    finished
+}
 
     pub fn status(&self) -> PlaybackStatus {
         match self.state.load(Ordering::Relaxed) {
@@ -224,6 +240,8 @@ mod tests {
             sink: Mutex::new(None),
             volume: Mutex::new(0.85),
             duration_secs: AtomicU64::new(0),
+            started_at: Mutex::new(None),
+            accumulated_ms: AtomicU64::new(0),
             state: AtomicU8::new(STATE_STOPPED),
         };
         let res = engine.play_encoded_bytes(Vec::new());

@@ -18,8 +18,12 @@ pub mod error;
 pub mod fmp4;
 /// HLS streaming support.
 pub mod hls;
+/// Personal Apple Music Library & Playlists synchronization.
+pub mod library;
 /// Interactive zero-friction Apple Music Sign-In.
 pub mod login;
+/// Synchronized and plain lyrics fetching & parsing.
+pub mod lyrics;
 /// Data models for tracks, playlists, and metadata.
 pub mod models;
 /// Playback queue management with repeat and shuffle support.
@@ -41,6 +45,11 @@ pub use fmp4::{
     strip_enca_protection_atoms,
 };
 pub use hls::HlsStreamPlan;
+pub use library::{
+    fetch_playlist_tracks, fetch_user_library_songs, fetch_user_playlists,
+    parse_library_songs_json, parse_user_playlists_json, UserPlaylist,
+};
 pub use login::LoginBrowserGuard;
+pub use lyrics::{fetch_track_lyrics, parse_lrc, LyricLine};
 pub use models::{DrmMode, PlaybackStatus, Track};
 pub use queue::{PlaybackQueue, RepeatMode};

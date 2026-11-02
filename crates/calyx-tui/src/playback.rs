@@ -2,74 +2,147 @@ use calyx_core::Track;
 use crate::app::TuiApp;
 use crate::artwork::TerminalCoverArt;
 
+pub enum BgEvent {
+    AudioReady(Track, Result<Vec<u8>, String>, String),
+    AudioAppend(String, Vec<u8>),
+    ArtworkReady(String, TerminalCoverArt),
+    LyricsReady(Vec<calyx_core::LyricLine>),
+    PlaylistReady(String, Result<Vec<Track>, String>),
+}
+
 impl TuiApp {
-    pub async fn play_track(&mut self, mut track: Track) {
-        if track.artwork_url.is_none() {
-            if let Some(resolved_url) = self.client.resolve_artwork_url(&track).await {
-                track.artwork_url = Some(resolved_url);
-                let _ = self.store.upsert_track(&track);
-            }
-        }
-
-        let art_bytes = if let Some(art_url) = track.artwork_url.as_deref() {
-            self.client.fetch_stream_bytes(art_url).await.ok()
-        } else {
-            None
-        };
-
-        let seed = format!("{}:{}:{}:{}", track.id, track.artist, track.album, track.title);
-        self.current_artwork = Some(TerminalCoverArt::from_jpeg_or_seed(art_bytes.as_deref(), &seed));
-
-        let mut drm_note: Option<String> = None;
-        if self.session.has_full_stream_credentials() {
-            match self.session.load_wvd_device() {
-                Ok(wvd) => {
-                    match self.client.fetch_full_track_stream(&track.id, &wvd).await {
-                        Ok(full_bytes) => match self.audio.play_encoded_bytes(full_bytes) {
-                            Ok(()) => {
-                                self.audio.set_volume(self.volume);
-                                self.status_message.clear();
-                                self.current_track = Some(track);
-                                return;
-                            }
-                            Err(e) => drm_note = Some(format!("Decodificación: {e}")),
-                        },
-                        Err(e) => drm_note = Some(e.to_string()),
+    pub async fn poll_bg_events(&mut self) {
+        while let Ok(ev) = self.bg_rx.try_recv() {
+            match ev {
+                BgEvent::AudioReady(track, res, hint) => {
+                    if self.current_track.as_ref().map(|t| t.id == track.id).unwrap_or(true) {
+                        match res {
+                            Ok(bytes) => match self.audio.play_encoded_bytes(bytes) {
+                                Ok(()) => { self.audio.set_volume(self.volume); self.status_message = hint; self.current_track = Some(track); }
+                                Err(e) => self.status_message = format!("Error de audio: {e}"),
+                            },
+                            Err(e) => self.status_message = e,
+                        }
                     }
                 }
-                Err(_) => {
-                    drm_note = Some("Falta device.wvd L3 en carpeta".to_string());
+                BgEvent::AudioAppend(tid, bytes) => {
+                    if self.current_track.as_ref().map(|t| t.id == tid).unwrap_or(false) {
+                        let _ = self.audio.append_encoded_bytes(bytes);
+                    }
                 }
+                BgEvent::ArtworkReady(tid, art) => {
+                    if self.current_track.as_ref().map(|t| t.id == tid).unwrap_or(true) { self.current_artwork = Some(art); }
+                }
+                BgEvent::LyricsReady(lines) => self.current_lyrics = lines,
+                BgEvent::PlaylistReady(name, Ok(list)) if !list.is_empty() => {
+                    self.queue.clear();
+                    for t in &list { self.queue.enqueue_back(t.clone()); }
+                    self.tracks = list; self.selected_index = 0; self.list_state.select(Some(0));
+                    self.active_view = crate::app::ActiveView::Library;
+                    self.status_message = format!("Reproduciendo '{}' ({} pistas)...", name, self.queue.len());
+                    self.play_next().await;
+                }
+                BgEvent::PlaylistReady(name, _) => self.status_message = format!("No se pudo reproducir playlist '{name}'."),
+            }
+        }
+    }
+
+pub async fn play_track(&mut self, mut track: Track) {
+    if let Some(old) = self.play_task.take() { old.abort(); }
+    self.audio.stop();
+    let orig_id = track.id.clone();
+    let seed = format!("{}:{}:{}:{}", orig_id, track.artist, track.album, track.title);
+    self.current_artwork = Some(TerminalCoverArt::from_jpeg_or_seed(None, &seed));
+    self.current_lyrics = vec![calyx_core::LyricLine { time_ms: 0, text: "⏳ Sincronizando letra...".to_string() }];
+    self.current_track = Some(track.clone());
+    self.status_message = format!("⏳ Cargando audio en 2do plano: {} — {}...", track.artist, track.title);
+
+    let (client, session, tx) = (self.client.clone(), self.session.clone(), self.bg_tx.clone());
+    self.play_task = Some(tokio::spawn(async move {
+        let clean_title = track.title.split(['(', '[']).next().unwrap_or(&track.title).trim();
+        let q = format!("{} {}", track.artist, clean_title);
+        let mut candidates = vec![orig_id.clone()];
+        if let Some(lib_id) = track.hls_manifest_url.clone().filter(|id| !candidates.contains(id)) {
+            candidates.push(lib_id);
+        }
+        if let Ok(found) = client.search_catalog(&q, 5).await {
+            for cat in found {
+                if track.preview_url.is_none() { track.preview_url = cat.preview_url; }
+                if track.artwork_url.is_none() { track.artwork_url = cat.artwork_url; }
+                if !candidates.contains(&cat.id) { candidates.push(cat.id); }
+            }
+        }
+        let mut sent = false;
+        let mut drm_note: Option<String> = None;
+
+        // Pre-fetch artwork and lyrics
+        if let Some(art_url) = track.artwork_url.as_deref() {
+            if let Ok(ab) = client.fetch_stream_bytes(art_url).await {
+                let _ = tx.send(BgEvent::ArtworkReady(track.id.clone(), TerminalCoverArt::from_jpeg_or_seed(Some(&ab), &seed)));
             }
         }
 
-        let Some(url) = track.preview_url.clone() else {
-            self.status_message = "La pista no tiene URL de stream disponible.".to_string();
-            return;
-        };
+        let lyrics = calyx_core::fetch_track_lyrics(client.http(), &track.title, &track.artist).await;
+        let _ = tx.send(BgEvent::LyricsReady(lyrics));
 
-        match self.client.fetch_stream_bytes(&url).await {
-            Ok(bytes) => match self.audio.play_encoded_bytes(bytes) {
-                Ok(()) => {
-                    self.audio.set_volume(self.volume);
-                    let hint = match drm_note {
-                        Some(note) => format!("[Preview 30s | {note}]"),
-                        None => "[Preview 30s — Presiona 'u' para Login Apple]".to_string(),
-                    };
-                    self.status_message = hint;
-                    self.current_track = Some(track);
+if session.has_full_stream_credentials() {
+    match session.load_wvd_device() {
+        Ok(wvd) => {
+            let hint_ok = format!("Widevine L3 Activo: {} — {}", track.artist, track.title);
+            for cid in &candidates {
+                if let Err(e) = client.stream_full_track_progressive(cid, &wvd, |chunk, is_first| {
+                    if is_first { sent = true; let _ = tx.send(BgEvent::AudioReady(track.clone(), Ok(chunk), hint_ok.clone())); }
+                    else { let _ = tx.send(BgEvent::AudioAppend(orig_id.clone(), chunk)); }
+                }).await {
+                    if sent { break; }
+                    drm_note = Some(e.to_string());
+                } else {
+                    break;
                 }
-                Err(e) => self.status_message = format!("Error de audio: {e}"),
-            },
-            Err(e) => self.status_message = format!("Error de red en stream: {e}"),
-        }
+            }
+        },
+        Err(_) => drm_note = Some("Falta device.wvd L3 en carpeta".to_string()),
     }
+}
 
-    pub async fn play_selected(&mut self) {
-        if let Some(track) = self.selected_track() {
-            self.play_track(track).await;
+        if !sent {
+            match track.preview_url.as_deref() {
+                Some(u) => {
+                    let res = client.fetch_stream_bytes(u).await.map_err(|e| format!("Error de red: {e}"));
+                    let hint = drm_note.map(|n| format!("[Preview 30s | {n}]")).unwrap_or_else(|| "[Preview 30s — Presiona 'u' para Login Apple]".to_string());
+                    let _ = tx.send(BgEvent::AudioReady(track.clone(), res, hint));
+                }
+                None => { let _ = tx.send(BgEvent::AudioReady(track.clone(), Err("Sin URL de stream.".to_string()), String::new())); }
+            }
+        }
+    }));
+}
+
+pub async fn play_selected(&mut self) -> () {
+    match self.active_view {
+        crate::app::ActiveView::Playlists => {
+            if let Some(pl) = self.playlists.get(self.playlist_state.selected().unwrap_or(0)).cloned() {
+                let dev_tok = self.session.developer_token.as_deref().unwrap_or("");
+                let user_tok = self.session.media_user_token.as_deref().unwrap_or("");
+                match calyx_core::fetch_playlist_tracks(self.client.http(), dev_tok, user_tok, &pl.id, &self.session.storefront).await {
+                    Ok(tracks) => {
+                        self.tracks = tracks;
+                        self.selected_index = 0;
+                        self.list_state.select(Some(0));
+                        self.active_view = crate::app::ActiveView::Library;
+                        self.status_message = format!("Playlist '{}' cargada ({} canciones). Presiona 'p' para reproducir toda.", pl.name, self.tracks.len());
+                    }
+                    Err(e) => self.status_message = format!("Error cargando playlist '{}': {e}", pl.name),
+                }
+            }
+        },
+        _ => {
+            if let Some(track) = self.selected_track() {
+                self.play_track(track).await;
+            }
         }
     }
+}
 
     pub async fn play_next(&mut self) {
         if let Some(next) = self.queue.next_track(self.current_track.clone()) {
@@ -77,16 +150,89 @@ impl TuiApp {
         }
     }
 
-    #[allow(dead_code)]
     pub async fn play_previous(&mut self) {
         if let Some(prev) = self.queue.previous_track(self.current_track.clone()) {
             self.play_track(prev).await;
         }
     }
 
-    pub async fn check_auto_advance(&mut self) {
-        if self.audio.is_finished() {
+pub async fn check_auto_advance(&mut self) {
+    if self.audio.is_finished() {
+        self.play_next().await;
+    }
+}
+
+    pub async fn play_all(&mut self) {
+        if self.active_view == crate::app::ActiveView::Playlists {
+            if let Some(pl) = self.playlists.get(self.playlist_state.selected().unwrap_or(0)).cloned() {
+                self.status_message = format!("⏳ Cargando playlist '{}' en 2do plano...", pl.name);
+                let (http, sf, tx) = (self.client.http().clone(), self.session.storefront.clone(), self.bg_tx.clone());
+                let dev_tok = self.session.developer_token.clone().unwrap_or_default();
+                let user_tok = self.session.media_user_token.clone().unwrap_or_default();
+                tokio::spawn(async move {
+                    let res = calyx_core::fetch_playlist_tracks(&http, &dev_tok, &user_tok, &pl.id, &sf).await.map_err(|e| e.to_string());
+                    let _ = tx.send(BgEvent::PlaylistReady(pl.name, res));
+                });
+            }
+            return;
+        }
+        if !self.tracks.is_empty() {
+            self.queue.clear();
+            let start = self.selected_index.min(self.tracks.len() - 1);
+            for t in self.tracks[start..].iter().chain(self.tracks[..start].iter()) {
+                self.queue.enqueue_back(t.clone());
+            }
             self.play_next().await;
+        }
+    }
+
+pub async fn sync_playlists(&mut self) -> () {
+    let dev_tok = self.session.developer_token.as_deref().unwrap_or("");
+    let user_tok = self.session.media_user_token.as_deref().unwrap_or("");
+    self.active_view = crate::app::ActiveView::Playlists;
+    match calyx_core::fetch_user_playlists(self.client.http(), dev_tok, user_tok, 50).await {
+        Ok(playlists) => {
+            self.status_message = format!("Playlists sincronizadas: {} listas encontradas (Enter para abrir).", playlists.len());
+            self.playlists = playlists;
+            self.playlist_state.select(if self.playlists.is_empty() { None } else { Some(0) });
+        }
+        Err(e) => self.status_message = format!("Error sincronizando playlists: {e}"),
+    }
+}
+
+    pub async fn sync_library(&mut self) {
+        let dev_tok = self.session.developer_token.as_deref().unwrap_or("");
+        let user_tok = self.session.media_user_token.as_deref().unwrap_or("");
+        self.active_view = crate::app::ActiveView::Library;
+
+        match calyx_core::fetch_user_library_songs(self.client.http(), dev_tok, user_tok, &self.session.storefront, 50).await {
+            Ok(songs) => {
+                self.status_message = format!("Biblioteca sincronizada: {} canciones cargadas.", songs.len());
+                if !songs.is_empty() {
+                    self.tracks = songs;
+                    self.selected_index = 0;
+                    self.list_state.select(Some(0));
+                }
+            }
+            Err(e) => self.status_message = format!("Error sincronizando biblioteca: {e}"),
+        }
+    }
+
+    pub fn open_home(&mut self) {
+        self.tracks = self.store.search_tracks("", 50).unwrap_or_default();
+        self.selected_index = 0;
+        self.list_state.select(Some(0));
+        self.active_view = crate::app::ActiveView::Home;
+        self.status_message = "1 — Recientes: Historial de búsquedas ('/').".to_string();
+    }
+
+    pub async fn open_section_query(&mut self, view: crate::app::ActiveView, query: &str, label: &str) {
+        self.active_view = view;
+        if let Ok(res) = self.client.search_catalog(query, 25).await {
+            self.tracks = res;
+            self.selected_index = 0;
+            self.list_state.select(Some(0));
+            self.status_message = format!("{label} cargadas ({} pistas).", self.tracks.len());
         }
     }
 }

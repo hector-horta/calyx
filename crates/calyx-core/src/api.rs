@@ -9,6 +9,7 @@ use crate::hls::HlsStreamPlan;
 use crate::login::LoginBrowserGuard;
 use crate::models::Track;
 
+#[derive(Clone)]
 pub struct AppleMusicClient {
     http: Client,
     storefront: String,
@@ -64,50 +65,72 @@ impl AppleMusicClient {
         &self.http
     }
 
-    pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<Track>> {
-        let clean_term = term.trim();
-        if clean_term.is_empty() {
-            return Err(CalyxError::Validation("Search query cannot be empty".to_string()));
-        }
+pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<Track>> {
+    let clean_term = term.trim();
+    if clean_term.is_empty() {
+        return Err(CalyxError::Validation("Search query cannot be empty".to_string()));
+    }
 
-        info!("Searching Apple Music catalog for '{}' (storefront={})", clean_term, self.storefront);
-        let encoded_term: String = clean_term
-            .chars()
-            .map(|c| if c.is_ascii_alphanumeric() { c } else { '+' })
-            .collect();
+    info!("Searching Apple Music catalog for '{}' (storefront={})", clean_term, self.storefront);
 
-        let url = format!(
-            "https://itunes.apple.com/search?media=music&entity=song&country={}&term={}&limit={}",
-            self.storefront,
-            encoded_term,
-            limit.clamp(1, 50)
-        );
-
-        let resp = self.http.get(&url).send().await?;
-        let payload: ItunesSearchPayload = resp.json().await?;
-
-        let mut tracks = Vec::new();
-        for item in payload.results {
-            if let (Some(id), Some(title)) = (item.track_id, item.track_name) {
-                let track = Track {
-                    id: id.to_string(),
-                    title,
-                    artist: item.artist_name.unwrap_or_else(|| "Unknown Artist".to_string()),
-                    album: item.collection_name.unwrap_or_else(|| "Unknown Album".to_string()),
-                    duration_ms: item.track_time_millis.unwrap_or(0),
-                    storefront: self.storefront.clone(),
-                    preview_url: item.preview_url,
-                    artwork_url: item.artwork_url100,
-                    hls_manifest_url: None,
-                    is_lossless: true,
-                };
-                if track.validate().is_ok() {
-                    tracks.push(track);
+    if let Some(dev_tok) = self.developer_token.as_deref().filter(|s| !s.is_empty()) {
+        let url = format!("https://amp-api.music.apple.com/v1/catalog/{}/search", self.storefront);
+        let lim_s = limit.clamp(1, 25).to_string();
+        if let Ok(resp) = self.http.get(&url)
+            .query(&[("term", clean_term), ("types", "songs"), ("limit", lim_s.as_str())])
+            .header("Authorization", format!("Bearer {dev_tok}"))
+            .header("Origin", "https://music.apple.com")
+            .header("Referer", "https://music.apple.com/")
+            .send().await
+        {
+            if let Ok(val) = resp.json::<serde_json::Value>().await {
+                if let Some(songs_obj) = val.pointer("/results/songs") {
+                    if let Ok(list) = crate::library::parse_library_songs_json(&songs_obj.to_string(), &self.storefront) {
+                        if !list.is_empty() { return Ok(list); }
+                    }
                 }
             }
         }
-        Ok(tracks)
     }
+
+    // Fallback to itunes.apple.com/search
+    let encoded_term: String = clean_term.chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '+' })
+        .collect();
+
+    let url = format!(
+        "https://itunes.apple.com/search?media=music&entity=song&country={}&term={}&limit={}",
+        self.storefront,
+        encoded_term,
+        limit.clamp(1, 50)
+    );
+
+    let resp = self.http.get(&url).send().await?;
+    let payload: ItunesSearchPayload = resp.json().await?;
+
+    let mut tracks = Vec::new();
+    for item in payload.results {
+        if let (Some(id), Some(title)) = (item.track_id, item.track_name) {
+            let track = Track {
+                id: id.to_string(),
+                title,
+                artist: item.artist_name.unwrap_or_else(|| "Unknown Artist".to_string()),
+                album: item.collection_name.unwrap_or_else(|| "Unknown Album".to_string()),
+                duration_ms: item.track_time_millis.unwrap_or(0),
+                storefront: self.storefront.clone(),
+                preview_url: item.preview_url,
+                artwork_url: item.artwork_url100,
+                hls_manifest_url: None,
+                is_lossless: true,
+            };
+            if track.validate().is_ok() {
+                tracks.push(track);
+            }
+        }
+    }
+
+    Ok(tracks)
+}
 
     pub async fn sync_developer_token(&mut self) -> CalyxResult<String> {
         let token = crate::auth::fetch_apple_developer_token(&self.http).await?;
@@ -138,11 +161,8 @@ impl AppleMusicClient {
         Ok((dev_token, user_token, verified_sf, Some(guard)))
     }
 
-    pub async fn fetch_full_track_stream(
-        &self,
-        track_id: &str,
-        wvd: &WidevineDeviceL3,
-    ) -> CalyxResult<Vec<u8>> {
+    pub async fn stream_full_track_progressive<F>(&self, track_id: &str, wvd: &WidevineDeviceL3, mut on_chunk: F) -> CalyxResult<()>
+    where F: FnMut(Vec<u8>, bool) {
         let dev_token = self.developer_token.as_deref().filter(|s| !s.is_empty())
             .ok_or_else(|| CalyxError::Auth("Falta Developer Token".to_string()))?;
         let user_token = self.media_user_token.as_deref().filter(|s| !s.is_empty())
@@ -166,48 +186,65 @@ impl AppleMusicClient {
         let lic_b64 = self.request_widevine_license(&license_url, track_id, key_uri, pssh, &challenge, dev_token, user_token).await?;
         let track_key = wvd.extract_content_key_from_license(&lic_b64, &lic_req)?;
 
-        let mut full_audio = Vec::new();
-        let mut seen_urls = Vec::new();
+        let (mut buf, mut init_hdr, mut seen_urls, mut is_first) = (Vec::new(), Vec::new(), Vec::new(), true);
         for seg_url in plan.init_segment_url.iter().chain(plan.media_segment_urls.iter().take(64)) {
             if !seen_urls.contains(seg_url) {
                 seen_urls.push(seg_url.clone());
-                full_audio.extend_from_slice(&self.fetch_stream_bytes(seg_url).await?);
+                let mut resp = self.http.get(seg_url).send().await?;
+                while let Some(net_bytes) = resp.chunk().await? {
+                    buf.extend_from_slice(&net_bytes);
+                    let min_p = if is_first { 2 } else { 4 };
+                    while let Some(batch) = crate::fmp4::extract_progressive_fmp4_batch(&mut buf, &mut init_hdr, min_p, &track_key, is_cenc) {
+                        on_chunk(batch, is_first); is_first = false;
+                    }
+                }
             }
         }
-        if full_audio.is_empty() {
-            return Err(CalyxError::Audio("Stream HLS vacío".to_string()));
+        if !buf.is_empty() {
+            let mut tail = Vec::with_capacity(init_hdr.len() + buf.len());
+            tail.extend_from_slice(&init_hdr); tail.extend_from_slice(&buf);
+            let _ = decrypt_apple_fmp4_stream(&mut tail, &track_key, is_cenc);
+            on_chunk(tail, is_first); is_first = false;
         }
-        decrypt_apple_fmp4_stream(&mut full_audio, &track_key, is_cenc)?;
-        Ok(full_audio)
+        if is_first { return Err(CalyxError::Audio("Stream HLS vacío".to_string())); }
+        Ok(())
     }
 
-    async fn resolve_webplay_manifest(&self, track_id: &str, dev_token: &str, user_token: &str) -> CalyxResult<(String, String)> {
-        let resp = self.http.post("https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/webPlayback")
-            .header("Authorization", format!("Bearer {dev_token}"))
-            .header("Media-User-Token", user_token)
-            .header("Accept", "application/json, text/plain, */*")
-            .header("Origin", "https://music.apple.com")
-            .header("Referer", "https://music.apple.com/")
-            .json(&serde_json::json!({ "salableAdamId": track_id })).send().await?;
-        let val = self.parse_apple_json(resp, "webPlayback").await?;
-        let song = val.pointer("/songList/0").ok_or_else(|| CalyxError::Drm("webPlayback sin activos".to_string()))?;
-        let ctrp_url = song.get("assets").and_then(|v| v.as_array()).and_then(|arr| {
-            arr.iter().find(|a| a.get("flavor").and_then(|f| f.as_str()) == Some("28:ctrp256"))
-                .or_else(|| arr.iter().find(|a| a.get("flavor").and_then(|f| f.as_str()) == Some("32:ctrp64")))
-                .or_else(|| arr.first())
-                .and_then(|a| a.get("URL").and_then(|u| u.as_str()))
-        });
-        let hls_url = ctrp_url.or_else(|| song.get("hls-playlist-url").and_then(|v| v.as_str()))
-            .ok_or_else(|| CalyxError::Drm("Sin URL HLS en webPlay".to_string()))?.to_string();
-        let license_url = song.get("hls-key-server-url").and_then(|v| v.as_str())
-            .unwrap_or("https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/acquireWebPlaybackLicense").to_string();
-        Ok((hls_url, license_url))
-    }
+async fn resolve_webplay_manifest(&self, track_id: &str, dev_token: &str, user_token: &str) -> CalyxResult<(String, String)> {
+    let payload = if track_id.starts_with("i.") {
+        serde_json::json!({ "universalLibraryId": track_id })
+    } else {
+        serde_json::json!({ "salableAdamId": track_id })
+    };
+
+    let resp = self.http.post("https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/webPlayback")
+        .header("Authorization", format!("Bearer {dev_token}"))
+        .header("Media-User-Token", user_token)
+        .header("Accept", "application/json, text/plain, */*")
+        .header("Origin", "https://music.apple.com")
+        .header("Referer", "https://music.apple.com/")
+        .json(&payload).send().await?;
+
+    let val = self.parse_apple_json(resp, "webPlayback").await?;
+    let song = val.pointer("/songList/0").ok_or_else(|| CalyxError::Drm("webPlayback sin activos".to_string()))?;
+    let ctrp_url = song.get("assets").and_then(|v| v.as_array()).and_then(|arr| {
+        arr.iter().find(|a| a.get("flavor").and_then(|f| f.as_str()) == Some("28:ctrp256"))
+            .or_else(|| arr.iter().find(|a| a.get("flavor").and_then(|f| f.as_str()) == Some("32:ctrp64")))
+            .or_else(|| arr.first())
+            .and_then(|a| a.get("URL").and_then(|u| u.as_str()))
+    });
+    let hls_url = ctrp_url.or_else(|| song.get("hls-playlist-url").and_then(|v| v.as_str()))
+        .ok_or_else(|| CalyxError::Drm("Sin URL HLS en webPlay".to_string()))?.to_string();
+    let license_url = song.get("hls-key-server-url").and_then(|v| v.as_str())
+        .unwrap_or("https://play.itunes.apple.com/WebObjects/MZPlay.woa/wa/acquireWebPlaybackLicense").to_string();
+
+    Ok((hls_url, license_url))
+}
 
     async fn request_widevine_license(&self, license_url: &str, track_id: &str, key_uri: &str, pssh: &crate::drm::PsshBox, challenge: &[u8], dev_token: &str, user_token: &str) -> CalyxResult<String> {
         let uri_field = if !key_uri.is_empty() { key_uri.to_string() } else { format!("data:text/plain;base64,{}", BASE64.encode(&pssh.raw_bytes)) };
         let body = serde_json::json!({
-            "adamId": track_id, "challenge": BASE64.encode(challenge), "isLibrary": false,
+            "adamId": track_id, "challenge": BASE64.encode(challenge), "isLibrary": track_id.starts_with("i."),
             "key-system": "com.widevine.alpha", "uri": uri_field, "user-initiated": true
         });
         let resp = self.http.post(license_url)
@@ -252,30 +289,6 @@ impl AppleMusicClient {
         }
         let bytes = self.http.get(url).send().await?.bytes().await?;
         Ok(bytes.to_vec())
-    }
-
-    pub async fn resolve_artwork_url(&self, track: &Track) -> Option<String> {
-        if let Some(existing) = track.artwork_url.as_ref().filter(|s| !s.is_empty()) {
-            return Some(existing.clone());
-        }
-        let lookup_url = format!(
-            "https://itunes.apple.com/lookup?id={}&country={}",
-            track.id, self.storefront
-        );
-        if let Ok(resp) = self.http.get(&lookup_url).send().await {
-            if let Ok(payload) = resp.json::<ItunesSearchPayload>().await {
-                if let Some(art) = payload.results.into_iter().find_map(|r| r.artwork_url100) {
-                    return Some(art);
-                }
-            }
-        }
-        let query = format!("{} {}", track.artist, track.title);
-        if let Ok(results) = self.search_catalog(&query, 1).await {
-            if let Some(art) = results.into_iter().find_map(|r| r.artwork_url) {
-                return Some(art);
-            }
-        }
-        None
     }
 }
 

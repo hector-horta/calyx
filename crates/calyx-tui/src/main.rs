@@ -2,6 +2,7 @@ mod app;
 mod artwork;
 mod playback;
 mod ui;
+mod ui_player;
 
 use std::io;
 use std::time::Duration;
@@ -45,6 +46,7 @@ async fn run_event_loop(
     app: &mut app::TuiApp,
 ) -> Result<()> {
     while !app.should_quit {
+        app.poll_bg_events().await;
         app.check_auto_advance().await;
         terminal.draw(|f| ui::render(f, app))?;
 
@@ -73,8 +75,42 @@ async fn run_event_loop(
                         KeyCode::Char('a') => app.enqueue_selected_back(),
                         KeyCode::Char('n') => app.enqueue_selected_next(),
                         KeyCode::Char('d') => app.remove_selected_from_queue(),
+                        KeyCode::Char('c') => app.clear_current_list(),
                         KeyCode::Char('s') => { app.toggle_shuffle(); },
                         KeyCode::Char('r') => { app.toggle_repeat(); },
+                        KeyCode::Char('1') => app.open_home(),
+                        KeyCode::Char('2') => {
+                            app.status_message = "Cargando 2 — Novedades en Apple Music...".to_string();
+                            terminal.draw(|f| ui::render(f, app))?;
+                            app.open_section_query(app::ActiveView::New, "top hits 2026", "Novedades").await;
+                        }
+                        KeyCode::Char('3') => {
+                            app.status_message = "Cargando 3 — Estaciones y Mezclas de Radio...".to_string();
+                            terminal.draw(|f| ui::render(f, app))?;
+                            app.open_section_query(app::ActiveView::Radio, "electronic chill radio mix", "Estaciones de Radio").await;
+                        }
+                        KeyCode::Char('4') | KeyCode::Char('l') => {
+                            app.status_message = "Sincronizando 4 — Biblioteca personal de Apple Music...".to_string();
+                            terminal.draw(|f| ui::render(f, app))?;
+                            app.sync_library().await;
+                        }
+KeyCode::Char('5') => {
+    app.status_message = "Sincronizando 5 — Tus Playlists de Apple Music...".to_string();
+    terminal.draw(|f| ui::render(f, app))?;
+    app.sync_playlists().await;
+},
+
+KeyCode::Char('p') | KeyCode::Char('P') => {
+    app.status_message = "Reproduciendo toda la playlist / lista actual...".to_string();
+    terminal.draw(|f| ui::render(f, app))?;
+    app.play_all().await;
+}
+                        KeyCode::Char('?') => {
+                            app.active_view = app::ActiveView::Help;
+                            app.status_message = "Ayuda de atajos de teclado (Presiona 1-5 o Tab para volver).".to_string();
+                        }
+                        KeyCode::Char('>') | KeyCode::Char('.') => app.play_next().await,
+                        KeyCode::Char('<') | KeyCode::Char(',') => app.play_previous().await,
                         KeyCode::Tab => app.toggle_view(),
                         KeyCode::Char('u') => {
                             app.status_message = "Abriendo ventana Apple Sign-In... Inicia sesión y la ventana se cerrará sola.".to_string();
