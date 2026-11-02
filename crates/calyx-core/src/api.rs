@@ -161,8 +161,7 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
         Ok((dev_token, user_token, verified_sf, Some(guard)))
     }
 
-    pub async fn stream_full_track_progressive<F>(&self, track_id: &str, wvd: &WidevineDeviceL3, mut on_chunk: F) -> CalyxResult<()>
-    where F: FnMut(Vec<u8>, bool) {
+    pub async fn fetch_full_track_stream(&self, track_id: &str, wvd: &WidevineDeviceL3) -> CalyxResult<Vec<u8>> {
         let dev_token = self.developer_token.as_deref().filter(|s| !s.is_empty())
             .ok_or_else(|| CalyxError::Auth("Falta Developer Token".to_string()))?;
         let user_token = self.media_user_token.as_deref().filter(|s| !s.is_empty())
@@ -186,28 +185,21 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
         let lic_b64 = self.request_widevine_license(&license_url, track_id, key_uri, pssh, &challenge, dev_token, user_token).await?;
         let track_key = wvd.extract_content_key_from_license(&lic_b64, &lic_req)?;
 
-        let (mut buf, mut init_hdr, mut seen_urls, mut is_first) = (Vec::new(), Vec::new(), Vec::new(), true);
+        let mut full_audio = Vec::new();
+        let mut seen_urls = Vec::new();
         for seg_url in plan.init_segment_url.iter().chain(plan.media_segment_urls.iter().take(64)) {
             if !seen_urls.contains(seg_url) {
                 seen_urls.push(seg_url.clone());
-                let mut resp = self.http.get(seg_url).send().await?;
-                while let Some(net_bytes) = resp.chunk().await? {
-                    buf.extend_from_slice(&net_bytes);
-                    let min_p = if is_first { 2 } else { 4 };
-                    while let Some(batch) = crate::fmp4::extract_progressive_fmp4_batch(&mut buf, &mut init_hdr, min_p, &track_key, is_cenc) {
-                        on_chunk(batch, is_first); is_first = false;
-                    }
-                }
+                full_audio.extend_from_slice(&self.fetch_stream_bytes(seg_url).await?);
             }
         }
-        if !buf.is_empty() {
-            let mut tail = Vec::with_capacity(init_hdr.len() + buf.len());
-            tail.extend_from_slice(&init_hdr); tail.extend_from_slice(&buf);
-            let _ = decrypt_apple_fmp4_stream(&mut tail, &track_key, is_cenc);
-            on_chunk(tail, is_first); is_first = false;
+
+        if full_audio.is_empty() {
+            return Err(CalyxError::Audio("Stream HLS vacío".to_string()));
         }
-        if is_first { return Err(CalyxError::Audio("Stream HLS vacío".to_string())); }
-        Ok(())
+
+        decrypt_apple_fmp4_stream(&mut full_audio, &track_key, is_cenc)?;
+        Ok(full_audio)
     }
 
 async fn resolve_webplay_manifest(&self, track_id: &str, dev_token: &str, user_token: &str) -> CalyxResult<(String, String)> {
