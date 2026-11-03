@@ -80,16 +80,39 @@ let switches_line = Line::from(vec![
 ]);
 
 let spec = app.current_spectrum();
-let lit = ((ratio * 12.0).round() as usize).clamp(0, 12);
+let progress_cell = (ratio * 48.0).clamp(0.0, 48.0);
+let dim_col = Color::Rgb(65, 70, 75);
+let lerp_col = |c1: Color, c2: Color, t: f64| -> Color {
+    match (c1, c2) {
+        (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => {
+            let r = (r1 as f64 + (r2 as f64 - r1 as f64) * t).clamp(0.0, 255.0) as u8;
+            let g = (g1 as f64 + (g2 as f64 - g1 as f64) * t).clamp(0.0, 255.0) as u8;
+            let b = (b1 as f64 + (b2 as f64 - b1 as f64) * t).clamp(0.0, 255.0) as u8;
+            Color::Rgb(r, g, b)
+        }
+        _ => if t > 0.5 { c2 } else { c1 },
+    }
+};
+
 let srow = |r: u8, c: Color, v_spans: Vec<Span<'static>>| -> Line<'static> {
     let mut v = get_glyph_spans(r);
     v.push(Span::raw("  "));
     for b in 0..12 {
         let val = spec[(b * 32) / 12];
         let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
-        let col = if b < lit { c } else { Color::DarkGray };
         let ch = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'][idx];
-        v.push(Span::styled(format!("{ch}{ch}{ch}{ch}"), Style::default().fg(col)));
+        let ch_str = ch.to_string();
+        for col_idx in 0..4 {
+            let cell = (b * 4 + col_idx) as f64;
+            let col = if cell + 1.0 <= progress_cell {
+                c
+            } else if cell <= progress_cell {
+                lerp_col(dim_col, c, progress_cell - cell)
+            } else {
+                dim_col
+            };
+            v.push(Span::styled(ch_str.clone(), Style::default().fg(col)));
+        }
         if b < 11 {
             v.push(Span::raw(" "));
         }
