@@ -29,6 +29,7 @@ pub struct NativeAudioEngine {
     started_at: Mutex<Option<std::time::Instant>>,
     accumulated_ms: AtomicU64,
     state: AtomicU8,
+    spectrum_frames: Mutex<Vec<[u8; 32]>>,
 }
 
 impl NativeAudioEngine {
@@ -46,6 +47,7 @@ impl NativeAudioEngine {
             started_at: Mutex::new(None),
             accumulated_ms: AtomicU64::new(0),
             state: AtomicU8::new(STATE_STOPPED),
+            spectrum_frames: Mutex::new(Vec::with_capacity(128)),
         })
     }
 
@@ -135,38 +137,31 @@ impl NativeAudioEngine {
         Ok((channels, sample_rate, pcm_samples))
     }
 
-    pub fn play_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
-        let (channels, sample_rate, pcm_samples) = Self::decode_m4a_to_pcm(bytes)?;
-        let dur_s = pcm_samples.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
-        self.duration_secs.store(dur_s, Ordering::Relaxed);
+pub fn play_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
+    let (channels, sample_rate, pcm_samples) = Self::decode_m4a_to_pcm(bytes)?;
+    let dur_s = pcm_samples.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
+    self.duration_secs.store(dur_s, Ordering::Relaxed);
 
-        if let Some(handle) = &self.handle {
-            let new_sink = Sink::try_new(handle)
-                .map_err(|e| CalyxError::Audio(format!("Failed to create audio sink: {e}")))?;
-            let vol = *self.volume.lock().unwrap();
-            new_sink.set_volume(vol);
-            new_sink.append(SamplesBuffer::new(channels, sample_rate, pcm_samples));
-            new_sink.play();
+    let spectrum_frames = Self::compute_spectrum_frames(&pcm_samples, channels, sample_rate);
+    *self.spectrum_frames.lock().unwrap() = spectrum_frames;
 
-            let mut guard = self.sink.lock().unwrap();
-            if let Some(old) = guard.take() { old.stop(); }
-            *guard = Some(new_sink);
-        }
-        self.accumulated_ms.store(0, Ordering::Relaxed);
-        *self.started_at.lock().unwrap() = Some(std::time::Instant::now());
-        self.state.store(STATE_PLAYING, Ordering::Relaxed);
-        Ok(())
+    if let Some(handle) = &self.handle {
+        let new_sink = Sink::try_new(handle)
+            .map_err(|e| CalyxError::Audio(format!("Failed to create audio sink: {e}")))?;
+        let vol = *self.volume.lock().unwrap();
+        new_sink.set_volume(vol);
+        new_sink.append(SamplesBuffer::new(channels, sample_rate, pcm_samples));
+        new_sink.play();
+
+        let mut guard = self.sink.lock().unwrap();
+        if let Some(old) = guard.take() { old.stop(); }
+        *guard = Some(new_sink);
     }
-
-    pub fn append_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
-        let (channels, sample_rate, pcm_samples) = Self::decode_m4a_to_pcm(bytes)?;
-        let add_s = pcm_samples.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
-        self.duration_secs.fetch_add(add_s, Ordering::Relaxed);
-        if let Some(sink) = self.sink.lock().unwrap().as_ref() {
-            sink.append(SamplesBuffer::new(channels, sample_rate, pcm_samples));
-        }
-        Ok(())
-    }
+    self.accumulated_ms.store(0, Ordering::Relaxed);
+    *self.started_at.lock().unwrap() = Some(std::time::Instant::now());
+    self.state.store(STATE_PLAYING, Ordering::Relaxed);
+    Ok(())
+}
 
     pub fn toggle_pause(&self) {
         let current = self.state.load(Ordering::Relaxed);
@@ -219,13 +214,49 @@ pub fn is_finished(&self) -> bool {
     finished
 }
 
-    pub fn status(&self) -> PlaybackStatus {
-        match self.state.load(Ordering::Relaxed) {
-            STATE_PLAYING => PlaybackStatus::Playing,
-            STATE_PAUSED => PlaybackStatus::Paused,
-            _ => PlaybackStatus::Stopped,
-        }
+pub fn status(&self) -> PlaybackStatus {
+    match self.state.load(Ordering::Relaxed) {
+        STATE_PLAYING => PlaybackStatus::Playing,
+        STATE_PAUSED => PlaybackStatus::Paused,
+        _ => PlaybackStatus::Stopped,
     }
+}
+
+pub fn current_spectrum(&self) -> [u8; 32] {
+    if self.state.load(Ordering::Relaxed) == STATE_STOPPED {
+        return [0u8; 32];
+    }
+    let idx = (self.progress().0.as_millis() / 50) as usize;
+    let guard = self.spectrum_frames.lock().unwrap();
+    guard.get(idx).copied().unwrap_or([0u8; 32])
+}
+
+fn compute_spectrum_frames(pcm: &[i16], channels: u16, sample_rate: u32) -> Vec<[u8; 32]> {
+    let win = ((sample_rate as usize / 20) * channels.max(1) as usize).max(64);
+    let mut out = Vec::with_capacity(pcm.len() / win + 1);
+    let mut prev = [0u8; 32];
+    for chunk in pcm.chunks(win) {
+        let mut row = [0u8; 32];
+        let sub_len = (chunk.len() / 32).max(1);
+        for (b, sub) in chunk.chunks(sub_len).take(32).enumerate() {
+            let (mut sum, mut diff, mut last) = (0u64, 0u64, 0i32);
+            let step = (32 - b).clamp(1, 16);
+            for &s in sub.iter().step_by(step) {
+                let v = (s as i32) - last;
+                sum += (s as i32).unsigned_abs() as u64;
+                diff += v.unsigned_abs() as u64;
+                last = s as i32;
+            }
+            let n = (sub.len() / step).max(1) as u64;
+            let energy = ((sum / n) * (32 - b as u64) + (diff / n) * (b as u64 + 6)) / 24;
+            let scaled = ((energy / 210) as u8).clamp(1, 24);
+            row[b] = ((prev[b] as u16 * 2 + scaled as u16 * 3) / 5) as u8;
+            prev[b] = row[b];
+        }
+        out.push(row);
+    }
+    out
+}
 }
 
 #[cfg(test)]
@@ -243,6 +274,7 @@ mod tests {
             started_at: Mutex::new(None),
             accumulated_ms: AtomicU64::new(0),
             state: AtomicU8::new(STATE_STOPPED),
+            spectrum_frames: Mutex::new(Vec::with_capacity(1024)),
         };
         let res = engine.play_encoded_bytes(Vec::new());
         assert!(res.is_err());

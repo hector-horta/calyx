@@ -21,9 +21,9 @@ impl RepeatMode {
 
     pub fn badge(&self) -> &'static str {
         match self {
-            Self::Off => "🔁 Off",
-            Self::All => "🔁 All",
-            Self::One => "🔂 One",
+            Self::Off => "🔁  Off",
+            Self::All => "🔁  All",
+            Self::One => "🔂  One",
         }
     }
 }

@@ -136,24 +136,34 @@ fn render_tracks(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
 }
 
 fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
-    let cur_ms = app.playback_progress().0.as_millis() as u64;
+    let (elap, tot) = app.playback_progress();
+    let cur_ms = elap.as_millis() as u64;
+    let tot_ms = (tot.as_millis() as u64).max(cur_ms + 4000);
     let active_idx = app.current_lyrics.iter().rposition(|l| l.time_ms <= cur_ms).unwrap_or(0);
     let half = (area.height as usize / 2).max(1);
     let start = active_idx.saturating_sub(half);
+    let max_w = area.width.saturating_sub(5) as usize;
     let lines: Vec<Line<'_>> = if app.current_lyrics.is_empty() {
         vec![Line::from(""), Line::from(Span::styled("  ♪ Reproduce una canción para ver su letra sincronizada en vivo.", Style::default().fg(Color::Gray)))]
     } else {
         app.current_lyrics.iter().enumerate().skip(start).take(area.height as usize).map(|(idx, l)| {
             if idx == active_idx {
-                Line::from(Span::styled(format!(" ♪ {}", truncate(&l.text, area.width.saturating_sub(5) as usize)), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)))
+                let next_ms = app.current_lyrics.get(idx + 1).map(|n| n.time_ms).unwrap_or(tot_ms);
+                let (sung, active, unsung) = l.karaoke_parts(cur_ms, next_ms, max_w);
+                Line::from(vec![
+                    Span::styled(" ♪ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::styled(sung, Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::styled(active, Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED | Modifier::BOLD)),
+                    Span::styled(unsung, Style::default().fg(Color::White)),
+                ])
             } else if idx < active_idx {
-                Line::from(Span::styled(format!("   {}", truncate(&l.text, area.width.saturating_sub(5) as usize)), Style::default().fg(Color::Gray)))
+                Line::from(Span::styled(format!("   {}", truncate(&l.text, max_w)), Style::default().fg(Color::DarkGray)))
             } else {
-                Line::from(Span::styled(format!("   {}", truncate(&l.text, area.width.saturating_sub(5) as usize)), Style::default().fg(Color::White)))
+                Line::from(Span::styled(format!("   {}", truncate(&l.text, max_w)), Style::default().fg(Color::Gray)))
             }
         }).collect()
     };
-    frame.render_widget(Paragraph::new(lines).block(Block::default().borders(Borders::LEFT).title_top(" 🎤 Letra en Vivo ")), area);
+    frame.render_widget(Paragraph::new(lines).block(Block::default().borders(Borders::LEFT).title_top(" Letras ")), area);
 }
 
 pub fn truncate(s: &str, max_chars: usize) -> String {

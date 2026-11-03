@@ -71,7 +71,7 @@ impl TuiApp {
             current_track: None,
             current_artwork: None,
             current_lyrics: Vec::new(),
-            status_message: "Listo. [1-5 - Navegar] ─── [/ - Buscar] ─── [? - Ayuda] ─── [Tab - Ver Cola]".to_string(),
+            status_message: String::new(),
             drm_mode: DrmMode::WidevineL3Cbcs,
             session,
             volume: 0.85,
@@ -250,6 +250,7 @@ pub fn selected_track(&self) -> Option<Track> {
         self.audio.set_volume(self.volume);
     }
     pub fn playback_status(&self) -> PlaybackStatus { self.audio.status() }
+    pub fn current_spectrum(&self) -> [u8; 32] { self.audio.current_spectrum() }
     pub fn playback_progress(&self) -> (std::time::Duration, std::time::Duration) {
         let (elap, pcm) = self.audio.progress();
         let tot = self.current_track.as_ref().map(|t| std::time::Duration::from_millis(t.duration_ms)).filter(|&d| d > std::time::Duration::ZERO).unwrap_or(pcm);
