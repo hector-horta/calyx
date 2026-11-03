@@ -55,6 +55,18 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         .rposition(|l| l.time_ms <= cur_ms)
         .unwrap_or(0);
 
+    let lerp_col = |c1: Color, c2: Color, t: f64| -> Color {
+        match (c1, c2) {
+            (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) => {
+                let r = (r1 as f64 + (r2 as f64 - r1 as f64) * t).clamp(0.0, 255.0) as u8;
+                let g = (g1 as f64 + (g2 as f64 - g1 as f64) * t).clamp(0.0, 255.0) as u8;
+                let b = (b1 as f64 + (b2 as f64 - b1 as f64) * t).clamp(0.0, 255.0) as u8;
+                Color::Rgb(r, g, b)
+            }
+            _ => if t > 0.5 { c2 } else { c1 },
+        }
+    };
+
     let mut visual_lines: Vec<Line<'static>> = Vec::new();
     let mut active_visual_idx = 0;
     for (idx, line) in app.current_lyrics.iter().enumerate() {
@@ -62,31 +74,39 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
             let next_ms = app.current_lyrics.get(idx + 1).map(|n| n.time_ms).unwrap_or(tot_ms);
             let gap = next_ms.saturating_sub(line.time_ms).max(1200);
             let elapsed = cur_ms.saturating_sub(line.time_ms);
-            let sing_dur = ((gap as f64) * 0.85).clamp(800.0, 5000.0);
+            let sing_dur = ((gap as f64) * 0.88).clamp(800.0, 6000.0);
             let ratio = (elapsed as f64 / sing_dur).clamp(0.0, 1.0);
-            let target_char = ((line.text.chars().count() as f64) * ratio).floor() as usize;
-            let mut seen_chars = 0usize;
+            let total_chars = line.text.chars().count().max(1);
+            let progress_char = (total_chars as f64) * ratio;
             let chunks = wrap_text(&line.text, max_w);
 
+            let mut global_char_idx = 0usize;
             for (c_idx, chunk) in chunks.into_iter().enumerate() {
                 if c_idx == 0 { active_visual_idx = visual_lines.len(); }
                 let mut spans = vec![if c_idx == 0 {
-                    Span::styled(" ♪ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
+                    Span::styled(" ♪ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
                 } else {
                     Span::raw("   ")
                 }];
-                for (w_idx, word) in chunk.split_whitespace().enumerate() {
-                    let space = if w_idx > 0 { " " } else { "" };
-                    let style = if ratio >= 1.0 || seen_chars + word.len() <= target_char {
-                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
-                    } else if seen_chars <= target_char {
-                        Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED | Modifier::BOLD)
+                for ch in chunk.chars() {
+                    let cell = global_char_idx as f64;
+                    let (col, is_bold) = if cell + 1.0 <= progress_char {
+                        (Color::White, true)
+                    } else if cell <= progress_char {
+                        let t = progress_char - cell;
+                        (lerp_col(Color::Rgb(95, 100, 110), Color::White, t), true)
                     } else {
-                        Style::default().fg(Color::White)
+                        (Color::Rgb(95, 100, 110), false)
                     };
-                    spans.push(Span::styled(format!("{space}{word}"), style));
-                    seen_chars += word.len() + 1;
+                    let style = if is_bold {
+                        Style::default().fg(col).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(col)
+                    };
+                    spans.push(Span::styled(ch.to_string(), style));
+                    global_char_idx += 1;
                 }
+                global_char_idx += 1;
                 visual_lines.push(Line::from(spans));
             }
         } else {
@@ -94,7 +114,7 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
             for chunk in chunks {
                 visual_lines.push(Line::from(vec![
                     Span::raw("   "),
-                    Span::styled(chunk, Style::default().fg(Color::DarkGray)),
+                    Span::styled(chunk, Style::default().fg(Color::Rgb(80, 85, 95))),
                 ]));
             }
         }
