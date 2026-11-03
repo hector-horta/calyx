@@ -93,7 +93,7 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
         Span::raw(" ── "),
         Span::styled("[-/+ - Vol]", Style::default().fg(Color::Cyan)),
         Span::raw("─"),
-    ]).alignment(Alignment::Center);
+    ]);
 
     frame.render_widget(
         Paragraph::new(vec![
