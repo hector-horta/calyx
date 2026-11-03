@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
@@ -21,22 +21,20 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
     let nav_line = Line::from(vec![
         Span::raw("─"),
         nav_tab(l.nav_home(), app.active_view == ActiveView::Home),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         nav_tab(l.nav_new(), app.active_view == ActiveView::New),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         nav_tab(l.nav_radio(), app.active_view == ActiveView::Radio),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         nav_tab(l.nav_library(), app.active_view == ActiveView::Library),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         nav_tab(l.nav_playlists(), app.active_view == ActiveView::Playlists),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         nav_tab(l.nav_search(), app.is_editing),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         nav_tab(l.nav_queue(), app.active_view == ActiveView::Queue),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         nav_tab(l.nav_lang(), false),
-        Span::raw(" ─── "),
-        nav_tab(l.nav_help(), app.active_view == ActiveView::Help),
         Span::raw("───"),
     ]);
 
@@ -48,10 +46,20 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
         format!(" 🔍 {}", app.search_input)
     };
 
+    let help_line = Line::from(vec![
+        nav_tab(l.nav_help(), app.active_view == ActiveView::Help),
+        Span::raw(" "),
+    ]).alignment(Alignment::Right);
+
+    let top_block = Block::default()
+        .borders(Borders::ALL)
+        .title_top(" Calyx Apple Music ")
+        .title_top(help_line);
+
     frame.render_widget(
         Paragraph::new(search_text)
             .style(if app.is_editing { Style::default().fg(Color::Yellow) } else { Style::default().fg(Color::White) })
-            .block(Block::default().borders(Borders::ALL).title_top(" Calyx Apple Music ")),
+            .block(top_block),
         chunks[0],
     );
 
