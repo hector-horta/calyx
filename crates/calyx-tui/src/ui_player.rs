@@ -130,8 +130,8 @@ let bottom_controls = Line::from(vec![
         Paragraph::new(vec![
             header_line,
             Line::from(""),
-            srow(2, Color::Rgb(255, 215, 0), vec![Span::styled("  VOL ", Style::default().fg(Color::DarkGray))]),
-            srow(1, Color::Rgb(0, 240, 180), vec![Span::styled(format!("  {:>3}%", vol), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
+            srow(2, Color::Rgb(255, 215, 0), vec![Span::styled("   VOL", Style::default().fg(Color::DarkGray))]),
+            srow(1, Color::Rgb(0, 240, 180), vec![Span::styled(format!("  {:>4}", format!("{}%", vol)), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
             srow(0, Color::Rgb(0, 200, 100), vol_bar),
             time_line,
             switches_line,
