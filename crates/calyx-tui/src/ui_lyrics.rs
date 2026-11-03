@@ -47,8 +47,9 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         return;
     }
 
-    let (elap, _) = app.playback_progress();
+    let (elap, tot) = app.playback_progress();
     let cur_ms = elap.as_millis() as u64;
+    let tot_ms = (tot.as_millis() as u64).max(cur_ms + 4000);
     let max_w = (area.width as usize).saturating_sub(6).max(10);
     let active_idx = app.current_lyrics.iter()
         .rposition(|l| l.time_ms <= cur_ms)
@@ -57,24 +58,40 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let mut visual_lines: Vec<Line<'static>> = Vec::new();
     let mut active_visual_idx = 0;
     for (idx, line) in app.current_lyrics.iter().enumerate() {
-        let is_active = idx == active_idx;
-        let chunks = wrap_text(&line.text, max_w);
+        if idx == active_idx {
+            let next_ms = app.current_lyrics.get(idx + 1).map(|n| n.time_ms).unwrap_or(tot_ms);
+            let gap = next_ms.saturating_sub(line.time_ms).max(1200);
+            let elapsed = cur_ms.saturating_sub(line.time_ms);
+            let sing_dur = ((gap as f64) * 0.85).clamp(800.0, 5000.0);
+            let ratio = (elapsed as f64 / sing_dur).clamp(0.0, 1.0);
+            let target_char = ((line.text.chars().count() as f64) * ratio).floor() as usize;
+            let mut seen_chars = 0usize;
+            let chunks = wrap_text(&line.text, max_w);
 
-        for (c_idx, chunk) in chunks.into_iter().enumerate() {
-            if is_active {
-                if c_idx == 0 {
-                    active_visual_idx = visual_lines.len();
-                    visual_lines.push(Line::from(vec![
-                        Span::styled(" ♪ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-                        Span::styled(chunk, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-                    ]));
+            for (c_idx, chunk) in chunks.into_iter().enumerate() {
+                if c_idx == 0 { active_visual_idx = visual_lines.len(); }
+                let mut spans = vec![if c_idx == 0 {
+                    Span::styled(" ♪ ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD))
                 } else {
-                    visual_lines.push(Line::from(vec![
-                        Span::raw("   "),
-                        Span::styled(chunk, Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
-                    ]));
+                    Span::raw("   ")
+                }];
+                for (w_idx, word) in chunk.split_whitespace().enumerate() {
+                    let space = if w_idx > 0 { " " } else { "" };
+                    let style = if ratio >= 1.0 || seen_chars + word.len() <= target_char {
+                        Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+                    } else if seen_chars <= target_char {
+                        Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED | Modifier::BOLD)
+                    } else {
+                        Style::default().fg(Color::White)
+                    };
+                    spans.push(Span::styled(format!("{space}{word}"), style));
+                    seen_chars += word.len() + 1;
                 }
-            } else {
+                visual_lines.push(Line::from(spans));
+            }
+        } else {
+            let chunks = wrap_text(&line.text, max_w);
+            for chunk in chunks {
                 visual_lines.push(Line::from(vec![
                     Span::raw("   "),
                     Span::styled(chunk, Style::default().fg(Color::DarkGray)),
