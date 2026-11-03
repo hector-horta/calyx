@@ -48,11 +48,19 @@ let time_line = Line::from(Span::styled(
     Style::default().fg(Color::Rgb(220, 225, 230)).add_modifier(Modifier::BOLD)
 ));
 
-let (g2, g1, g0, g_col) = match app.playback_status() {
-    calyx_core::models::PlaybackStatus::Playing => (" █◣   ", " ██◣  ", " █◤   ", Color::Cyan),
-    calyx_core::models::PlaybackStatus::Paused => (" █ █  ", " █ █  ", " █ █  ", Color::Yellow),
-    calyx_core::models::PlaybackStatus::Buffering => ("  ↻   ", "  ↻   ", "      ", Color::Cyan),
-    calyx_core::models::PlaybackStatus::Stopped => (" █ █  ", " █ █  ", " █ █  ", Color::DarkGray),
+let get_glyph_spans = |r: u8| -> Vec<Span<'static>> {
+    let row_idx = (2 - r) as usize;
+    match app.playback_status() {
+        calyx_core::models::PlaybackStatus::Playing => {
+            app.play_icon.rows.get(row_idx).cloned().unwrap_or_else(|| vec![Span::raw("      ")])
+        }
+        calyx_core::models::PlaybackStatus::Paused | calyx_core::models::PlaybackStatus::Stopped => {
+            app.pause_icon.rows.get(row_idx).cloned().unwrap_or_else(|| vec![Span::raw("      ")])
+        }
+        calyx_core::models::PlaybackStatus::Buffering => {
+            vec![Span::styled(if r == 1 { "  ↻   " } else { "      " }, Style::default().fg(Color::Cyan))]
+        }
+    }
 };
 
 let vol = (app.volume * 100.0).round() as u8;
@@ -73,11 +81,9 @@ let switches_line = Line::from(vec![
 
 let spec = app.current_spectrum();
 let lit = ((ratio * 20.0).round() as usize).clamp(0, 20);
-let srow = |r: u8, c: Color, g: &'static str, v_spans: Vec<Span<'static>>| -> Line<'static> {
-    let mut v = vec![
-        Span::styled(g, Style::default().fg(g_col).add_modifier(Modifier::BOLD)),
-        Span::raw("  "),
-    ];
+let srow = |r: u8, c: Color, v_spans: Vec<Span<'static>>| -> Line<'static> {
+    let mut v = get_glyph_spans(r);
+    v.push(Span::raw("  "));
     for b in 0..20 {
         let val = spec[(b * 32) / 20];
         let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
@@ -124,9 +130,9 @@ let bottom_controls = Line::from(vec![
         Paragraph::new(vec![
             header_line,
             Line::from(""),
-            srow(2, Color::Rgb(255, 215, 0), g2, vec![Span::styled("  VOL ", Style::default().fg(Color::DarkGray))]),
-            srow(1, Color::Rgb(0, 240, 180), g1, vec![Span::styled(format!("  {:>3}%", vol), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
-            srow(0, Color::Rgb(0, 200, 100), g0, vol_bar),
+            srow(2, Color::Rgb(255, 215, 0), vec![Span::styled("  VOL ", Style::default().fg(Color::DarkGray))]),
+            srow(1, Color::Rgb(0, 240, 180), vec![Span::styled(format!("  {:>3}%", vol), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
+            srow(0, Color::Rgb(0, 200, 100), vol_bar),
             time_line,
             switches_line,
             Line::from(""),

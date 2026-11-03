@@ -110,3 +110,44 @@ fn fnv1a_hash(data: &[u8]) -> u64 {
     }
     hash
 }
+
+#[derive(Debug, Clone)]
+pub struct TerminalIcon {
+    pub rows: Vec<Vec<Span<'static>>>,
+}
+
+impl TerminalIcon {
+    pub fn load_or_fallback(paths: &[&str], width: usize, height_pixels: usize, fallback_lines: [&'static str; 3], fallback_col: Color) -> Self {
+        for path in paths {
+            if let Ok(bytes) = std::fs::read(path) {
+                if let Ok(img) = image::load_from_memory(&bytes) {
+                    return Self::from_image(img, width, height_pixels);
+                }
+            }
+        }
+        let rows = fallback_lines.iter().map(|&s| vec![Span::styled(s, Style::default().fg(fallback_col).add_modifier(ratatui::style::Modifier::BOLD))]).collect();
+        Self { rows }
+    }
+
+    fn from_image(img: image::DynamicImage, width: usize, height_pixels: usize) -> Self {
+        let rgba = img.resize_exact(width as u32, height_pixels as u32, FilterType::Lanczos3).to_rgba8();
+        let mut rows = Vec::with_capacity(height_pixels / 2);
+        for y in (0..height_pixels).step_by(2) {
+            let mut spans = Vec::with_capacity(width);
+            for x in 0..width {
+                let top = rgba.get_pixel(x as u32, y as u32);
+                let bot = rgba.get_pixel(x as u32, (y + 1) as u32);
+                let top_vis = top[3] >= 64 && (top[0] > 25 || top[1] > 25 || top[2] > 25);
+                let bot_vis = bot[3] >= 64 && (bot[0] > 25 || bot[1] > 25 || bot[2] > 25);
+                match (top_vis, bot_vis) {
+                    (true, true) => spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(top[0], top[1], top[2])).bg(Color::Rgb(bot[0], bot[1], bot[2])))),
+                    (true, false) => spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(top[0], top[1], top[2])))),
+                    (false, true) => spans.push(Span::styled("▄", Style::default().fg(Color::Rgb(bot[0], bot[1], bot[2])))),
+                    (false, false) => spans.push(Span::raw(" ")),
+                }
+            }
+            rows.push(spans);
+        }
+        Self { rows }
+    }
+}

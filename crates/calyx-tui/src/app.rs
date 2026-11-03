@@ -29,6 +29,8 @@ pub struct TuiApp {
     pub active_view: ActiveView,
     pub current_track: Option<Track>,
     pub current_artwork: Option<TerminalCoverArt>,
+    pub play_icon: crate::artwork::TerminalIcon,
+    pub pause_icon: crate::artwork::TerminalIcon,
     pub current_lyrics: Vec<calyx_core::LyricLine>,
     pub status_message: String,
     #[allow(dead_code)]
@@ -71,6 +73,18 @@ impl TuiApp {
             active_view: ActiveView::Home,
             current_track: None,
             current_artwork: None,
+            play_icon: crate::artwork::TerminalIcon::load_or_fallback(
+                &["assets/icons/transparent-play.png", "assets/icons/play.png"],
+                6, 6,
+                [" █◣   ", " ██◣  ", " █◤   "],
+                ratatui::style::Color::Cyan,
+            ),
+            pause_icon: crate::artwork::TerminalIcon::load_or_fallback(
+                &["assets/icons/transparent - pause.png", "assets/icons/pause.png"],
+                6, 6,
+                [" █ █  ", " █ █  ", " █ █  "],
+                ratatui::style::Color::Yellow,
+            ),
             current_lyrics: Vec::new(),
             status_message: String::new(),
             drm_mode: DrmMode::WidevineL3Cbcs,
