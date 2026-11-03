@@ -89,7 +89,8 @@ async fn run_event_loop(
                             terminal.draw(|f| ui::render(f, app))?;
                             app.open_section_query(app::ActiveView::Radio, "electronic chill radio mix", "Estaciones de Radio").await;
                         }
-                        KeyCode::Char('4') | KeyCode::Char('l') => {
+                        KeyCode::Char('l') | KeyCode::Char('L') => app.toggle_language(),
+                        KeyCode::Char('4') => {
                             app.status_message = "Sincronizando 4 — Biblioteca personal de Apple Music...".to_string();
                             terminal.draw(|f| ui::render(f, app))?;
                             app.sync_library().await;

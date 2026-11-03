@@ -13,7 +13,7 @@ pub fn render_player_panel(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         None => crate::artwork::TerminalCoverArt::from_jpeg_or_seed(None, "Calyx").to_lines(),
     };
     frame.render_widget(
-        Paragraph::new(art_lines).block(Block::default().borders(Borders::ALL).title(" Portada ")),
+        Paragraph::new(art_lines).block(Block::default().borders(Borders::ALL).title(app.language.title_cover())),
         bottom_chunks[0],
     );
 
@@ -22,14 +22,14 @@ let header_line = match &app.current_track {
         Span::styled(format!(" {} ", truncate(&t.title, 34)), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
         Span::styled(format!("— {} • {}", truncate(&t.artist, 22), truncate(&t.album, 22)), Style::default().fg(Color::Cyan)),
     ]),
-    None => Line::from(Span::styled(" Sin reproducción activa", Style::default().fg(Color::DarkGray))),
+    None => Line::from(Span::styled(app.language.no_active_playback(), Style::default().fg(Color::DarkGray))),
 };
 
 let status_str = match app.playback_status() {
-    calyx_core::models::PlaybackStatus::Playing => "▶  Reproduciendo",
-    calyx_core::models::PlaybackStatus::Paused => "⏸  En Pausa",
-    calyx_core::models::PlaybackStatus::Buffering => "⏳  Cargando...",
-    calyx_core::models::PlaybackStatus::Stopped => "⏹  Detenido",
+    calyx_core::models::PlaybackStatus::Playing => app.language.status_playing(),
+    calyx_core::models::PlaybackStatus::Paused => app.language.status_paused(),
+    calyx_core::models::PlaybackStatus::Buffering => app.language.status_buffering(),
+    calyx_core::models::PlaybackStatus::Stopped => app.language.status_stopped(),
 };
 
 let (elapsed, total) = app.playback_progress();
@@ -55,10 +55,15 @@ let srow = |r: u8, c: Color| -> Line<'static> {
     Line::from(v)
 };
 
+let (lbl_next, lbl_queue) = match app.language {
+    calyx_core::Language::Es => ("A continuación", "en cola"),
+    calyx_core::Language::En => ("Up next", "in queue"),
+};
+
 let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
-    (Some(next), true) => Line::from(Span::styled(format!(" A continuación: {} — {} ({} en cola)", truncate(&next.title, 28), truncate(&next.artist, 20), app.queue.len()), Style::default().fg(Color::Cyan))),
+    (Some(next), true) => Line::from(Span::styled(format!(" {lbl_next}: {} — {} ({} {lbl_queue})", truncate(&next.title, 28), truncate(&next.artist, 20), app.queue.len()), Style::default().fg(Color::Cyan))),
     (Some(next), false) => Line::from(vec![
-        Span::styled(format!(" A continuación: {} — {} ({})  │  ", truncate(&next.title, 22), truncate(&next.artist, 14), app.queue.len()), Style::default().fg(Color::Cyan)),
+        Span::styled(format!(" {lbl_next}: {} — {} ({})  │  ", truncate(&next.title, 22), truncate(&next.artist, 14), app.queue.len()), Style::default().fg(Color::Cyan)),
         Span::styled(truncate(&app.status_message, 42), Style::default().fg(Color::White).add_modifier(Modifier::ITALIC)),
     ]),
     (None, false) => Line::from(Span::styled(format!(" {}", app.status_message), Style::default().fg(Color::White).add_modifier(Modifier::ITALIC))),
@@ -69,15 +74,15 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
         Span::raw("─"),
         Span::styled("[Enter - Play]", Style::default().fg(Color::Cyan)),
         Span::raw(" ─── "),
-        Span::styled("[p - Play Lista]", Style::default().fg(Color::Cyan)),
+        Span::styled(app.language.btn_play_list(), Style::default().fg(Color::Cyan)),
         Span::raw(" ─── "),
-        Span::styled("[Espacio - Pausa]", Style::default().fg(Color::Cyan)),
+        Span::styled(app.language.btn_pause(), Style::default().fg(Color::Cyan)),
         Span::raw(" ─── "),
-        Span::styled("[< / > - Ant/Sig]", Style::default().fg(Color::Cyan)),
+        Span::styled(app.language.btn_prev_next(), Style::default().fg(Color::Cyan)),
         Span::raw(" ─── "),
-        Span::styled("[s - Shuffle]", Style::default().fg(if app.queue.is_shuffle() { Color::Yellow } else { Color::Cyan })),
+        Span::styled(app.language.btn_shuffle(), Style::default().fg(if app.queue.is_shuffle() { Color::Yellow } else { Color::Cyan })),
         Span::raw(" ─── "),
-        Span::styled("[r - Repeat]", Style::default().fg(Color::Cyan)),
+        Span::styled(app.language.btn_repeat(), Style::default().fg(Color::Cyan)),
         Span::raw(" ─── "),
         Span::styled("[-/+ - Vol]", Style::default().fg(Color::Cyan)),
         Span::raw("─"),
@@ -94,7 +99,7 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
             Line::from(""),
             footer_line,
         ])
-        .block(Block::default().borders(Borders::ALL).title_top(" Reproductor ").title_bottom(bottom_controls)),
+        .block(Block::default().borders(Borders::ALL).title_top(app.language.title_player()).title_bottom(bottom_controls)),
         bottom_chunks[1],
     );
 }

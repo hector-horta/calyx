@@ -18,6 +18,8 @@ pub mod error;
 pub mod fmp4;
 /// HLS streaming support.
 pub mod hls;
+/// Internationalization and localized text resources.
+pub mod i18n;
 /// Personal Apple Music Library & Playlists synchronization.
 pub mod library;
 /// Interactive zero-friction Apple Music Sign-In.
@@ -45,6 +47,7 @@ pub use fmp4::{
     strip_enca_protection_atoms,
 };
 pub use hls::HlsStreamPlan;
+pub use i18n::Language;
 pub use library::{
     fetch_playlist_tracks, fetch_user_library_songs, fetch_user_playlists,
     parse_library_songs_json, parse_user_playlists_json, UserPlaylist,

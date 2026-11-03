@@ -7,17 +7,45 @@ use crate::cdp::{send_cdp_command, CdpTarget, CDP_PORT};
 use crate::error::{CalyxError, CalyxResult};
 
 pub fn find_browser_executable() -> CalyxResult<PathBuf> {
-    [
-        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
-        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-        r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
-    ]
-    .into_iter()
-    .map(PathBuf::from)
-    .find(|p| p.exists())
-    .ok_or_else(|| CalyxError::Auth("No se encontró Edge, Chrome ni Brave instalado.".to_string()))
+    if let Ok(bin) = std::env::var("CALYX_BROWSER_BIN").or_else(|_| std::env::var("BROWSER")) {
+        let p = PathBuf::from(bin);
+        if p.exists() {
+            return Ok(p);
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let mut candidates = Vec::new();
+        for base in ["PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"] {
+            if let Ok(dir) = std::env::var(base) {
+                let pb = PathBuf::from(dir);
+                candidates.push(pb.join(r"Microsoft\Edge\Application\msedge.exe"));
+                candidates.push(pb.join(r"Google\Chrome\Application\chrome.exe"));
+                candidates.push(pb.join(r"BraveSoftware\Brave-Browser\Application\brave.exe"));
+            }
+        }
+        candidates.into_iter().find(|p| p.exists()).ok_or_else(|| {
+            CalyxError::Auth("No se encontró un navegador compatible. Consulta 'Autenticación' en README.".to_string())
+        })
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(bin) = std::env::var("CALYX_BROWSER_BIN").or_else(|_| std::env::var("BROWSER")) {
+            let p = PathBuf::from(bin);
+            if p.exists() { return Ok(p); }
+        }
+        let list = [
+            "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable", "/usr/bin/chromium",
+            "/usr/bin/chromium-browser", "/usr/bin/brave-browser", "/usr/bin/microsoft-edge",
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        ];
+        list.into_iter().map(PathBuf::from).find(|p| p.exists())
+            .ok_or_else(|| CalyxError::Auth("No se encontró un navegador compatible. Consulta 'Autenticación' en README.".to_string()))
+    }
 }
 
 pub fn calyx_browser_profile_dir() -> PathBuf {

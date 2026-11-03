@@ -33,6 +33,7 @@ pub struct TuiApp {
     pub status_message: String,
     #[allow(dead_code)]
     pub drm_mode: DrmMode,
+    pub language: calyx_core::Language,
     pub session: SessionConfig,
     pub volume: f32,
     pub should_quit: bool,
@@ -73,6 +74,7 @@ impl TuiApp {
             current_lyrics: Vec::new(),
             status_message: String::new(),
             drm_mode: DrmMode::WidevineL3Cbcs,
+            language: session.language.unwrap_or_else(calyx_core::Language::detect_system),
             session,
             volume: 0.85,
             should_quit: false,
@@ -197,6 +199,16 @@ pub fn selected_track(&self) -> Option<Track> {
         let shuf = self.queue.toggle_shuffle();
         self.status_message = format!("Modo Aleatorio (Shuffle): {}", if shuf { "ON 🔀" } else { "OFF" });
         shuf
+    }
+
+    pub fn toggle_language(&mut self) {
+        self.language = self.language.toggle();
+        self.session.language = Some(self.language);
+        let _ = self.session.save();
+        self.status_message = match self.language {
+            calyx_core::Language::Es => "Idioma: Español ('L' para cambiar)".to_string(),
+            calyx_core::Language::En => "Language: English ('L' to switch)".to_string(),
+        };
     }
 
     pub async fn execute_search(&mut self) {

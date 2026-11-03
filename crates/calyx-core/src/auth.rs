@@ -14,6 +14,7 @@ pub struct SessionConfig {
     pub developer_token: Option<String>,
     pub media_user_token: Option<String>,
     pub wvd_path: Option<String>,
+    pub language: Option<crate::i18n::Language>,
 }
 
 impl SessionConfig {
@@ -41,6 +42,9 @@ impl SessionConfig {
             cfg.wvd_path = std::env::var("CALYX_WVD_PATH")
                 .ok()
                 .or_else(discover_local_wvd_path);
+        }
+        if cfg.language.is_none() {
+            cfg.language = Some(crate::i18n::Language::detect_system());
         }
         cfg
     }
