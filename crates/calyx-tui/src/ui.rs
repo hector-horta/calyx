@@ -30,8 +30,6 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
         Span::raw(" ── "),
         nav_tab(l.nav_playlists(), app.active_view == ActiveView::Playlists),
         Span::raw(" ── "),
-        nav_tab(l.nav_search(), app.is_editing),
-        Span::raw(" ── "),
         nav_tab(l.nav_queue(), app.active_view == ActiveView::Queue),
         Span::raw(" ── "),
         nav_tab(l.nav_lang(), false),
@@ -71,19 +69,44 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
 }
 
 fn render_central_with_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Line<'static>) {
+    let (lbl_a, lbl_n, lbl_p, lbl_c) = match app.language {
+        calyx_core::Language::Es => (" Encolar", " A Continuación", " Reproducir", " Limpiar"),
+        calyx_core::Language::En => (" Enqueue", " Play Next", " Play Playlist", " Clear"),
+    };
     let bottom_bar = match app.active_view {
-        ActiveView::Playlists => match app.language {
-            calyx_core::Language::Es => "─[Enter - Abrir Playlist] ─── [p - Reproducir Lista]─",
-            calyx_core::Language::En => "─[Enter - Open Playlist] ─── [p - Play Playlist]─",
-        },
-        ActiveView::Queue => match app.language {
-            calyx_core::Language::Es => "─[d - Quitar Pista] ─── [c - Limpiar Cola]─",
-            calyx_core::Language::En => "─[d - Remove Track] ─── [c - Clear Queue]─",
-        },
-        _ => match app.language {
-            calyx_core::Language::Es => "─[a - Encolar] ─── [n - A Continuación] ─── [p - Reproducir Lista] ─── [c - Limpiar]─",
-            calyx_core::Language::En => "─[a - Enqueue] ─── [n - Play Next] ─── [p - Play Playlist] ─── [c - Clear All]─",
-        },
+        ActiveView::Playlists => Line::from(vec![
+            Span::raw("─"),
+            Span::styled("Enter", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Abrir", Style::default().fg(Color::DarkGray)),
+            Span::raw(" ── "),
+            Span::styled("p", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_p, Style::default().fg(Color::DarkGray)),
+            Span::raw("─"),
+        ]),
+        ActiveView::Queue => Line::from(vec![
+            Span::raw("─"),
+            Span::styled("d", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(" Quitar", Style::default().fg(Color::DarkGray)),
+            Span::raw(" ── "),
+            Span::styled("c", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_c, Style::default().fg(Color::DarkGray)),
+            Span::raw("─"),
+        ]),
+        _ => Line::from(vec![
+            Span::raw("─"),
+            Span::styled("a", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_a, Style::default().fg(Color::DarkGray)),
+            Span::raw(" ── "),
+            Span::styled("n", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_n, Style::default().fg(Color::DarkGray)),
+            Span::raw(" ── "),
+            Span::styled("p", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_p, Style::default().fg(Color::DarkGray)),
+            Span::raw(" ── "),
+            Span::styled("c", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_c, Style::default().fg(Color::DarkGray)),
+            Span::raw("─"),
+        ]),
     };
     let outer = Block::default().borders(Borders::ALL).title_top(nav_line).title_bottom(bottom_bar);
     let inner = outer.inner(area);
@@ -114,10 +137,16 @@ fn render_playlists(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
 
 fn render_queue(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let upcoming = app.queue.upcoming();
+    let avail = (area.width as usize).saturating_sub(18);
+    let (wt, wa) = if avail < 30 { (28, 16) } else {
+        let wt = (avail * 60) / 100;
+        let wa = avail.saturating_sub(wt);
+        (wt, wa)
+    };
     let items: Vec<ListItem<'_>> = if upcoming.is_empty() {
         vec![ListItem::new(Line::from(Span::styled("  La cola está vacía. Selecciona pistas y presiona 'a' o 'n'.", Style::default().fg(Color::DarkGray))))]
     } else {
-        upcoming.iter().enumerate().map(|(i, t)| ListItem::new(Line::from(format!("{:>2}. {:<32} │ {:<18} │ {}", i + 1, truncate(&t.title, 30), truncate(&t.artist, 16), t.formatted_duration())))).collect()
+        upcoming.iter().enumerate().map(|(i, t)| ListItem::new(Line::from(format!("{:>2}. {:<wt$} │ {:<wa$} │ {}", i + 1, truncate(&t.title, wt.saturating_sub(1)), truncate(&t.artist, wa.saturating_sub(1)), t.formatted_duration())))).collect()
     };
     let list = List::new(items)
         .highlight_symbol("▶ ")
@@ -127,7 +156,16 @@ fn render_queue(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
 }
 
 fn render_tracks(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
-    let items: Vec<ListItem<'_>> = app.tracks.iter().map(|t| ListItem::new(Line::from(format!("{:<32} │ {:<20} │ {:<18} │ {}", truncate(&t.title, 30), truncate(&t.artist, 18), truncate(&t.album, 16), t.formatted_duration())))).collect();
+    let avail = (area.width as usize).saturating_sub(18);
+    let (wt, wa, wal) = if avail < 40 {
+        (26, 16, 14)
+    } else {
+        let wt = (avail * 46) / 100;
+        let wa = (avail * 24) / 100;
+        let wal = avail.saturating_sub(wt + wa);
+        (wt, wa, wal)
+    };
+    let items: Vec<ListItem<'_>> = app.tracks.iter().map(|t| ListItem::new(Line::from(format!("{:<wt$} │ {:<wa$} │ {:<wal$} │ {}", truncate(&t.title, wt.saturating_sub(1)), truncate(&t.artist, wa.saturating_sub(1)), truncate(&t.album, wal.saturating_sub(1)), t.formatted_duration())))).collect();
     let list = List::new(items)
         .highlight_symbol("▶ ")
         .highlight_style(Style::default().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD));

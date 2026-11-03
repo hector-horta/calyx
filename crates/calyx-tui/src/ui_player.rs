@@ -37,22 +37,29 @@ let elap_s = elapsed.as_secs();
 let tot_s = total.as_secs().max(app.current_track.as_ref().map(|t| t.duration_ms / 1000).unwrap_or(0));
 let rem_s = tot_s.saturating_sub(elap_s);
 let ratio = if tot_s > 0 { (elapsed.as_millis() as f64 / (tot_s as f64 * 1000.0)).clamp(0.0, 1.0) } else { 0.0 };
-let (shuf_str, shuf_col) = if app.queue.is_shuffle() { ("🔀  ON [s]", Color::Yellow) } else { ("🔀  OFF [s]", Color::Green) };
-let (rep_str, rep_col) = match app.queue.repeat_mode() {
-    calyx_core::queue::RepeatMode::Off => ("🔁  OFF [r]", Color::Green),
-    calyx_core::queue::RepeatMode::All => ("🔁  ALL [r]", Color::Yellow),
-    calyx_core::queue::RepeatMode::One => ("🔂  ONE [r]", Color::Yellow),
+let (shuf_str, shuf_col) = if app.queue.is_shuffle() {
+    ("🔀  ON [s]", Color::Rgb(200, 235, 245))
+} else {
+    ("🔀  OFF [s]", Color::DarkGray)
 };
+let (rep_str, rep_col) = match app.queue.repeat_mode() {
+    calyx_core::queue::RepeatMode::Off => ("🔁  OFF [r]", Color::DarkGray),
+    calyx_core::queue::RepeatMode::All => ("🔁  ALL [r]", Color::Cyan),
+    calyx_core::queue::RepeatMode::One => ("🔂  ONE [r]", Color::Cyan),
+};
+
 let time_line = Line::from(Span::styled(
     format!("[{:02}:{:02} / {:02}:{:02} (-{:02}:{:02})]", elap_s / 60, elap_s % 60, tot_s / 60, tot_s % 60, rem_s / 60, rem_s % 60),
-    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+    Style::default().fg(Color::Rgb(220, 225, 230)).add_modifier(Modifier::BOLD)
 ));
 
 let state_line = Line::from(vec![
-    Span::styled(status_str.to_string(), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-    Span::styled(format!("  │  Vol: {:>3}%  │  ", (app.volume * 100.0) as u8), Style::default().fg(Color::Green)),
+    Span::styled(status_str.to_string(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+    Span::styled("  │  Vol: ", Style::default().fg(Color::DarkGray)),
+    Span::styled(format!("{:>3}%", (app.volume * 100.0) as u8), Style::default().fg(Color::White)),
+    Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
     Span::styled(shuf_str, Style::default().fg(shuf_col)),
-    Span::styled("  │  ", Style::default().fg(Color::Green)),
+    Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
     Span::styled(rep_str, Style::default().fg(rep_col)),
 ]);
 
@@ -74,26 +81,26 @@ let (lbl_next, lbl_queue) = match app.language {
 };
 
 let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
-    (Some(next), true) => Line::from(Span::styled(format!("{lbl_next}: {} — {} ({} {lbl_queue})", truncate(&next.title, 28), truncate(&next.artist, 20), app.queue.len()), Style::default().fg(Color::Cyan))),
+    (Some(next), true) => Line::from(Span::styled(format!("{lbl_next}: {} — {} ({} {lbl_queue})", truncate(&next.title, 34), truncate(&next.artist, 20), app.queue.len()), Style::default().fg(Color::Rgb(120, 160, 160)))),
     (Some(next), false) => Line::from(vec![
-        Span::styled(format!("{lbl_next}: {} — {} ({})  │  ", truncate(&next.title, 22), truncate(&next.artist, 14), app.queue.len()), Style::default().fg(Color::Cyan)),
-        Span::styled(truncate(&app.status_message, 42), Style::default().fg(Color::White).add_modifier(Modifier::ITALIC)),
+        Span::styled(format!("{lbl_next}: {} — {} ({})  │  ", truncate(&next.title, 34), truncate(&next.artist, 20), app.queue.len()), Style::default().fg(Color::Rgb(120, 160, 160))),
+        Span::styled(truncate(&app.status_message, 42), Style::default().fg(Color::Rgb(120, 160, 160)).add_modifier(Modifier::ITALIC)),
     ]),
-    (None, false) => Line::from(Span::styled(format!("{}", app.status_message), Style::default().fg(Color::White).add_modifier(Modifier::ITALIC))),
+    (None, false) => Line::from(Span::styled(format!("{}", app.status_message), Style::default().fg(Color::Rgb(120, 160, 160)))),
     (None, true) => Line::from(""),
 };
 
-    let bottom_controls = Line::from(vec![
-        Span::raw("─"),
-        Span::styled("[Enter - Play]", Style::default().fg(Color::Cyan)),
-        Span::raw(" ── "),
-        Span::styled(app.language.btn_pause(), Style::default().fg(Color::Cyan)),
-        Span::raw(" ── "),
-        Span::styled(app.language.btn_prev_next(), Style::default().fg(Color::Cyan)),
-        Span::raw(" ── "),
-        Span::styled("[-/+ - Vol]", Style::default().fg(Color::Cyan)),
-        Span::raw("─"),
-    ]);
+let bottom_controls = Line::from(vec![
+    Span::raw("─"),
+    Span::styled("[Enter - Play]", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+    Span::raw(" ── "),
+    Span::styled(app.language.btn_pause(), Style::default().fg(Color::DarkGray)),
+    Span::raw(" ── "),
+    Span::styled(app.language.btn_prev_next(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+    Span::raw(" ── "),
+    Span::styled("[-/+ - Vol]", Style::default().fg(Color::DarkGray)),
+    Span::raw("─"),
+]);
 
     frame.render_widget(
         Paragraph::new(vec![

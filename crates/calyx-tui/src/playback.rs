@@ -84,7 +84,7 @@ pub async fn play_track(&mut self, mut track: Track) {
             if session.has_full_stream_credentials() {
                 match session.load_wvd_device() {
                     Ok(wvd) => {
-                        let hint_ok = format!("Widevine L3 Activo: {} — {}", track.artist, track.title);
+                        let hint_ok = "[AAC 256k]".to_string();
                         for cid in &candidates {
                             match client.fetch_full_track_stream(cid, &wvd).await {
                                 Ok(full_bytes) => return Ok((full_bytes, hint_ok)),
