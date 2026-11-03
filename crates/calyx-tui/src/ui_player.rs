@@ -13,7 +13,7 @@ pub fn render_player_panel(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         None => crate::artwork::TerminalCoverArt::from_jpeg_or_seed(None, "Calyx").to_lines(),
     };
     frame.render_widget(
-        Paragraph::new(art_lines).block(Block::default().borders(Borders::ALL).title(app.language.title_cover())),
+        Paragraph::new(art_lines).block(Block::default().borders(Borders::ALL)),
         bottom_chunks[0],
     );
 
@@ -102,7 +102,7 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
             Line::from(""),
             footer_line,
         ])
-        .block(Block::default().borders(Borders::ALL).title_top(app.language.title_player()).title_bottom(bottom_controls)),
+        .block(Block::default().borders(Borders::ALL).title_bottom(bottom_controls)),
         bottom_chunks[1],
     );
 }
