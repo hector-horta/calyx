@@ -70,7 +70,7 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
 
 fn render_central_with_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Line<'static>) {
     let (lbl_a, lbl_n, lbl_p, lbl_c) = match app.language {
-        calyx_core::Language::Es => (" Encolar", " A Continuación", " Reproducir", " Limpiar"),
+        calyx_core::Language::Es => (" Encolar", " A Continuación", " Reproducir Lista", " Limpiar"),
         calyx_core::Language::En => (" Enqueue", " Play Next", " Play Playlist", " Clear"),
     };
     let bottom_bar = match app.active_view {
