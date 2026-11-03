@@ -80,17 +80,17 @@ let switches_line = Line::from(vec![
 ]);
 
 let spec = app.current_spectrum();
-let lit = ((ratio * 20.0).round() as usize).clamp(0, 20);
+let lit = ((ratio * 15.0).round() as usize).clamp(0, 15);
 let srow = |r: u8, c: Color, v_spans: Vec<Span<'static>>| -> Line<'static> {
     let mut v = get_glyph_spans(r);
     v.push(Span::raw("  "));
-    for b in 0..20 {
-        let val = spec[(b * 32) / 20];
+    for b in 0..15 {
+        let val = spec[(b * 32) / 15];
         let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
         let col = if b < lit { c } else { Color::DarkGray };
         let ch = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'][idx];
-        v.push(Span::styled(format!("{ch}{ch}"), Style::default().fg(col)));
-        if b < 19 {
+        v.push(Span::styled(format!("{ch}{ch}{ch}"), Style::default().fg(col)));
+        if b < 14 {
             v.push(Span::raw(" "));
         }
     }
