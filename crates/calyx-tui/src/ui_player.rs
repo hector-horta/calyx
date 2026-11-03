@@ -25,12 +25,7 @@ let header_line = match &app.current_track {
     None => Line::from(Span::styled(app.language.no_active_playback(), Style::default().fg(Color::DarkGray))),
 };
 
-let status_str = match app.playback_status() {
-    calyx_core::models::PlaybackStatus::Playing => app.language.status_playing(),
-    calyx_core::models::PlaybackStatus::Paused => app.language.status_paused(),
-    calyx_core::models::PlaybackStatus::Buffering => app.language.status_buffering(),
-    calyx_core::models::PlaybackStatus::Stopped => app.language.status_stopped(),
-};
+
 
 let (elapsed, total) = app.playback_progress();
 let elap_s = elapsed.as_secs();
@@ -53,26 +48,48 @@ let time_line = Line::from(Span::styled(
     Style::default().fg(Color::Rgb(220, 225, 230)).add_modifier(Modifier::BOLD)
 ));
 
-let state_line = Line::from(vec![
-    Span::styled(status_str.to_string(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-    Span::styled("  │  Vol: ", Style::default().fg(Color::DarkGray)),
-    Span::styled(format!("{:>3}%", (app.volume * 100.0) as u8), Style::default().fg(Color::White)),
-    Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+let (g2, g1, g0, g_col) = match app.playback_status() {
+    calyx_core::models::PlaybackStatus::Playing => ("█◣  ", "███◣", "█◤  ", Color::Cyan),
+    calyx_core::models::PlaybackStatus::Paused => ("█ █ ", "█ █ ", "█ █ ", Color::Yellow),
+    calyx_core::models::PlaybackStatus::Buffering => (" ↻  ", " ↻  ", "    ", Color::Cyan),
+    calyx_core::models::PlaybackStatus::Stopped => ("■ ■ ", "■ ■ ", "■ ■ ", Color::DarkGray),
+};
+
+let vol = (app.volume * 100.0).round() as u8;
+let vol_lit = ((vol as f64 / 100.0) * 4.0).round() as usize;
+let vol_steps = ['▂', '▄', '▆', '█'];
+let vol_bar: Vec<Span<'static>> = std::iter::once(Span::raw(" "))
+    .chain(vol_steps.iter().enumerate().map(|(i, &s)| {
+        let col = if i < vol_lit { Color::Cyan } else { Color::DarkGray };
+        Span::styled(s.to_string(), Style::default().fg(col))
+    }))
+    .collect();
+
+let switches_line = Line::from(vec![
     Span::styled(shuf_str, Style::default().fg(shuf_col)),
-    Span::styled("  │  ", Style::default().fg(Color::DarkGray)),
+    Span::styled("   │   ", Style::default().fg(Color::DarkGray)),
     Span::styled(rep_str, Style::default().fg(rep_col)),
 ]);
 
 let spec = app.current_spectrum();
-let lit = ((ratio * 32.0).round() as usize).clamp(0, 32);
-let srow = |r: u8, c: Color| -> Line<'static> {
-    let mut v = Vec::new();
-    for (b, &val) in spec.iter().enumerate() {
+let lit = ((ratio * 20.0).round() as usize).clamp(0, 20);
+let srow = |r: u8, c: Color, g: &'static str, v_spans: Vec<Span<'static>>| -> Line<'static> {
+    let mut v = vec![
+        Span::styled(g, Style::default().fg(g_col).add_modifier(Modifier::BOLD)),
+        Span::raw("  "),
+    ];
+    for b in 0..20 {
+        let val = spec[(b * 32) / 20];
         let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
         let col = if b < lit { c } else { Color::DarkGray };
         let ch = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'][idx];
         v.push(Span::styled(format!("{ch}{ch}"), Style::default().fg(col)));
+        if b < 19 {
+            v.push(Span::raw(" "));
+        }
     }
+    v.push(Span::raw("  "));
+    v.extend(v_spans);
     Line::from(v)
 };
 
@@ -107,11 +124,11 @@ let bottom_controls = Line::from(vec![
         Paragraph::new(vec![
             header_line,
             Line::from(""),
-            srow(2, Color::Rgb(255, 215, 0)),
-            srow(1, Color::Rgb(0, 240, 180)),
-            srow(0, Color::Rgb(0, 200, 100)),
+            srow(2, Color::Rgb(255, 215, 0), g2, vec![Span::styled(" VOL", Style::default().fg(Color::DarkGray))]),
+            srow(1, Color::Rgb(0, 240, 180), g1, vec![Span::styled(format!("{:>3}%", vol), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
+            srow(0, Color::Rgb(0, 200, 100), g0, vol_bar),
             time_line,
-            state_line,
+            switches_line,
             Line::from(""),
             footer_line,
         ])
