@@ -1,5 +1,6 @@
 mod app;
 mod artwork;
+mod navigation;
 mod playback;
 mod ui;
 mod ui_help;

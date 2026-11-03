@@ -17,7 +17,12 @@ impl TuiApp {
                         self.current_lyrics = lyrics;
                         match res {
                             Ok(bytes) => match self.audio.play_encoded_bytes(bytes) {
-                                Ok(()) => { self.audio.set_volume(self.volume); self.status_message = hint; self.current_track = Some(track); }
+                                Ok(()) => {
+                                    self.audio.set_volume(self.volume);
+                                    self.status_message = hint;
+                                    self.current_track = Some(track);
+                                    self.trigger_prefetch_next();
+                                }
                                 Err(e) => self.status_message = format!("Error de audio: {e}"),
                             },
                             Err(e) => self.status_message = e,
@@ -233,53 +238,41 @@ pub async fn check_auto_advance(&mut self) {
         }
     }
 
-pub async fn sync_playlists(&mut self) -> () {
-    let dev_tok = self.session.developer_token.as_deref().unwrap_or("");
-    let user_tok = self.session.media_user_token.as_deref().unwrap_or("");
-    self.active_view = crate::app::ActiveView::Playlists;
-    match calyx_core::fetch_user_playlists(self.client.http(), dev_tok, user_tok, 50).await {
-        Ok(playlists) => {
-            self.status_message = format!("Playlists sincronizadas: {} listas encontradas (Enter para abrir).", playlists.len());
-            self.playlists = playlists;
-            self.playlist_state.select(if self.playlists.is_empty() { None } else { Some(0) });
-        }
-        Err(e) => self.status_message = format!("Error sincronizando playlists: {e}"),
-    }
-}
+    pub fn trigger_prefetch_next(&mut self) {
+        let Some(next_track) = self.queue.peek_next().cloned() else { return; };
+        if self.audio_cache.contains(&next_track.id) { return; }
 
-    pub async fn sync_library(&mut self) {
-        let dev_tok = self.session.developer_token.as_deref().unwrap_or("");
-        let user_tok = self.session.media_user_token.as_deref().unwrap_or("");
-        self.active_view = crate::app::ActiveView::Library;
+        let (client, session, cache) = (self.client.clone(), self.session.clone(), self.audio_cache.clone());
+        tokio::spawn(async move {
+            if !session.has_full_stream_credentials() { return; }
+            let Ok(wvd) = session.load_wvd_device() else { return; };
 
-        match calyx_core::fetch_user_library_songs(self.client.http(), dev_tok, user_tok, &self.session.storefront, 50).await {
-            Ok(songs) => {
-                self.status_message = format!("Biblioteca sincronizada: {} canciones cargadas.", songs.len());
-                if !songs.is_empty() {
-                    self.tracks = songs;
-                    self.selected_index = 0;
-                    self.list_state.select(Some(0));
+            let mut candidates = vec![next_track.id.clone()];
+            if let Some(lib_id) = next_track.hls_manifest_url.clone().filter(|id| !candidates.contains(id)) {
+                candidates.push(lib_id);
+            }
+
+            for cid in &candidates {
+                if let Ok(full_bytes) = client.fetch_full_track_stream(cid, &wvd).await {
+                    if let Ok(()) = cache.put(cid, &full_bytes) {
+                        cache.evict_if_needed();
+                    }
+                    return;
                 }
             }
-            Err(e) => self.status_message = format!("Error sincronizando biblioteca: {e}"),
-        }
-    }
 
-    pub fn open_home(&mut self) {
-        self.tracks = self.store.search_tracks("", 50).unwrap_or_default();
-        self.selected_index = 0;
-        self.list_state.select(Some(0));
-        self.active_view = crate::app::ActiveView::Home;
-        self.status_message = "1 — Recientes: Historial de búsquedas ('/').".to_string();
-    }
-
-    pub async fn open_section_query(&mut self, view: crate::app::ActiveView, query: &str, label: &str) {
-        self.active_view = view;
-        if let Ok(res) = self.client.search_catalog(query, 25).await {
-            self.tracks = res;
-            self.selected_index = 0;
-            self.list_state.select(Some(0));
-            self.status_message = format!("{label} cargadas ({} pistas).", self.tracks.len());
-        }
+            let clean_title = next_track.title.split(['(', '[']).next().unwrap_or(&next_track.title).trim();
+            let q = format!("{} {}", next_track.artist, clean_title);
+            if let Ok(found) = client.search_catalog(&q, 3).await {
+                for cat in found {
+                    if let Ok(full_bytes) = client.fetch_full_track_stream(&cat.id, &wvd).await {
+                        let _ = cache.put(&cat.id, &full_bytes);
+                        let _ = cache.put(&next_track.id, &full_bytes);
+                        cache.evict_if_needed();
+                        return;
+                    }
+                }
+            }
+        });
     }
 }
