@@ -2,6 +2,7 @@ mod app;
 mod artwork;
 mod playback;
 mod ui;
+mod ui_help;
 mod ui_player;
 
 use std::io;

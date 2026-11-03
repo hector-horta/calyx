@@ -56,7 +56,7 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
     );
 
     match app.active_view {
-        ActiveView::Help => render_help(frame, chunks[1], app, nav_line),
+        ActiveView::Help => crate::ui_help::render_help(frame, chunks[1], app, nav_line),
         _ => render_central_with_lyrics(frame, chunks[1], app, nav_line),
     }
     render_player_panel(frame, chunks[2], app);
@@ -102,41 +102,7 @@ fn render_playlists(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     frame.render_stateful_widget(list, area, &mut state);
 }
 
-fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Line<'static>) {
-    let is_es = app.language == calyx_core::Language::Es;
-    let lines = if is_es {
-        vec![
-            Line::from(""),
-            Line::from(Span::styled("  🧭 Navegación Superior", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [1 - Inicio] ─── [2 - Novedades] ─── [3 - Radio] ─── [4 - Biblioteca] ─── [5 - Playlists] ─── [/ - Buscar] ─── [Tab - Cola] ─── [L - Idioma] ─── [? - Ayuda]"),
-            Line::from(""),
-            Line::from(Span::styled("  📋 Gestión de Cola, Playlists y Recientes", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [p - Reproducir Lista] ─── [a - Encolar] ─── [n - A continuación] ─── [d - Quitar Pista] ─── [c - Limpiar Todo]"),
-            Line::from(""),
-            Line::from(Span::styled("  🎵 Controles del Reproductor", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [Enter - Play] ─── [Espacio - Pausa] ─── [< / > - Ant/Sig] ─── [s - Aleatorio] ─── [r - Repetir] ─── [-/+ - Vol]"),
-            Line::from(""),
-            Line::from(Span::styled("  🔐 Cuenta Apple Music & Sistema", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [u - Login Apple ID] ─── [t - Sincronizar DevToken] ─── [L - Cambiar Idioma] ─── [q - Salir]"),
-        ]
-    } else {
-        vec![
-            Line::from(""),
-            Line::from(Span::styled("  🧭 Top Navigation", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [1 - Home] ─── [2 - New] ─── [3 - Radio] ─── [4 - Library] ─── [5 - Playlists] ─── [/ - Search] ─── [Tab - Queue] ─── [L - Language] ─── [? - Help]"),
-            Line::from(""),
-            Line::from(Span::styled("  📋 Queue, Playlists & Recent Management", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [p - Play Playlist] ─── [a - Enqueue] ─── [n - Play Next] ─── [d - Remove Track] ─── [c - Clear All]"),
-            Line::from(""),
-            Line::from(Span::styled("  🎵 Player Controls", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [Enter - Play] ─── [Space - Pause] ─── [< / > - Prev/Next] ─── [s - Shuffle] ─── [r - Repeat] ─── [-/+ - Vol]"),
-            Line::from(""),
-            Line::from(Span::styled("  🔐 Apple Music Account & System", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("     [u - Apple ID Login] ─── [t - Sync DevToken] ─── [L - Toggle Language] ─── [q - Quit]"),
-        ]
-    };
-    frame.render_widget(Paragraph::new(lines).block(Block::default().borders(Borders::ALL).title_top(nav_line)), area);
-}
+
 
 fn render_queue(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let upcoming = app.queue.upcoming();

@@ -26,7 +26,7 @@ pub fn find_browser_executable() -> CalyxResult<PathBuf> {
             }
         }
         candidates.into_iter().find(|p| p.exists()).ok_or_else(|| {
-            CalyxError::Auth("No se encontró un navegador compatible. Consulta 'Autenticación' en README.".to_string())
+            CalyxError::Auth("No se encontró un navegador compatible. Presiona '?' en Calyx para ver la guía manual.".to_string())
         })
     }
 
@@ -44,7 +44,7 @@ pub fn find_browser_executable() -> CalyxResult<PathBuf> {
             "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
         ];
         list.into_iter().map(PathBuf::from).find(|p| p.exists())
-            .ok_or_else(|| CalyxError::Auth("No se encontró un navegador compatible. Consulta 'Autenticación' en README.".to_string()))
+            .ok_or_else(|| CalyxError::Auth("No se encontró un navegador compatible. Presiona '?' en Calyx para ver la guía manual.".to_string()))
     }
 }
 
