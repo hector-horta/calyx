@@ -32,6 +32,8 @@ pub mod lyrics_ttml;
 pub mod models;
 /// Playback queue management with repeat and shuffle support.
 pub mod queue;
+/// Local disk cache for decrypted streaming audio.
+pub mod audio_cache;
 /// Pure-Rust Widevine L3 cryptographic primitives.
 pub mod wv_crypto;
 /// Built-in Android 9 L3 WVD device credentials.
@@ -59,3 +61,4 @@ pub use lyrics::{fetch_track_lyrics, parse_lrc, LyricLine};
 pub use lyrics_ttml::{fetch_apple_music_lyrics, parse_ttml, parse_ttml_time};
 pub use models::{DrmMode, PlaybackStatus, Track};
 pub use queue::{PlaybackQueue, RepeatMode};
+pub use audio_cache::AudioCache;

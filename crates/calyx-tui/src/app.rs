@@ -45,6 +45,7 @@ pub struct TuiApp {
     pub(crate) bg_tx: tokio::sync::mpsc::UnboundedSender<crate::playback::BgEvent>,
     pub(crate) bg_rx: tokio::sync::mpsc::UnboundedReceiver<crate::playback::BgEvent>,
     pub(crate) play_task: Option<tokio::task::JoinHandle<()>>,
+    pub(crate) audio_cache: calyx_core::AudioCache,
 }
 
 impl TuiApp {
@@ -59,6 +60,10 @@ impl TuiApp {
         let mut queue_state = ListState::default();
         queue_state.select(Some(0));
         let (bg_tx, bg_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let audio_cache = calyx_core::AudioCache::new(2 * 1024 * 1024 * 1024);
+        let cache_bg = audio_cache.clone();
+        tokio::task::spawn_blocking(move || { cache_bg.evict_if_needed(); });
 
         Ok(Self {
             search_input: String::with_capacity(1024),
@@ -98,6 +103,7 @@ impl TuiApp {
             bg_tx,
             bg_rx,
             play_task: None,
+            audio_cache,
         })
     }
 

@@ -50,7 +50,7 @@ pub async fn play_track(&mut self, mut track: Track) {
     self.current_track = Some(track.clone());
     self.status_message = format!("⏳ Cargando audio en 2do plano: {} — {}...", track.artist, track.title);
 
-    let (client, session, tx) = (self.client.clone(), self.session.clone(), self.bg_tx.clone());
+    let (client, session, tx, cache) = (self.client.clone(), self.session.clone(), self.bg_tx.clone(), self.audio_cache.clone());
     self.play_task = Some(tokio::spawn(async move {
         let mut candidates = vec![orig_id.clone()];
         if let Some(lib_id) = track.hls_manifest_url.clone().filter(|id| !candidates.contains(id)) {
@@ -84,6 +84,15 @@ pub async fn play_track(&mut self, mut track: Track) {
             _ => None,
         };
         let lyrics_fut = calyx_core::fetch_track_lyrics(client.http(), &track.title, &track.artist, apple_ctx);
+
+        for cid in &candidates {
+            if let Some(cached_bytes) = cache.get(cid) {
+                let lyrics = lyrics_fut.await;
+                let _ = tx.send(BgEvent::AudioReady(track.clone(), Ok(cached_bytes), lyrics, "[AAC 256k | Caché]".to_string()));
+                return;
+            }
+        }
+
         let wvd_fut = async {
             let mut local_note: Option<String> = None;
             if session.has_full_stream_credentials() {
@@ -92,7 +101,11 @@ pub async fn play_track(&mut self, mut track: Track) {
                         let hint_ok = "[AAC 256k]".to_string();
                         for cid in &candidates {
                             match client.fetch_full_track_stream(cid, &wvd).await {
-                                Ok(full_bytes) => return Ok((full_bytes, hint_ok)),
+                                Ok(full_bytes) => {
+                                    let (c_c, id_c, b_c) = (cache.clone(), cid.clone(), full_bytes.clone());
+                                    tokio::task::spawn_blocking(move || { if c_c.put(&id_c, &b_c).is_ok() { c_c.evict_if_needed(); } });
+                                    return Ok((full_bytes, hint_ok));
+                                }
                                 Err(e) => local_note = Some(e.to_string()),
                             }
                         }
@@ -102,7 +115,11 @@ pub async fn play_track(&mut self, mut track: Track) {
                             for cat in found {
                                 if !candidates.contains(&cat.id) {
                                     match client.fetch_full_track_stream(&cat.id, &wvd).await {
-                                        Ok(full_bytes) => return Ok((full_bytes, hint_ok)),
+                                        Ok(full_bytes) => {
+                                            let (c_c, id_c, b_c) = (cache.clone(), cat.id.clone(), full_bytes.clone());
+                                            tokio::task::spawn_blocking(move || { if c_c.put(&id_c, &b_c).is_ok() { c_c.evict_if_needed(); } });
+                                            return Ok((full_bytes, hint_ok));
+                                        }
                                         Err(e) => local_note = Some(e.to_string()),
                                     }
                                 }
