@@ -43,9 +43,13 @@ let (rep_str, rep_col) = match app.queue.repeat_mode() {
     calyx_core::queue::RepeatMode::All => ("🔁  ALL [r]", Color::Yellow),
     calyx_core::queue::RepeatMode::One => ("🔂  ONE [r]", Color::Yellow),
 };
-let state_time_line = Line::from(vec![
-    Span::styled(format!("{status_str}  │  "), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
-    Span::styled(format!("[{:02}:{:02} / {:02}:{:02} (-{:02}:{:02})]", elap_s / 60, elap_s % 60, tot_s / 60, tot_s % 60, rem_s / 60, rem_s % 60), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+let time_line = Line::from(Span::styled(
+    format!("[{:02}:{:02} / {:02}:{:02} (-{:02}:{:02})]", elap_s / 60, elap_s % 60, tot_s / 60, tot_s % 60, rem_s / 60, rem_s % 60),
+    Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+));
+
+let state_line = Line::from(vec![
+    Span::styled(status_str.to_string(), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
     Span::styled(format!("  │  Vol: {:>3}%  │  ", (app.volume * 100.0) as u8), Style::default().fg(Color::Green)),
     Span::styled(shuf_str, Style::default().fg(shuf_col)),
     Span::styled("  │  ", Style::default().fg(Color::Green)),
@@ -94,11 +98,12 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
     frame.render_widget(
         Paragraph::new(vec![
             header_line,
-            state_time_line,
             Line::from(""),
             srow(2, Color::Rgb(255, 215, 0)),
             srow(1, Color::Rgb(0, 240, 180)),
             srow(0, Color::Rgb(0, 200, 100)),
+            time_line,
+            state_line,
             Line::from(""),
             footer_line,
         ])
