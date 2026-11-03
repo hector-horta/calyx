@@ -49,16 +49,16 @@ let time_line = Line::from(Span::styled(
 ));
 
 let (g2, g1, g0, g_col) = match app.playback_status() {
-    calyx_core::models::PlaybackStatus::Playing => ("█◣  ", "███◣", "█◤  ", Color::Cyan),
-    calyx_core::models::PlaybackStatus::Paused => ("█ █ ", "█ █ ", "█ █ ", Color::Yellow),
-    calyx_core::models::PlaybackStatus::Buffering => (" ↻  ", " ↻  ", "    ", Color::Cyan),
-    calyx_core::models::PlaybackStatus::Stopped => ("■ ■ ", "■ ■ ", "■ ■ ", Color::DarkGray),
+    calyx_core::models::PlaybackStatus::Playing => (" █◣   ", " ██◣  ", " █◤   ", Color::Cyan),
+    calyx_core::models::PlaybackStatus::Paused => (" █ █  ", " █ █  ", " █ █  ", Color::Yellow),
+    calyx_core::models::PlaybackStatus::Buffering => ("  ↻   ", "  ↻   ", "      ", Color::Cyan),
+    calyx_core::models::PlaybackStatus::Stopped => (" █ █  ", " █ █  ", " █ █  ", Color::DarkGray),
 };
 
 let vol = (app.volume * 100.0).round() as u8;
 let vol_lit = ((vol as f64 / 100.0) * 4.0).round() as usize;
 let vol_steps = ['▂', '▄', '▆', '█'];
-let vol_bar: Vec<Span<'static>> = std::iter::once(Span::raw(" "))
+let vol_bar: Vec<Span<'static>> = std::iter::once(Span::raw("  "))
     .chain(vol_steps.iter().enumerate().map(|(i, &s)| {
         let col = if i < vol_lit { Color::Cyan } else { Color::DarkGray };
         Span::styled(s.to_string(), Style::default().fg(col))
@@ -124,8 +124,8 @@ let bottom_controls = Line::from(vec![
         Paragraph::new(vec![
             header_line,
             Line::from(""),
-            srow(2, Color::Rgb(255, 215, 0), g2, vec![Span::styled(" VOL", Style::default().fg(Color::DarkGray))]),
-            srow(1, Color::Rgb(0, 240, 180), g1, vec![Span::styled(format!("{:>3}%", vol), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
+            srow(2, Color::Rgb(255, 215, 0), g2, vec![Span::styled("  VOL ", Style::default().fg(Color::DarkGray))]),
+            srow(1, Color::Rgb(0, 240, 180), g1, vec![Span::styled(format!("  {:>3}%", vol), Style::default().fg(Color::White).add_modifier(Modifier::BOLD))]),
             srow(0, Color::Rgb(0, 200, 100), g0, vol_bar),
             time_line,
             switches_line,
