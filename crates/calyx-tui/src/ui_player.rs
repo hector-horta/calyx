@@ -69,8 +69,9 @@ let srow = |r: u8, c: Color| -> Line<'static> {
     let mut v = Vec::new();
     for (b, &val) in spec.iter().enumerate() {
         let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
-        let col = if val == 0 { Color::Rgb(45, 60, 60) } else if b < lit { c } else { Color::Rgb(55, 80, 80) };
-        v.push(Span::styled(format!("{} ", [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'][idx]), Style::default().fg(col)));
+        let col = if b < lit { c } else { Color::DarkGray };
+        let ch = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'][idx];
+        v.push(Span::styled(format!("{ch}{ch}"), Style::default().fg(col)));
     }
     Line::from(v)
 };
