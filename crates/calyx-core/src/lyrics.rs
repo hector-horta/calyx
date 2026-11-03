@@ -36,25 +36,58 @@ pub fn parse_lrc(raw: &str) -> Vec<LyricLine> {
     lines
 }
 
-pub async fn fetch_track_lyrics(http: &Client, title: &str, artist: &str) -> Vec<LyricLine> {
-    let clean_title = title.split(['(', '[']).next().unwrap_or(title).split(" - ").next().unwrap_or(title).trim();
+pub async fn fetch_track_lyrics(
+    http: &Client,
+    title: &str,
+    artist: &str,
+    apple_ctx: Option<(&str, &str, &str, &str)>,
+) -> Vec<LyricLine> {
+    // Apple Music fallback
+    if let Some((dev_tok, usr_tok, stf, sid)) = apple_ctx {
+        if let Some(lyrics) = crate::lyrics_ttml::fetch_apple_music_lyrics(http, dev_tok, usr_tok, stf, sid).await {
+            return lyrics;
+        }
+    }
+
+    // Clean title for search
+    let clean_title = title.split(['(', '[']).next().unwrap_or(title)
+        .split(" - ").next().unwrap_or(title).trim();
+
+    // Fallback to lrclib.net /api/get
+    if let Ok(resp) = http.get("https://lrclib.net/api/get")
+        .query(&[("artist_name", artist), ("track_name", clean_title)])
+        .header("User-Agent", "Calyx/0.1.0")
+        .timeout(std::time::Duration::from_secs(5))
+        .send().await
+    {
+        if let Ok(item) = resp.json::<Value>().await {
+            if let Some(synced) = item.get("syncedLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
+                let parsed = parse_lrc(synced);
+                if !parsed.is_empty() { return parsed; }
+            }
+            if let Some(plain) = item.get("plainLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
+                let parsed = parse_lrc(plain);
+                if !parsed.is_empty() { return parsed; }
+            }
+        }
+    }
+
+    // Fallback to lrclib.net /api/search
     let q = format!("{artist} {clean_title}");
     if let Ok(resp) = http.get("https://lrclib.net/api/search")
         .query(&[("q", &q)])
-        .timeout(std::time::Duration::from_secs(7))
+        .header("User-Agent", "Calyx/0.1.0")
+        .timeout(std::time::Duration::from_secs(5))
         .send().await
     {
         if let Ok(val) = resp.json::<Value>().await {
             if let Some(arr) = val.as_array() {
-                // First pass: check syncedLyrics
                 for item in arr {
                     if let Some(synced) = item.get("syncedLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
                         let parsed = parse_lrc(synced);
                         if !parsed.is_empty() { return parsed; }
                     }
                 }
-
-                // Second pass: check plainLyrics
                 for item in arr {
                     if let Some(plain) = item.get("plainLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
                         let parsed = parse_lrc(plain);
@@ -64,6 +97,7 @@ pub async fn fetch_track_lyrics(http: &Client, title: &str, artist: &str) -> Vec
             }
         }
     }
+
     vec![LyricLine { time_ms: 0, text: "♪ Letra no disponible para esta pista.".to_string() }]
 }
 

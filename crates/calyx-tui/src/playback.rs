@@ -78,7 +78,12 @@ pub async fn play_track(&mut self, mut track: Track) {
             });
         }
 
-        let lyrics_fut = calyx_core::fetch_track_lyrics(client.http(), &track.title, &track.artist);
+        let apple_ctx = match (&session.developer_token, &session.media_user_token) {
+            (Some(dev), Some(usr)) => Some((dev.as_str(), usr.as_str(), session.storefront.as_str(), track.id.as_str())),
+            (Some(dev), None) => Some((dev.as_str(), "", session.storefront.as_str(), track.id.as_str())),
+            _ => None,
+        };
+        let lyrics_fut = calyx_core::fetch_track_lyrics(client.http(), &track.title, &track.artist, apple_ctx);
         let wvd_fut = async {
             let mut local_note: Option<String> = None;
             if session.has_full_stream_credentials() {
