@@ -37,10 +37,19 @@ let elap_s = elapsed.as_secs();
 let tot_s = total.as_secs().max(app.current_track.as_ref().map(|t| t.duration_ms / 1000).unwrap_or(0));
 let rem_s = tot_s.saturating_sub(elap_s);
 let ratio = if tot_s > 0 { (elapsed.as_millis() as f64 / (tot_s as f64 * 1000.0)).clamp(0.0, 1.0) } else { 0.0 };
+let (shuf_str, shuf_col) = if app.queue.is_shuffle() { ("🔀  ON [s]", Color::Yellow) } else { ("🔀  OFF [s]", Color::Green) };
+let (rep_str, rep_col) = match app.queue.repeat_mode() {
+    calyx_core::queue::RepeatMode::Off => ("🔁  OFF [r]", Color::Green),
+    calyx_core::queue::RepeatMode::All => ("🔁  ALL [r]", Color::Yellow),
+    calyx_core::queue::RepeatMode::One => ("🔂  ONE [r]", Color::Yellow),
+};
 let state_time_line = Line::from(vec![
     Span::styled(format!(" {status_str}  │  "), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
     Span::styled(format!("[{:02}:{:02} / {:02}:{:02} (-{:02}:{:02})]", elap_s / 60, elap_s % 60, tot_s / 60, tot_s % 60, rem_s / 60, rem_s % 60), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-    Span::styled(format!("  │  Vol: {:>3}%  │  {}  │  {}", (app.volume * 100.0) as u8, if app.queue.is_shuffle() { "🔀  ON" } else { "🔀  OFF" }, app.queue.repeat_mode().badge()), Style::default().fg(Color::Green)),
+    Span::styled(format!("  │  Vol: {:>3}%  │  ", (app.volume * 100.0) as u8), Style::default().fg(Color::Green)),
+    Span::styled(shuf_str, Style::default().fg(shuf_col)),
+    Span::styled("  │  ", Style::default().fg(Color::Green)),
+    Span::styled(rep_str, Style::default().fg(rep_col)),
 ]);
 
 let spec = app.current_spectrum();
@@ -73,17 +82,11 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
     let bottom_controls = Line::from(vec![
         Span::raw("─"),
         Span::styled("[Enter - Play]", Style::default().fg(Color::Cyan)),
-        Span::raw(" ─── "),
-        Span::styled(app.language.btn_play_list(), Style::default().fg(Color::Cyan)),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         Span::styled(app.language.btn_pause(), Style::default().fg(Color::Cyan)),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         Span::styled(app.language.btn_prev_next(), Style::default().fg(Color::Cyan)),
-        Span::raw(" ─── "),
-        Span::styled(app.language.btn_shuffle(), Style::default().fg(if app.queue.is_shuffle() { Color::Yellow } else { Color::Cyan })),
-        Span::raw(" ─── "),
-        Span::styled(app.language.btn_repeat(), Style::default().fg(Color::Cyan)),
-        Span::raw(" ─── "),
+        Span::raw(" ── "),
         Span::styled("[-/+ - Vol]", Style::default().fg(Color::Cyan)),
         Span::raw("─"),
     ]);
