@@ -1,4 +1,4 @@
-use ratatui::{layout::{Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::{Line, Span}, widgets::{Block, Borders, Paragraph}, Frame};
+use ratatui::{layout::{Alignment, Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::{Line, Span}, widgets::{Block, Borders, Paragraph}, Frame};
 use crate::app::TuiApp;
 use crate::ui::truncate;
 
@@ -19,7 +19,7 @@ pub fn render_player_panel(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
 
 let header_line = match &app.current_track {
     Some(t) => Line::from(vec![
-        Span::styled(format!(" {} ", truncate(&t.title, 34)), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{} ", truncate(&t.title, 34)), Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
         Span::styled(format!("— {} • {}", truncate(&t.artist, 22), truncate(&t.album, 22)), Style::default().fg(Color::Cyan)),
     ]),
     None => Line::from(Span::styled(app.language.no_active_playback(), Style::default().fg(Color::DarkGray))),
@@ -44,7 +44,7 @@ let (rep_str, rep_col) = match app.queue.repeat_mode() {
     calyx_core::queue::RepeatMode::One => ("🔂  ONE [r]", Color::Yellow),
 };
 let state_time_line = Line::from(vec![
-    Span::styled(format!(" {status_str}  │  "), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+    Span::styled(format!("{status_str}  │  "), Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
     Span::styled(format!("[{:02}:{:02} / {:02}:{:02} (-{:02}:{:02})]", elap_s / 60, elap_s % 60, tot_s / 60, tot_s % 60, rem_s / 60, rem_s % 60), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
     Span::styled(format!("  │  Vol: {:>3}%  │  ", (app.volume * 100.0) as u8), Style::default().fg(Color::Green)),
     Span::styled(shuf_str, Style::default().fg(shuf_col)),
@@ -55,7 +55,7 @@ let state_time_line = Line::from(vec![
 let spec = app.current_spectrum();
 let lit = ((ratio * 32.0).round() as usize).clamp(0, 32);
 let srow = |r: u8, c: Color| -> Line<'static> {
-    let mut v = vec![Span::raw(" ")];
+    let mut v = Vec::new();
     for (b, &val) in spec.iter().enumerate() {
         let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
         let col = if val == 0 { Color::Rgb(45, 60, 60) } else if b < lit { c } else { Color::Rgb(55, 80, 80) };
@@ -70,12 +70,12 @@ let (lbl_next, lbl_queue) = match app.language {
 };
 
 let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
-    (Some(next), true) => Line::from(Span::styled(format!(" {lbl_next}: {} — {} ({} {lbl_queue})", truncate(&next.title, 28), truncate(&next.artist, 20), app.queue.len()), Style::default().fg(Color::Cyan))),
+    (Some(next), true) => Line::from(Span::styled(format!("{lbl_next}: {} — {} ({} {lbl_queue})", truncate(&next.title, 28), truncate(&next.artist, 20), app.queue.len()), Style::default().fg(Color::Cyan))),
     (Some(next), false) => Line::from(vec![
-        Span::styled(format!(" {lbl_next}: {} — {} ({})  │  ", truncate(&next.title, 22), truncate(&next.artist, 14), app.queue.len()), Style::default().fg(Color::Cyan)),
+        Span::styled(format!("{lbl_next}: {} — {} ({})  │  ", truncate(&next.title, 22), truncate(&next.artist, 14), app.queue.len()), Style::default().fg(Color::Cyan)),
         Span::styled(truncate(&app.status_message, 42), Style::default().fg(Color::White).add_modifier(Modifier::ITALIC)),
     ]),
-    (None, false) => Line::from(Span::styled(format!(" {}", app.status_message), Style::default().fg(Color::White).add_modifier(Modifier::ITALIC))),
+    (None, false) => Line::from(Span::styled(format!("{}", app.status_message), Style::default().fg(Color::White).add_modifier(Modifier::ITALIC))),
     (None, true) => Line::from(""),
 };
 
@@ -89,7 +89,7 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
         Span::raw(" ── "),
         Span::styled("[-/+ - Vol]", Style::default().fg(Color::Cyan)),
         Span::raw("─"),
-    ]);
+    ]).alignment(Alignment::Center);
 
     frame.render_widget(
         Paragraph::new(vec![
@@ -102,6 +102,7 @@ let footer_line = match (app.queue.peek_next(), app.status_message.is_empty()) {
             Line::from(""),
             footer_line,
         ])
+        .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL).title_bottom(bottom_controls)),
         bottom_chunks[1],
     );
