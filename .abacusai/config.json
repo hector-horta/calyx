@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(\"D:\\Qt\\Tools\\CMake_64\\bin\\cmake.exe\" -S D:/dev/calyx -B D:/dev/calyx/build/tmp-debug -G \"NMake Makefiles JOM\" -DCMAKE_BU…)",
-      "Bash(if exist \"C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.50.35717\\bin\\HostX64\\x64\\cl.exe\" (echo …)"
-    ]
-  }
-}
