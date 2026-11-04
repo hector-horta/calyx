@@ -63,7 +63,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
 
     if app.language == Language::Es {
         auth_content.extend_from_slice(&[
-            Line::from(vec![Span::styled("Modo Manual (Headless / Servidores Linux / SSH):", Style::default().bold())]),
+            Line::from(vec![Span::styled("Modo Manual (Servidores / SSH / Safari):", Style::default().bold())]),
             Line::from(vec![Span::styled(
                 "1. Iniciar sesión en music.apple.com",
                 Style::default()
@@ -77,14 +77,18 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
                 Style::default()
             )]),
             Line::from(vec![Span::styled(
-                "4. export CALYX_MEDIA_USER_TOKEN=\"tu_token\" o calyx_auth.json",
+                "4. En terminal: export CALYX_MEDIA_USER_TOKEN=\"tu_token\"",
+                Style::default().italic(),
+            )]),
+            Line::from(vec![Span::styled(
+                "   O agregarlo en archivo: calyx_auth.json",
                 Style::default().italic(),
             )])
         ]);
     } else {
         auth_content.extend_from_slice(&[
             Line::from(vec![Span::styled(
-                "Manual Mode (Headless / Linux Servers / SSH):", Style::default().bold()
+                "Manual Mode (Servers / SSH / Safari):", Style::default().bold()
             )]),
             Line::from(vec![Span::styled(
                 "1. Log in at music.apple.com",
@@ -99,7 +103,11 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
                 Style::default()
             )]),
             Line::from(vec![Span::styled(
-                "4. export CALYX_MEDIA_USER_TOKEN=\"your_token\" or calyx_auth.json",
+                "4. In terminal: export CALYX_MEDIA_USER_TOKEN=\"your_token\"",
+                Style::default().italic(),
+            )]),
+            Line::from(vec![Span::styled(
+                "   Or save in file: calyx_auth.json",
                 Style::default().italic(),
             )])
         ]);
