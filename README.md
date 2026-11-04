@@ -73,6 +73,7 @@ cargo run -p calyx-tui
 - **🎤 Letras Sincronizadas TTML con Relleno por Carácter (Fade-In RGB)**:
   - Parser nativo TTML de Apple Music con timestamps de alta precisión, con fallback automático a LRCLIB.
   - Resaltado letra por letra en **24-bit TrueColor**: la vocal o consonante cantada se ilumina progresivamente con interpolación de color continua desde gris tenue hasta blanco brillante (`Color::White` BOLD) al compás del canto.
+  - **🈳 Pronunciación Fonética y Transliteración (`y`)**: Motor nativo offline que translitera caracteres asiáticos a Romaji/alfabeto latino (Japonés Kanji/Kana mediante KAKASI y Coreano Hangul por descomposición silábica). Presiona `y` para ciclar entre `Dual` (original + fonética simultánea), `Romaji` (solo fonética) o `Desactivado`.
 - **🌈 Analizador de Espectro Analógico (48 Pasos de Fluidez)**:
   - 12 bandas de frecuencia de 4 caracteres de ancho (`████`) con ranuras sutiles de 1 espacio.
   - El avance temporal de la pista ilumina el espectro celda por celda con un barrido analógico suave mediante *color blending* (Dorado, Aqua y Verde esmeralda).
