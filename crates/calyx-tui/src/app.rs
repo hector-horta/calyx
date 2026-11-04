@@ -64,6 +64,16 @@ impl TuiApp {
         let audio_cache = calyx_core::AudioCache::new(2 * 1024 * 1024 * 1024);
         let cache_bg = audio_cache.clone();
         tokio::task::spawn_blocking(move || { cache_bg.evict_if_needed(); });
+        if session.developer_token.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
+            let mut c_bg = client.clone();
+            let mut s_bg = session.clone();
+            tokio::spawn(async move {
+                if let Ok(tok) = c_bg.sync_developer_token().await {
+                    s_bg.developer_token = Some(tok);
+                    let _ = s_bg.save();
+                }
+            });
+        }
 
         Ok(Self {
             search_input: String::with_capacity(1024),
@@ -245,19 +255,6 @@ pub fn selected_track(&self) -> Option<Track> {
                 self.active_view = ActiveView::Home;
             }
             Err(e) => self.status_message = format!("Error de búsqueda: {e}"),
-        }
-    }
-
-    pub async fn sync_apple_auth(&mut self) {
-        self.status_message = "Sincronizando Developer Token...".to_string();
-        match self.client.sync_developer_token().await {
-            Ok(token) => {
-                self.session.developer_token = Some(token.clone());
-                let _ = self.session.save();
-                let p = &token[..token.len().min(16)];
-                self.status_message = format!("Token sincronizado ({p}...)");
-            }
-            Err(e) => self.status_message = format!("Error en Token: {e}"),
         }
     }
 

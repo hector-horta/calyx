@@ -74,7 +74,7 @@ async fn run_event_loop(
                     match key_event.code {
                         KeyCode::Char('q') => app.should_quit = true,
                         KeyCode::Char('/') => app.is_editing = true,
-                        KeyCode::Char('t') => app.sync_apple_auth().await,
+
                         KeyCode::Char('a') => app.enqueue_selected_back(),
                         KeyCode::Char('n') => app.enqueue_selected_next(),
                         KeyCode::Char('d') => app.remove_selected_from_queue(),

@@ -28,7 +28,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
             Line::from("  [s] Aleatorio          [r] Repetir       [- / +] Volumen"),
             Line::from(""),
             Line::from(Span::styled("  ⚙️  Sistema & Configuración", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("  [L] Cambiar Idioma     [t] Sync DevToken [q] Salir"),
+            Line::from("  [L] Cambiar Idioma     [u] Login Apple   [q] Salir"),
         ]
     } else {
         vec![
@@ -45,7 +45,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
             Line::from("  [s] Shuffle            [r] Repeat        [- / +] Volume"),
             Line::from(""),
             Line::from(Span::styled("  ⚙️  System & Settings", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("  [L] Toggle Language    [t] Sync DevToken [q] Quit"),
+            Line::from("  [L] Toggle Language    [u] Apple Login   [q] Quit"),
         ]
     };
 

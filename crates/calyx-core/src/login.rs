@@ -83,7 +83,7 @@ pub async fn interactive_apple_login(
     http: &Client,
     storefront: &str,
     dev_token: &str,
-) -> CalyxResult<(String, LoginBrowserGuard)> {
+) -> CalyxResult<(Option<String>, String, LoginBrowserGuard)> {
     let browser_bin = find_browser_executable()?;
     let profile_dir = calyx_browser_profile_dir();
     let _ = std::fs::create_dir_all(&profile_dir);
@@ -130,17 +130,18 @@ pub async fn interactive_apple_login(
             let is_main_music_origin = url.starts_with("https://music.apple.com");
             if is_page && is_main_music_origin {
                 if let Some(ws_url) = target.ws_url.as_deref() {
-                    let Some(token) = probe_cdp_for_verified_token(ws_url).await else { continue };
+                    let Some((opt_dev, token)) = probe_cdp_for_verified_token(ws_url).await else { continue };
                     if rejected.as_deref() == Some(token.as_str()) {
                         continue;
                     }
-                    if !token_is_live(http, dev_token, &token).await {
+                    let test_dev = opt_dev.as_deref().unwrap_or(dev_token);
+                    if !test_dev.is_empty() && !token_is_live(http, test_dev, &token).await {
                         info!("Token en perfil del navegador expirado; esperando login manual.");
                         rejected = Some(token);
                         continue;
                     }
                     let guard = LoginBrowserGuard { ws_url: ws_url.to_string(), child: Some(child) };
-                    return Ok((token, guard));
+                    return Ok((opt_dev, token, guard));
                 }
             }
         }
@@ -182,33 +183,47 @@ fn spawn_app_window(bin: &PathBuf, profile_dir: &PathBuf, url: &str) -> CalyxRes
         .map_err(|e| CalyxError::Auth(format!("No se pudo lanzar ventana de login: {e}")))
 }
 
-async fn probe_cdp_for_verified_token(ws_url: &str) -> Option<String> {
-    let first_tok = probe_cdp_for_media_token(ws_url).await?;
+async fn probe_cdp_for_verified_token(ws_url: &str) -> Option<(Option<String>, String)> {
+    let (dev1, first_tok) = probe_cdp_for_tokens(ws_url).await?;
     let mk_ready_cmd = r#"{"id":4,"method":"Runtime.evaluate","params":{"expression":"(() => { try { const mk = window.MusicKit && window.MusicKit.getInstance && window.MusicKit.getInstance(); if (mk && mk.isAuthorized && mk.musicUserToken && mk.musicUserToken.length > 20) return 'READY'; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i) || ''; if (k.includes('media-user-token') && (localStorage.getItem(k) || '').length > 20) return 'READY'; } return 'WAITING'; } catch(e) { return 'WAITING'; } })()","returnByValue":true}}"#;
     if !send_cdp_command(ws_url, mk_ready_cmd).await?.contains("READY") {
         return None;
     }
     tokio::time::sleep(Duration::from_millis(800)).await;
-    let second_tok = probe_cdp_for_media_token(ws_url).await?;
-    (first_tok == second_tok).then_some(second_tok)
+    let (dev2, second_tok) = probe_cdp_for_tokens(ws_url).await?;
+    (first_tok == second_tok).then_some((dev2.or(dev1), second_tok))
 }
 
-async fn probe_cdp_for_media_token(ws_url: &str) -> Option<String> {
-    let js_cmd = r#"{"id":3,"method":"Runtime.evaluate","params":{"expression":"(() => { try { const mk = window.MusicKit && window.MusicKit.getInstance && window.MusicKit.getInstance(); if (mk && mk.musicUserToken && mk.musicUserToken.length > 20) return mk.musicUserToken; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i) || ''; if (k.includes('media-user-token')) { const v = localStorage.getItem(k) || ''; if (v.length > 20) return v; } } return ''; } catch(e) { return ''; } })()","returnByValue":true}}"#;
+async fn probe_cdp_for_tokens(ws_url: &str) -> Option<(Option<String>, String)> {
+    let js_cmd = r#"{"id":3,"method":"Runtime.evaluate","params":{"expression":"(() => { try { const mk = window.MusicKit && window.MusicKit.getInstance && window.MusicKit.getInstance(); let d = (mk && mk.developerToken) || ''; let u = (mk && mk.musicUserToken) || ''; for (let i = 0; i < localStorage.length; i++) { const k = (localStorage.key(i) || '').toLowerCase(); if (!d && (k.includes('developer-token') || k.includes('developertoken'))) d = localStorage.getItem(localStorage.key(i)) || ''; if (!u && k.includes('media-user-token')) u = localStorage.getItem(localStorage.key(i)) || ''; } return JSON.stringify({ dev: d.length > 50 ? d : null, user: u.length > 20 ? u : null }); } catch(e) { return ''; } })()","returnByValue":true}}"#;
+    if let Some(raw) = send_cdp_command(ws_url, js_cmd).await {
+        if let Some(res) = extract_tokens_from_cdp_eval(&raw) {
+            return Some(res);
+        }
+    }
     for cmd in [
-        js_cmd,
+        // js_cmd already probed
         r#"{"id":1,"method":"Storage.getCookies"}"#,
         r#"{"id":2,"method":"Network.getAllCookies"}"#,
     ] {
         if let Some(raw) = send_cdp_command(ws_url, cmd).await {
             if let Some(tok) = extract_token_from_cdp_json(&raw) {
-                return Some(tok);
+                return Some((None, tok));
             }
         }
     }
     None
 }
 
+
+pub fn extract_tokens_from_cdp_eval(raw_json: &str) -> Option<(Option<String>, String)> {
+    let val: serde_json::Value = serde_json::from_str(raw_json).ok()?;
+    let str_val = val.pointer("/result/result/value").and_then(|v| v.as_str())?;
+    let inner: serde_json::Value = serde_json::from_str(str_val).ok()?;
+    let user = inner.get("user").and_then(|v| v.as_str()).map(str::trim).filter(|s| s.len() > 20)?.to_string();
+    let dev = inner.get("dev").and_then(|v| v.as_str()).map(str::trim).filter(|s| s.len() > 50).map(String::from);
+    Some((dev, user))
+}
 
 pub fn extract_token_from_cdp_json(raw_json: &str) -> Option<String> {
     let val: serde_json::Value = serde_json::from_str(raw_json).ok()?;
@@ -246,10 +261,21 @@ mod tests {
             Some("Aq123456789012345678901234567890==")
         );
 
+
         let eval_json = r#"{"id":2,"result":{"result":{"type":"string","value":"MusicKitUserToken98765432109876543210"}}}"#;
         assert_eq!(
             extract_token_from_cdp_json(eval_json).as_deref(),
             Some("MusicKitUserToken98765432109876543210")
         );
+
+    }
+
+    #[test]
+    fn test_extract_tokens_from_cdp_eval() {
+        let raw = r#"{"id":3,"result":{"result":{"type":"string","value":"{\"dev\":\"eyJhbGciOiJFUzI1NiIsabcdefghijklmnopqrstuvwxyz01234567890123456789\",\"user\":\"MusicKitUserToken98765432109876543210\"}"}}}"#;
+        let (dev, user) = extract_tokens_from_cdp_eval(raw).unwrap();
+        assert!(dev.unwrap().starts_with("eyJ"));
+        assert_eq!(user, "MusicKitUserToken98765432109876543210");
+
     }
 }

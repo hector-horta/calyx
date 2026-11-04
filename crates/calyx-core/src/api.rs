@@ -50,12 +50,7 @@ impl AppleMusicClient {
             .timeout(std::time::Duration::from_secs(18))
             .build()?;
 
-        Ok(Self {
-            http,
-            storefront: sf,
-            developer_token: None,
-            media_user_token: None,
-        })
+        Ok(Self { http, storefront: sf, developer_token: None, media_user_token: None })
     }
 
     pub fn set_tokens(&mut self, dev_token: Option<String>, user_token: Option<String>) {
@@ -114,20 +109,14 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
     for item in payload.results {
         if let (Some(id), Some(title)) = (item.track_id, item.track_name) {
             let track = Track {
-                id: id.to_string(),
-                title,
+                id: id.to_string(), title,
                 artist: item.artist_name.unwrap_or_else(|| "Unknown Artist".to_string()),
                 album: item.collection_name.unwrap_or_else(|| "Unknown Album".to_string()),
                 duration_ms: item.track_time_millis.unwrap_or(0),
-                storefront: self.storefront.clone(),
-                preview_url: item.preview_url,
-                artwork_url: item.artwork_url100,
-                hls_manifest_url: None,
-                is_lossless: true,
+                storefront: self.storefront.clone(), preview_url: item.preview_url,
+                artwork_url: item.artwork_url100, hls_manifest_url: None, is_lossless: true,
             };
-            if track.validate().is_ok() {
-                tracks.push(track);
-            }
+            if track.validate().is_ok() { tracks.push(track); }
         }
     }
 
@@ -152,8 +141,10 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
                 return Ok((dev_token, existing, self.storefront.clone(), None));
             }
         }
-        let (user_token, guard) =
+        let (extracted_dev, user_token, guard) =
             crate::login::interactive_apple_login(&self.http, &self.storefront, &dev_token).await?;
+        let dev_token = extracted_dev.unwrap_or(dev_token);
+        self.developer_token = Some(dev_token.clone());
         let verified_sf = self
             .verify_user_storefront(&dev_token, &user_token)
             .await
@@ -295,15 +286,12 @@ mod tests {
 
     #[test]
     fn test_storefront_validation() {
-        assert!(AppleMusicClient::new("cl").is_ok());
-        assert!(AppleMusicClient::new("US").is_ok());
-        assert!(AppleMusicClient::new("12").is_err());
-        assert!(AppleMusicClient::new("chile").is_err());
+        assert!(AppleMusicClient::new("cl").is_ok() && AppleMusicClient::new("US").is_ok());
+        assert!(AppleMusicClient::new("12").is_err() && AppleMusicClient::new("chile").is_err());
     }
 
     #[tokio::test]
     async fn test_rejects_empty_search_term() {
-        let client = AppleMusicClient::new("cl").expect("client");
-        assert!(client.search_catalog("   ", 10).await.is_err());
+        assert!(AppleMusicClient::new("cl").expect("client").search_catalog("   ", 10).await.is_err());
     }
 }

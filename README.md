@@ -52,8 +52,7 @@ cargo run -p calyx-tui
 | `s` | **Alternar Shuffle** (Aleatorio `🔀 ON` / `OFF`) |
 | `r` | **Alternar Repeat** (Repetición `🔁 Off` ➔ `🔁 All` ➔ `🔂 One`) |
 | `+` / `-` | **Ajustar volumen** (+5% / -5%) |
-| `u` | **Login Apple Music** (Abre navegador temporal para sincronizar sesión) |
-| `t` | **Sincronizar Developer Token** de Apple Music |
+| `u` | **Login Apple Music** (Abre navegador temporal; sincroniza automáticamente Developer Token y sesión de usuario) |
 | `q` | **Salir** de Calyx |
 
 ---
