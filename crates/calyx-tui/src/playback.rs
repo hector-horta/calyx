@@ -51,7 +51,7 @@ pub async fn play_track(&mut self, mut track: Track) {
     let orig_id = track.id.clone();
     let seed = format!("{}:{}:{}:{}", orig_id, track.artist, track.album, track.title);
     self.current_artwork = Some(TerminalCoverArt::from_jpeg_or_seed(None, &seed));
-    self.current_lyrics = vec![calyx_core::LyricLine { time_ms: 0, text: "⏳ Sincronizando letra...".to_string() }];
+    self.current_lyrics = vec![calyx_core::LyricLine::new(0, "⏳ Sincronizando letra...")];
     self.current_track = Some(track.clone());
     self.status_message = format!("⏳ Cargando audio en 2do plano: {} — {}...", track.artist, track.title);
 

@@ -26,6 +26,8 @@ pub mod library;
 pub mod login;
 /// Synchronized and plain lyrics fetching & parsing.
 pub mod lyrics;
+/// Phonetic transliteration engine (Romaji, Hangul RR).
+pub mod transliteration;
 /// Native Apple Music TTML lyrics parsing and fetching.
 pub mod lyrics_ttml;
 /// Data models for tracks, playlists, and metadata.
@@ -58,6 +60,7 @@ pub use library::{
 };
 pub use login::LoginBrowserGuard;
 pub use lyrics::{fetch_track_lyrics, parse_lrc, LyricLine};
+pub use transliteration::transliterate;
 pub use lyrics_ttml::{fetch_apple_music_lyrics, parse_ttml, parse_ttml_time};
 pub use models::{DrmMode, PlaybackStatus, Track};
 pub use queue::{PlaybackQueue, RepeatMode};

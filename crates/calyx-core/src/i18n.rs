@@ -65,6 +65,9 @@ impl Language {
     pub fn btn_enqueue(&self) -> &'static str { match self { Self::Es => "[a - Encolar]", Self::En => "[a - Enqueue]" } }
     pub fn btn_next_in_queue(&self) -> &'static str { match self { Self::Es => "[n - A Continuación]", Self::En => "[n - Play Next]" } }
     pub fn btn_remove_track(&self) -> &'static str { match self { Self::Es => "[d - Quitar Pista]", Self::En => "[d - Remove Track]" } }
+    pub fn btn_phonetic_dual(&self) -> &'static str { match self { Self::Es => " Fonética: Dual", Self::En => " Lyrics: Dual" } }
+    pub fn btn_phonetic_only(&self) -> &'static str { match self { Self::Es => " Fonética: Romaji", Self::En => " Lyrics: Romaji" } }
+    pub fn btn_phonetic_off(&self) -> &'static str { match self { Self::Es => " Fonética: Off", Self::En => " Lyrics: Off" } }
     pub fn btn_clear_all(&self) -> &'static str { match self { Self::Es => "[c - Limpiar Todo]", Self::En => "[c - Clear All]" } }
     pub fn status_playing(&self) -> &'static str { match self { Self::Es => "▶  Reproduciendo", Self::En => "▶  Playing" } }
     pub fn status_paused(&self) -> &'static str { match self { Self::Es => "⏸  En Pausa", Self::En => "⏸  Paused" } }

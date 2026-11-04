@@ -5,6 +5,15 @@ use serde_json::Value;
 pub struct LyricLine {
     pub time_ms: u64,
     pub text: String,
+    pub phonetic: Option<String>,
+}
+
+impl LyricLine {
+    pub fn new(time_ms: u64, text: impl Into<String>) -> Self {
+        let text = text.into();
+        let phonetic = crate::transliteration::transliterate(&text);
+        Self { time_ms, text, phonetic }
+    }
 }
 
 pub fn parse_lrc(raw: &str) -> Vec<LyricLine> {
@@ -21,17 +30,17 @@ pub fn parse_lrc(raw: &str) -> Vec<LyricLine> {
                         let time_ms = mins * 60_000 + (secs * 1000.0) as u64;
                         let val = if text.is_empty() { "•••" } else { text };
                         if val != "•••" || lines.last().map(|l: &LyricLine| l.text != "•••").unwrap_or(true) {
-                            lines.push(LyricLine { time_ms, text: val.to_string() });
+                            lines.push(LyricLine::new(time_ms, val));
                         }
                         continue;
                     }
                 }
             }
         }
-        lines.push(LyricLine { time_ms: idx as u64 * 4000, text: s.to_string() });
+        lines.push(LyricLine::new(idx as u64 * 4000, s));
     }
     if lines.first().map(|l| l.time_ms >= 3000).unwrap_or(false) {
-        lines.insert(0, LyricLine { time_ms: 0, text: "•••".to_string() });
+        lines.insert(0, LyricLine::new(0, "•••"));
     }
     lines
 }
@@ -98,7 +107,7 @@ pub async fn fetch_track_lyrics(
         }
     }
 
-    vec![LyricLine { time_ms: 0, text: "♪ Letra no disponible para esta pista.".to_string() }]
+    vec![LyricLine::new(0, "♪ Letra no disponible para esta pista.")]
 }
 
 impl LyricLine {

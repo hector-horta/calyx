@@ -78,7 +78,7 @@ pub fn parse_ttml(raw: &str) -> Vec<LyricLine> {
                         let time_str = &time_str[..quote_end_pos];
                         if let Some(time_ms) = parse_ttml_time(time_str) {
                             if !text.is_empty() {
-                                lines.push(LyricLine { time_ms, text });
+                                lines.push(LyricLine::new(time_ms, text));
                             }
                         }
                     }
@@ -94,7 +94,7 @@ pub fn parse_ttml(raw: &str) -> Vec<LyricLine> {
     }
 
     if !lines.is_empty() && lines.first().map(|l| l.time_ms >= 3000).unwrap_or(false) {
-        lines.insert(0, LyricLine { time_ms: 0, text: "•••".to_string() });
+        lines.insert(0, LyricLine::new(0, "•••"));
     }
 
     lines

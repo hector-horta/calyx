@@ -79,6 +79,7 @@ async fn run_event_loop(
                         KeyCode::Char('n') => app.enqueue_selected_next(),
                         KeyCode::Char('d') => app.remove_selected_from_queue(),
                         KeyCode::Char('c') => app.clear_current_list(),
+                        KeyCode::Char('y') | KeyCode::Char('Y') => app.toggle_phonetic_mode(),
                         KeyCode::Char('s') => { app.toggle_shuffle(); },
                         KeyCode::Char('r') => { app.toggle_repeat(); },
                         KeyCode::Char('1') => app.open_home(),

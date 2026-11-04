@@ -77,6 +77,11 @@ fn render_central_with_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, n
         calyx_core::Language::Es => (" Encolar", " A Continuación", " Reproducir Lista", " Limpiar"),
         calyx_core::Language::En => (" Enqueue", " Play Next", " Play Playlist", " Clear"),
     };
+    let lbl_y = match app.phonetic_mode {
+        crate::app::PhoneticMode::Dual => app.language.btn_phonetic_dual(),
+        crate::app::PhoneticMode::Phonetic => app.language.btn_phonetic_only(),
+        crate::app::PhoneticMode::Original => app.language.btn_phonetic_off(),
+    };
     let bottom_bar = match app.active_view {
         ActiveView::Playlists => Line::from(vec![
             Span::raw("─"),
@@ -92,6 +97,9 @@ fn render_central_with_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, n
             Span::styled("d", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::styled(" Quitar", Style::default().fg(Color::DarkGray)),
             Span::raw(" ── "),
+            Span::styled("y", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_y, Style::default().fg(Color::Yellow)),
+            Span::raw(" ── "),
             Span::styled("c", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::styled(lbl_c, Style::default().fg(Color::DarkGray)),
             Span::raw("─"),
@@ -106,6 +114,9 @@ fn render_central_with_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, n
             Span::raw(" ── "),
             Span::styled("p", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::styled(lbl_p, Style::default().fg(Color::DarkGray)),
+            Span::raw(" ── "),
+            Span::styled("y", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+            Span::styled(lbl_y, Style::default().fg(Color::Yellow)),
             Span::raw(" ── "),
             Span::styled("c", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
             Span::styled(lbl_c, Style::default().fg(Color::DarkGray)),

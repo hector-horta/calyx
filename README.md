@@ -45,6 +45,7 @@ cargo run -p calyx-tui
 | `L` / `l` | **Cambiar Idioma** en caliente (Español ⇄ English) |
 | `<` / `>` (o `,` / `.`) | **Pista Anterior / Siguiente** en la cola |
 | `c` | **Limpiar Todo** (vacía la Cola activa o el historial de Recientes) |
+| `y` | **Letras Fonéticas / Pronunciación** (cicla entre: `Dual [Kanji+Romaji]` ➔ `Romaji` ➔ `Original`) |
 | `d` | **Quitar Pista** seleccionada (de la Cola o de Recientes) |
 | `j` / `k` o `↑` / `↓` | **Navegar** arriba/abajo en la lista activa |
 | `Enter` | **Reproducir** la canción seleccionada |

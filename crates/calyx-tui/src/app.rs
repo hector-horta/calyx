@@ -16,6 +16,24 @@ pub enum ActiveView {
     Help,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PhoneticMode {
+    #[default]
+    Dual,
+    Phonetic,
+    Original,
+}
+
+impl PhoneticMode {
+    pub fn next(&self) -> Self {
+        match self {
+            Self::Dual => Self::Phonetic,
+            Self::Phonetic => Self::Original,
+            Self::Original => Self::Dual,
+        }
+    }
+}
+
 pub struct TuiApp {
     pub search_input: String,
     pub is_editing: bool,
@@ -36,6 +54,7 @@ pub struct TuiApp {
     #[allow(dead_code)]
     pub drm_mode: DrmMode,
     pub language: calyx_core::Language,
+    pub phonetic_mode: PhoneticMode,
     pub session: SessionConfig,
     pub volume: f32,
     pub should_quit: bool,
@@ -104,6 +123,7 @@ impl TuiApp {
             status_message: String::new(),
             drm_mode: DrmMode::WidevineL3Cbcs,
             language: session.language.unwrap_or_else(calyx_core::Language::detect_system),
+            phonetic_mode: PhoneticMode::default(),
             session,
             volume: 0.85,
             should_quit: false,
@@ -229,6 +249,18 @@ pub fn selected_track(&self) -> Option<Track> {
         let shuf = self.queue.toggle_shuffle();
         self.status_message = format!("Modo Aleatorio (Shuffle): {}", if shuf { "ON 🔀" } else { "OFF" });
         shuf
+    }
+
+    pub fn toggle_phonetic_mode(&mut self) {
+        self.phonetic_mode = self.phonetic_mode.next();
+        self.status_message = match (self.language, self.phonetic_mode) {
+            (calyx_core::Language::Es, PhoneticMode::Dual) => "Modo Fonética: Dual (Original + Romaji/Pinyin)",
+            (calyx_core::Language::Es, PhoneticMode::Phonetic) => "Modo Fonética: Solo Fonético (Romaji/Pinyin)",
+            (calyx_core::Language::Es, PhoneticMode::Original) => "Modo Fonética: Desactivado (Solo Original)",
+            (calyx_core::Language::En, PhoneticMode::Dual) => "Phonetic Mode: Dual (Original + Romaji/Pinyin)",
+            (calyx_core::Language::En, PhoneticMode::Phonetic) => "Phonetic Mode: Phonetic Only (Romaji/Pinyin)",
+            (calyx_core::Language::En, PhoneticMode::Original) => "Phonetic Mode: Off (Original Only)",
+        }.to_string();
     }
 
     pub fn toggle_language(&mut self) {

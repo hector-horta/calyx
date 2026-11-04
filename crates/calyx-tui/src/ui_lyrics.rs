@@ -76,9 +76,14 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
             let elapsed = cur_ms.saturating_sub(line.time_ms);
             let sing_dur = ((gap as f64) * 0.88).clamp(800.0, 6000.0);
             let ratio = (elapsed as f64 / sing_dur).clamp(0.0, 1.0);
-            let total_chars = line.text.chars().count().max(1);
+            let display_text = if app.phonetic_mode == crate::app::PhoneticMode::Phonetic {
+                line.phonetic.as_deref().unwrap_or(&line.text)
+            } else {
+                &line.text
+            };
+            let total_chars = display_text.chars().count().max(1);
             let progress_char = (total_chars as f64) * ratio;
-            let chunks = wrap_text(&line.text, max_w);
+            let chunks = wrap_text(display_text, max_w);
 
             let mut global_char_idx = 0usize;
             for (c_idx, chunk) in chunks.into_iter().enumerate() {
@@ -109,8 +114,21 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
                 global_char_idx += 1;
                 visual_lines.push(Line::from(spans));
             }
+            if app.phonetic_mode == crate::app::PhoneticMode::Dual {
+                if let Some(phonetic) = &line.phonetic {
+                    visual_lines.push(Line::from(vec![
+                        Span::raw("   "),
+                        Span::styled(format!("⤷ {phonetic}"), Style::default().fg(Color::Yellow)),
+                    ]));
+                }
+            }
         } else {
-            let chunks = wrap_text(&line.text, max_w);
+            let text = if app.phonetic_mode == crate::app::PhoneticMode::Phonetic {
+                line.phonetic.as_deref().unwrap_or(&line.text)
+            } else {
+                &line.text
+            };
+            let chunks = wrap_text(text, max_w);
             for chunk in chunks {
                 visual_lines.push(Line::from(vec![
                     Span::raw("   "),
