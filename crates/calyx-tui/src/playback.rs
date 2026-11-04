@@ -105,7 +105,12 @@ pub async fn play_track(&mut self, mut track: Track) {
                     Ok(wvd) => {
                         let hint_ok = "[AAC 256k]".to_string();
                         for cid in &candidates {
-                            match client.fetch_full_track_stream(cid, &wvd).await {
+                            let mut stream_res = client.fetch_full_track_stream(cid, &wvd).await;
+                            if stream_res.is_err() {
+                                tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                                stream_res = client.fetch_full_track_stream(cid, &wvd).await;
+                            }
+                            match stream_res {
                                 Ok(full_bytes) => {
                                     let (c_c, id_c, b_c) = (cache.clone(), cid.clone(), full_bytes.clone());
                                     tokio::task::spawn_blocking(move || { if c_c.put(&id_c, &b_c).is_ok() { c_c.evict_if_needed(); } });
@@ -253,7 +258,12 @@ pub async fn check_auto_advance(&mut self) {
             }
 
             for cid in &candidates {
-                if let Ok(full_bytes) = client.fetch_full_track_stream(cid, &wvd).await {
+                let mut res = client.fetch_full_track_stream(cid, &wvd).await;
+                if res.is_err() {
+                    tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+                    res = client.fetch_full_track_stream(cid, &wvd).await;
+                }
+                if let Ok(full_bytes) = res {
                     if let Ok(()) = cache.put(cid, &full_bytes) {
                         cache.evict_if_needed();
                     }
