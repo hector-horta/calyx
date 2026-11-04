@@ -215,7 +215,7 @@ pub fn selected_track(&self) -> Option<Track> {
             self.tracks.clear();
             self.selected_index = 0;
             self.list_state.select(None);
-            self.status_message = "Historial de Recientes (SQLite) vaciado por completo ('c').".to_string();
+            self.status_message = "Historial de Recientes vaciado por completo ('c').".to_string();
         }
     }
 
