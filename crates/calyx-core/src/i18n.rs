@@ -52,6 +52,7 @@ impl Language {
     pub fn nav_playlists(&self) -> &'static str { "[5 - Playlists]" }
     pub fn nav_search(&self) -> &'static str { match self { Self::Es => "[/ - Buscar]", Self::En => "[/ - Search]" } }
     pub fn nav_queue(&self) -> &'static str { match self { Self::Es => "[Tab - Cola]", Self::En => "[Tab - Queue]" } }
+    pub fn nav_login(&self) -> &'static str { match self { Self::Es => "[u - Iniciar Sesión]", Self::En => "[u - Sign In]" } }
     pub fn nav_help(&self) -> &'static str { match self { Self::Es => "[? - Ayuda]", Self::En => "[? - Help]" } }
     pub fn nav_lang(&self) -> &'static str { match self { Self::Es => "[L - Idioma]", Self::En => "[L - Language]" } }
 

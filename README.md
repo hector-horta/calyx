@@ -33,15 +33,18 @@ cargo run -p calyx-tui
 
 ## 🎵 Atajos de Teclado (TUI)
 
+> 💡 **Inicio Rápido**: Presiona **`u`** al abrir Calyx para iniciar sesión en Apple Music y desbloquear audio en alta fidelidad (`[AAC 256k]`), tu biblioteca personal y tus playlists.
+
 | **Tecla** | **Acción** |
 |:---:|:---|
+| `u` | **🔑 Iniciar Sesión / Login Apple Music** (*Recomendado*): Inicia sesión para desbloquear audio completo `[AAC 256k]`, Biblioteca y Playlists |
 | `/` | **Buscar** canciones en el catálogo de Apple Music |
 | `1` / `2` / `3` / `4` / `5` | **Secciones Apple Music** (`1 - Recientes`, `2 - Novedades`, `3 - Radio`, `4 - Biblioteca`, `5 - Playlists`) |
 | `?` | **Ayuda** de controles y guía de configuración integrada |
 | `p` | **Reproducir Lista / Play Playlist** (reproduce la lista o playlist completa) |
 | `L` / `l` | **Cambiar Idioma** en caliente (Español ⇄ English) |
 | `<` / `>` (o `,` / `.`) | **Pista Anterior / Siguiente** en la cola |
-| `c` | **Limpiar Todo** (vacía la Cola activa o el historial SQLite de Recientes) |
+| `c` | **Limpiar Todo** (vacía la Cola activa o el historial de Recientes) |
 | `d` | **Quitar Pista** seleccionada (de la Cola o de Recientes) |
 | `j` / `k` o `↑` / `↓` | **Navegar** arriba/abajo en la lista activa |
 | `Enter` | **Reproducir** la canción seleccionada |
@@ -52,7 +55,6 @@ cargo run -p calyx-tui
 | `s` | **Alternar Shuffle** (Aleatorio `🔀 ON` / `OFF`) |
 | `r` | **Alternar Repeat** (Repetición `🔁 Off` ➔ `🔁 All` ➔ `🔂 One`) |
 | `+` / `-` | **Ajustar volumen** (+5% / -5%) |
-| `u` | **Login Apple Music** (Abre navegador temporal; sincroniza automáticamente Developer Token y sesión de usuario) |
 | `q` | **Salir** de Calyx |
 
 ---

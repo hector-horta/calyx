@@ -56,6 +56,10 @@ impl SessionConfig {
         Ok(())
     }
 
+    pub fn is_logged_in(&self) -> bool {
+        self.media_user_token.as_ref().is_some_and(|t| !t.trim().is_empty())
+    }
+
     pub fn has_full_stream_credentials(&self) -> bool {
         self.developer_token.as_ref().is_some_and(|t| !t.trim().is_empty())
             && self.media_user_token.as_ref().is_some_and(|t| !t.trim().is_empty())
