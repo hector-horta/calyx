@@ -24,6 +24,10 @@ pub mod i18n;
 pub mod library;
 /// Interactive zero-friction Apple Music Sign-In.
 pub mod login;
+/// Multi-browser dynamic discovery (Chromium & Firefox/Gecko).
+pub mod browser_discovery;
+/// Gecko/Firefox family cookie extraction and login support.
+pub mod login_firefox;
 /// Synchronized and plain lyrics fetching & parsing.
 pub mod lyrics;
 /// Phonetic transliteration engine (Romaji, Hangul RR).
