@@ -10,8 +10,9 @@ pub fn find_browser_executable() -> CalyxResult<PathBuf> {
     match crate::browser_discovery::discover_browser() {
         Some(crate::browser_discovery::BrowserType::Chromium(p)) => Ok(p),
         Some(crate::browser_discovery::BrowserType::Firefox(p)) => Ok(p),
+        Some(crate::browser_discovery::BrowserType::WebKit(p)) => Ok(p),
         None => Err(CalyxError::Auth(
-            "No se encontró un navegador compatible (Chromium o Firefox). Presiona '?' en Calyx para ver la guía manual.".to_string(),
+            "No se encontró un navegador compatible. Presiona '?' en Calyx para ver la guía manual.".to_string(),
         )),
     }
 }
@@ -59,6 +60,12 @@ pub async fn interactive_apple_login(
     if let crate::browser_discovery::BrowserType::Firefox(_) = browser {
         info!("Iniciando flujo de login para navegador Gecko / Firefox...");
         let token = crate::login_firefox::wait_for_firefox_login(Duration::from_secs(180)).await?;
+        return Ok((None, token, LoginBrowserGuard { ws_url: String::new(), child: None }));
+    }
+
+    if let crate::browser_discovery::BrowserType::WebKit(_) = browser {
+        info!("Iniciando flujo de login para navegador WebKit / Safari...");
+        let token = crate::login_webkit::wait_for_webkit_login(Duration::from_secs(180)).await?;
         return Ok((None, token, LoginBrowserGuard { ws_url: String::new(), child: None }));
     }
 

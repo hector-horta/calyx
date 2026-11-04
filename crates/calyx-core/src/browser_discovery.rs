@@ -5,6 +5,7 @@ use std::env;
 pub enum BrowserType {
     Chromium(PathBuf),
     Firefox(PathBuf),
+    WebKit(PathBuf),
 }
 
 fn find_in_path(name: &str) -> Option<PathBuf> {
@@ -33,6 +34,9 @@ fn find_candidate(names: &[&str]) -> Option<PathBuf> {
 pub fn discover_browser() -> Option<BrowserType> {
     if let Ok(val) = env::var("CALYX_BROWSER_BIN").or_else(|_| env::var("BROWSER")) {
         let low = val.to_lowercase();
+        if low.contains("safari") || low.contains("webkit") || low.contains("orion") || low.contains("epiphany") {
+            return Some(BrowserType::WebKit(PathBuf::from(val)));
+        }
         if low.contains("firefox") || low.contains("librewolf") || low.contains("zen")
             || low.contains("waterfox") || low.contains("floorp")
         {
@@ -81,23 +85,20 @@ pub fn discover_browser() -> Option<BrowserType> {
 
     #[cfg(target_os = "macos")]
     {
-        let mac_chromium = [
-            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-            "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-            "/Applications/Arc.app/Contents/MacOS/Arc",
-        ];
-        if let Some(p) = mac_chromium.iter().map(PathBuf::from).find(|p| p.is_file()) {
-            return Some(BrowserType::Chromium(p));
+        for p in ["Google Chrome.app/Contents/MacOS/Google Chrome", "Brave Browser.app/Contents/MacOS/Brave Browser",
+                  "Microsoft Edge.app/Contents/MacOS/Microsoft Edge", "Arc.app/Contents/MacOS/Arc"] {
+            let pb = PathBuf::from("/Applications").join(p);
+            if pb.is_file() { return Some(BrowserType::Chromium(pb)); }
         }
-        let mac_firefox = [
-            "/Applications/Firefox.app/Contents/MacOS/firefox",
-            "/Applications/Zen Browser.app/Contents/MacOS/zen",
-            "/Applications/LibreWolf.app/Contents/MacOS/librewolf",
-        ];
-        if let Some(p) = mac_firefox.iter().map(PathBuf::from).find(|p| p.is_file()) {
-            return Some(BrowserType::Firefox(p));
+        let mac_webkit = ["/Applications/Safari.app/Contents/MacOS/Safari", "/Applications/Orion.app/Contents/MacOS/Orion"];
+        if let Some(p) = mac_webkit.iter().map(PathBuf::from).find(|p| p.is_file()) {
+            return Some(BrowserType::WebKit(p));
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    if let Some(p) = find_in_path("epiphany") {
+        return Some(BrowserType::WebKit(p));
     }
 
     None

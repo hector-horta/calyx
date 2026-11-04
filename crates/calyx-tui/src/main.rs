@@ -118,7 +118,12 @@ KeyCode::Char('p') | KeyCode::Char('P') => {
                         KeyCode::Char('<') | KeyCode::Char(',') => app.play_previous().await,
                         KeyCode::Tab => app.toggle_view(),
                         KeyCode::Char('u') => {
-                            app.status_message = "Abriendo ventana Apple Sign-In... Inicia sesión y la ventana se cerrará sola.".to_string();
+                            let b = calyx_core::browser_discovery::discover_browser();
+                            if matches!(b, Some(calyx_core::browser_discovery::BrowserType::WebKit(_))) {
+                                app.status_message = app.language.msg_login_safari_alert().to_string();
+                            } else {
+                                app.status_message = app.language.msg_login_opening().to_string();
+                            }
                             terminal.draw(|f| ui::render(f, app))?;
                             app.sync_user_auth().await;
                         }

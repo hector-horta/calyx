@@ -79,6 +79,8 @@ impl Language {
     pub fn no_active_playback(&self) -> &'static str { match self { Self::Es => " Sin reproducción activa", Self::En => " No active playback" } }
     pub fn no_lyrics(&self) -> &'static str { match self { Self::Es => "  ♪ Reproduce una canción para ver su letra sincronizada en vivo.", Self::En => "  ♪ Play a song to see live synchronized lyrics." } }
     pub fn no_browser_guide(&self) -> &'static str { match self { Self::Es => "No se encontró navegador. Consulta 'Autenticación' en README.", Self::En => "No browser found. See 'Authentication' in README." } }
+    pub fn msg_login_safari_alert(&self) -> &'static str { match self { Self::Es => "⚠️ Safari detectado: Haz clic en 'Permitir' cuando macOS te pida confirmación.", Self::En => "⚠️ Safari detected: Click 'Allow' when macOS prompts for permissions." } }
+    pub fn msg_login_opening(&self) -> &'static str { match self { Self::Es => "Abriendo Apple Sign-In... Inicia sesión y la sesión se sincronizará automáticamente.", Self::En => "Opening Apple Sign-In... Log in and session will sync automatically." } }
 }
 
 #[cfg(test)]

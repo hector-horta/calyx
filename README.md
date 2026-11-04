@@ -87,7 +87,12 @@ cargo run -p calyx-tui
 
 Calyx permite sincronizar tu biblioteca personal y reproducir el catálogo completo de Apple Music:
 
-- **Modo Automático**: Presiona la tecla `u` en Calyx para abrir un inicio de sesión temporal y seguro en tu navegador predeterminado. Al autenticarte, Calyx sincroniza tu sesión automáticamente y el navegador se cierra de inmediato.
+- **Modo Automático Multi-Navegador**: Presiona la tecla `u` en Calyx. Detecta dinámicamente tu navegador predeterminado y extrae la sesión sin requerir pasos manuales:
+  * **Chromium y derivados** *(Chrome, Edge, Brave, Arc, Opera, Vivaldi)*: Vía puerto temporal de depuración CDP.
+  * **Firefox y derivados** *(Firefox, LibreWolf, Zen Browser, Waterfox, Floorp)*: Vía lectura de snapshot local de `cookies.sqlite`.
+  * **Safari y WebKit** *(macOS Safari, Orion, GNOME Web)*: Vía lectura nativa de `Cookies.binarycookies`.
+  > [!NOTE]
+  > **Usuarios de macOS (Safari):** Al presionar `u`, macOS te solicitará permiso para que la Terminal lea la sesión de Safari. Haz clic en **"Permitir"** en el diálogo del sistema para que Calyx capture el token de forma automática.
 - **Modo Manual (Servidores Linux / SSH / Headless)**: Presiona `?` (Ayuda) directamente dentro de Calyx para consultar la **guía interactiva paso a paso** para configurar tu sesión mediante la variable de entorno `CALYX_MEDIA_USER_TOKEN` o el archivo de configuración `calyx_auth.json`.
 - **Navegador Personalizado**: Si tu navegador está en una ruta no estándar o usas Flatpak, puedes especificarlo con la variable de entorno `CALYX_BROWSER_BIN`:
   ```bash

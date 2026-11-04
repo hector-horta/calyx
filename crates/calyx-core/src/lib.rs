@@ -28,6 +28,8 @@ pub mod login;
 pub mod browser_discovery;
 /// Gecko/Firefox family cookie extraction and login support.
 pub mod login_firefox;
+/// WebKit/Safari family binary cookies parsing and login support.
+pub mod login_webkit;
 /// Synchronized and plain lyrics fetching & parsing.
 pub mod lyrics;
 /// Phonetic transliteration engine (Romaji, Hangul RR).
