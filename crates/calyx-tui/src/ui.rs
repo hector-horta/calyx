@@ -47,7 +47,7 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
     let mut top_actions = Vec::new();
     if !app.session.is_logged_in() {
         top_actions.push(Span::styled(l.nav_login(), Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)));
-        top_actions.push(Span::raw(" "));
+        top_actions.push(Span::raw("──"));
     }
     top_actions.push(nav_tab(l.nav_help(), app.active_view == ActiveView::Help));
     top_actions.push(Span::raw(" "));
