@@ -56,9 +56,9 @@ pub fn render_player_panel(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         }
         lines.push(Line::from(row));
     }
-    lines.extend(status_lines(app, density, inner_w));
+    lines.extend(status_lines(app, density));
     lines.push(Line::from(""));
-    lines.push(footer_line(app, density, inner_w));
+    lines.push(footer_line(app, inner_w));
     frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center).block(block), cols[1]);
 }
 

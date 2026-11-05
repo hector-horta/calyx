@@ -7,11 +7,10 @@ use ratatui::{
 };
 use crate::app::TuiApp;
 use crate::hints::{key_span, KEY_STYLE};
-use crate::player_footer::{fits_inline, footer};
+use crate::player_footer::footer;
 use crate::player_spectrum::{NARROW_BELOW, WIDE_FROM};
 use crate::ui::truncate;
 
-const INFO: Style = Style::new().fg(Color::Rgb(120, 160, 160));
 const TIME: Style = Style::new().fg(Color::Rgb(220, 225, 230)).add_modifier(Modifier::BOLD);
 const OFF: Style = Style::new().fg(Color::DarkGray);
 
@@ -104,11 +103,14 @@ fn switch_spans(app: &TuiApp, compact: bool) -> Vec<Span<'static>> {
     ]
 }
 
-pub fn status_lines(app: &TuiApp, density: Density, width: u16) -> Vec<Line<'static>> {
+pub fn status_lines(app: &TuiApp, density: Density) -> Vec<Line<'static>> {
     match density {
+        // Time and switches as one centered group: balanced whether or not a
+        // track is playing. The status message always goes to the footer.
         Density::Wide => {
-            let inline = if status_inline(app, density, width) { app.status_message.as_str() } else { "" };
-            vec![spread(Line::from(time_span(app)), Line::from(switch_spans(app, false)), inline, width)]
+            let mut spans = vec![time_span(app), Span::raw("     ")];
+            spans.extend(switch_spans(app, false));
+            vec![Line::from(spans)]
         }
         Density::Medium => vec![Line::from(time_span(app)), Line::from(switch_spans(app, false))],
         Density::Narrow => {
@@ -123,33 +125,9 @@ pub fn status_lines(app: &TuiApp, density: Density, width: u16) -> Vec<Line<'sta
     }
 }
 
-/// Whether the status message fits whole at the right of the wide status line
-/// (same geometry as `spread`); if not, it goes to the footer instead.
-fn status_inline(app: &TuiApp, density: Density, width: u16) -> bool {
-    if density != Density::Wide { return false; }
-    let (w, lw, cw) = (width as usize, Line::from(time_span(app)).width(), Line::from(switch_spans(app, false)).width());
-    let pad1 = (w.saturating_sub(cw) / 2).saturating_sub(lw).max(1);
-    fits_inline(&app.status_message, w.saturating_sub(lw + pad1 + cw + 2))
-}
-
-fn spread(left: Line<'static>, center: Line<'static>, right: &str, width: u16) -> Line<'static> {
-    let (w, lw, cw) = (width as usize, left.width(), center.width());
-    let pad1 = (w.saturating_sub(cw) / 2).saturating_sub(lw).max(1);
-    let room = w.saturating_sub(lw + pad1 + cw + 1);
-    // Leave 1 spare column: wide glyphs (emoji) occupy 2 cells but count as 1 char.
-    let right = Span::styled(truncate(right, room.saturating_sub(1)), INFO.add_modifier(Modifier::ITALIC));
-    let pad2 = w.saturating_sub(lw + pad1 + cw + right.width()).max(1);
-    let mut spans = left.spans;
-    spans.push(Span::raw(" ".repeat(pad1)));
-    spans.extend(center.spans);
-    spans.push(Span::raw(" ".repeat(pad2)));
-    spans.push(right);
-    Line::from(spans)
-}
-
-pub fn footer_line(app: &TuiApp, density: Density, width: u16) -> Line<'static> {
+pub fn footer_line(app: &TuiApp, width: u16) -> Line<'static> {
     let l = app.language;
-    let status = if status_inline(app, density, width) { "" } else { app.status_message.as_str() };
+    let status = app.status_message.as_str();
     let next = app.queue.peek_next().map(|n| format!(
         "{}: {} — {} ({} {})",
         l.lbl_up_next(),
