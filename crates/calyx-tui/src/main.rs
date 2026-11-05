@@ -8,6 +8,7 @@ mod player_footer;
 mod player_spectrum;
 mod player_status;
 mod ui;
+mod ui_dancer;
 mod ui_lists;
 mod ui_help;
 mod ui_lyrics;

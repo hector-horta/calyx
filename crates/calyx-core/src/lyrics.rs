@@ -45,6 +45,8 @@ pub fn parse_lrc(raw: &str) -> Vec<LyricLine> {
     lines
 }
 
+/// Fetches synced (or plain) lyrics: Apple Music first, then lrclib.net.
+/// Returns an empty list when no source has lyrics for the track.
 pub async fn fetch_track_lyrics(
     http: &Client,
     title: &str,
@@ -107,7 +109,8 @@ pub async fn fetch_track_lyrics(
         }
     }
 
-    vec![LyricLine::new(0, "♪ Letra no disponible para esta pista.")]
+    // No lyrics anywhere: empty list; the UI shows its own "no lyrics" view.
+    Vec::new()
 }
 
 impl LyricLine {
