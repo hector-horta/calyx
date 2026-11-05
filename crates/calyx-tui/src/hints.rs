@@ -9,16 +9,21 @@ pub const KEY_STYLE: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier:
 pub const LABEL_STYLE: Style = Style::new().fg(Color::DarkGray);
 const SEP: &str = " ── ";
 
-/// `key label` with the standard styles; `label_style` lets callers tint the label.
+/// The key framed in brackets (`[a]`), same format as the help screen.
+pub fn key_span(key: &str, style: Style) -> Span<'static> {
+    Span::styled(format!("[{key}]"), style)
+}
+
+/// `[key] label` with the standard styles; `label_style` lets callers tint the label.
 pub fn hint(key: &'static str, label: &'static str, label_style: Style) -> [Span<'static>; 3] {
     [
-        Span::styled(key, KEY_STYLE),
+        key_span(key, KEY_STYLE),
         Span::raw(" "),
         Span::styled(label, label_style)
     ]
 }
 
-/// A border title like `─a Encolar ── n A continuación─`.
+/// A border title like `─[a] Encolar ── [n] A continuación─`.
 pub fn hint_bar(items: &[(&'static str, &'static str, Style)]) -> Line<'static> {
     let mut spans = Vec::with_capacity(1 + items.len() * 3 + items.len().saturating_sub(1));
     spans.push(Span::raw("─"));
@@ -30,12 +35,12 @@ pub fn hint_bar(items: &[(&'static str, &'static str, Style)]) -> Line<'static> 
     Line::from(spans)
 }
 
-/// A navigation tab: same `key label` format; the active tab is shown inverted.
+/// A navigation tab: same `[key] label` format; the active tab is shown inverted.
 pub fn tab(key: &'static str, label: &'static str, active: bool) -> [Span<'static>; 3] {
     if active {
         let s = Style::new().fg(Color::Black).bg(Color::Cyan).add_modifier(Modifier::BOLD);
         [
-            Span::styled(key, s),
+            key_span(key, s),
             Span::styled(" ", s),
             Span::styled(label, s)
         ]
@@ -67,12 +72,12 @@ mod tests {
     #[test]
     fn hint_bar_joins_items() {
         let line = hint_bar(&[("a", "Encolar", LABEL_STYLE), ("n", "A continuación", LABEL_STYLE)]);
-        assert_eq!(text(&line), "─a Encolar ── n A continuación─");
+        assert_eq!(text(&line), "─[a] Encolar ── [n] A continuación─");
     }
 
     #[test]
     fn tab_bar_joins_tabs() {
         let line = tab_bar(vec![tab("1", "Inicio", true), tab("2", "Novedades", false)]);
-        assert_eq!(text(&line), "─1 Inicio ── 2 Novedades─");
+        assert_eq!(text(&line), "─[1] Inicio ── [2] Novedades─");
     }
 }
