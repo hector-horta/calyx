@@ -4,6 +4,7 @@ mod hints;
 mod audio_pipeline;
 mod navigation;
 mod playback;
+mod player_footer;
 mod player_spectrum;
 mod player_status;
 mod ui;

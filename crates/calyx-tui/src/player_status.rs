@@ -7,6 +7,7 @@ use ratatui::{
 };
 use crate::app::TuiApp;
 use crate::hints::KEY_STYLE;
+use crate::player_footer::{fits_inline, footer};
 use crate::player_spectrum::{NARROW_BELOW, WIDE_FROM};
 use crate::ui::truncate;
 
@@ -105,12 +106,10 @@ fn switch_spans(app: &TuiApp, compact: bool) -> Vec<Span<'static>> {
 
 pub fn status_lines(app: &TuiApp, density: Density, width: u16) -> Vec<Line<'static>> {
     match density {
-        Density::Wide => vec![spread(
-            Line::from(time_span(app)),
-            Line::from(switch_spans(app, false)),
-            &app.status_message,
-            width
-        )],
+        Density::Wide => {
+            let inline = if status_inline(app, density, width) { app.status_message.as_str() } else { "" };
+            vec![spread(Line::from(time_span(app)), Line::from(switch_spans(app, false)), inline, width)]
+        }
         Density::Medium => vec![Line::from(time_span(app)), Line::from(switch_spans(app, false))],
         Density::Narrow => {
             let mut spans = vec![time_span(app), Span::raw("  ")];
@@ -122,6 +121,15 @@ pub fn status_lines(app: &TuiApp, density: Density, width: u16) -> Vec<Line<'sta
             vec![Line::from(spans)]
         }
     }
+}
+
+/// Whether the status message fits whole at the right of the wide status line
+/// (same geometry as `spread`); if not, it goes to the footer instead.
+fn status_inline(app: &TuiApp, density: Density, width: u16) -> bool {
+    if density != Density::Wide { return false; }
+    let (w, lw, cw) = (width as usize, Line::from(time_span(app)).width(), Line::from(switch_spans(app, false)).width());
+    let pad1 = (w.saturating_sub(cw) / 2).saturating_sub(lw).max(1);
+    fits_inline(&app.status_message, w.saturating_sub(lw + pad1 + cw + 2))
 }
 
 fn spread(left: Line<'static>, center: Line<'static>, right: &str, width: u16) -> Line<'static> {
@@ -141,7 +149,7 @@ fn spread(left: Line<'static>, center: Line<'static>, right: &str, width: u16) -
 
 pub fn footer_line(app: &TuiApp, density: Density, width: u16) -> Line<'static> {
     let l = app.language;
-    let status = app.status_message.as_str();
+    let status = if status_inline(app, density, width) { "" } else { app.status_message.as_str() };
     let next = app.queue.peek_next().map(|n| format!(
         "{}: {} — {} ({} {})",
         l.lbl_up_next(),
@@ -150,20 +158,5 @@ pub fn footer_line(app: &TuiApp, density: Density, width: u16) -> Line<'static> 
         app.queue.len(),
         l.lbl_in_queue()
     ));
-    match density {
-        Density::Wide => Line::from(Span::styled(next.unwrap_or_default(), INFO)),
-        Density::Narrow => {
-            let text = if status.is_empty() { next.unwrap_or_default() } else { status.to_string() };
-            Line::from(Span::styled(truncate(&text, width as usize), INFO))
-        }
-        Density::Medium => match (next, status.is_empty()) {
-            (Some(n), true) => Line::from(Span::styled(n, INFO)),
-            (Some(n), false) => Line::from(vec![
-                Span::styled(format!("{n}  │  "), INFO),
-                Span::styled(truncate(status, 42), INFO.add_modifier(Modifier::ITALIC)),
-            ]),
-            (None, false) => Line::from(Span::styled(status.to_string(), INFO)),
-            (None, true) => Line::from(""),
-        },
-    }
+    footer(next, status, width as usize)
 }
