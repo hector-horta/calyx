@@ -4,6 +4,7 @@ use crate::artwork::TerminalCoverArt;
 
 pub enum BgEvent {
     AudioReady(Track, Result<Vec<u8>, String>, Vec<calyx_core::LyricLine>, String),
+    AudioDecoded(Track, Result<calyx_core::DecodedTrack, String>, Vec<calyx_core::LyricLine>, String),
     ArtworkReady(String, TerminalCoverArt),
     PlaylistReady(String, Result<Vec<Track>, String>),
 }
@@ -14,21 +15,13 @@ impl TuiApp {
             match ev {
                 BgEvent::AudioReady(track, res, lyrics, hint) => {
                     if self.current_track.as_ref().map(|t| t.id == track.id).unwrap_or(true) {
-                        self.current_lyrics = lyrics;
                         match res {
-                            Ok(bytes) => match self.audio.play_encoded_bytes(bytes) {
-                                Ok(()) => {
-                                    self.audio.set_volume(self.volume);
-                                    self.status_message = hint;
-                                    self.current_track = Some(track);
-                                    self.trigger_prefetch_next();
-                                }
-                                Err(e) => self.status_message = format!("Error de audio: {e}"),
-                            },
-                            Err(e) => self.status_message = e,
+                            Ok(bytes) => self.spawn_decode(track, bytes, lyrics, hint),
+                            Err(e) => { self.current_lyrics = lyrics; self.status_message = e; }
                         }
                     }
                 }
+                BgEvent::AudioDecoded(track, res, lyrics, hint) => self.on_audio_decoded(track, res, lyrics, hint),
                 BgEvent::ArtworkReady(tid, art) => {
                     if self.current_track.as_ref().map(|t| t.id == tid).unwrap_or(true) { self.current_artwork = Some(art); }
                 }

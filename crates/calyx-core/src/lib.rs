@@ -48,8 +48,14 @@ pub mod wv_crypto;
 pub mod wvd_builtin;
 /// Pluggable Service Facade contract and native backend providers.
 pub mod backend;
+/// Off-thread M4A decoding to PCM.
+pub mod decode;
+/// Precomputed visualizer frames.
+pub mod spectrum;
 
 /// Re-exported public items from the library's modules.
+pub use decode::{decode_track, DecodedTrack};
+pub use spectrum::{SpectrumFrame, SPECTRUM_BANDS};
 pub use backend::{StreamingBackend, AppleMusicBackend, AudioStreamSource, SectionType};
 pub use api::AppleMusicClient;
 pub use audio::NativeAudioEngine;

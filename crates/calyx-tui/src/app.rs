@@ -311,7 +311,7 @@ pub fn selected_track(&self) -> Option<Track> {
         self.audio.set_volume(self.volume);
     }
     pub fn playback_status(&self) -> PlaybackStatus { self.audio.status() }
-    pub fn current_spectrum(&self) -> [u8; 32] { self.audio.current_spectrum() }
+    pub fn current_spectrum(&self) -> calyx_core::SpectrumFrame { self.audio.current_spectrum() }
     pub fn playback_progress(&self) -> (std::time::Duration, std::time::Duration) {
         let (elap, pcm) = self.audio.progress();
         let tot = self.current_track.as_ref().map(|t| std::time::Duration::from_millis(t.duration_ms)).filter(|&d| d > std::time::Duration::ZERO).unwrap_or(pcm);

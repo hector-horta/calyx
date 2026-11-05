@@ -1,5 +1,6 @@
 mod app;
 mod artwork;
+mod audio_pipeline;
 mod navigation;
 mod playback;
 mod ui;
