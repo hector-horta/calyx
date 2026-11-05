@@ -6,7 +6,7 @@ use ratatui::{
     text::{Line, Span},
 };
 use crate::app::TuiApp;
-use crate::hints::KEY_STYLE;
+use crate::hints::{key_span, KEY_STYLE};
 use crate::player_footer::{fits_inline, footer};
 use crate::player_spectrum::{NARROW_BELOW, WIDE_FROM};
 use crate::ui::truncate;
@@ -94,11 +94,11 @@ fn switch_spans(app: &TuiApp, compact: bool) -> Vec<Span<'static>> {
         (format!("🔀 {}", l.btn_shuffle()), format!("{rep_icon} {rep_label}"))
     };
     vec![
-        Span::styled("s", KEY_STYLE),
+        key_span("s", KEY_STYLE),
         Span::raw(" "),
         Span::styled(shuf, shuffle_style),
         Span::styled("   │   ", OFF),
-        Span::styled("r", KEY_STYLE),
+        key_span("r", KEY_STYLE),
         Span::raw(" "),
         Span::styled(rep, rep_style),
     ]
