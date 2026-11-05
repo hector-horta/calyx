@@ -40,7 +40,6 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         frame.render_widget(
             Paragraph::new(empty_lines).block(Block::default()
                 .borders(Borders::LEFT)
-                .title_top(app.language.title_lyrics())
             ),
             area
         );
@@ -145,7 +144,7 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         Paragraph::new(visible)
             .block(Block::default()
                 .borders(Borders::LEFT)
-                .title_top(app.language.title_lyrics())),
+                ),
         area,
     );
 }
