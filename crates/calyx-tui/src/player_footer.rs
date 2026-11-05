@@ -1,6 +1,5 @@
-//! Where the status message goes: inline on the wide status line when it fits
-//! whole, otherwise on the footer line, where it is only cut if it is wider
-//! than the whole panel.
+//! Footer line of the player: "up next" and the status message, which is
+//! only cut when it is wider than the whole panel.
 
 use ratatui::{
     style::{Color, Modifier, Style},
@@ -14,11 +13,6 @@ const SEP: &str = "  │  ";
 /// Columns `text` takes on screen (emoji count as 2).
 fn cols(text: &str) -> usize {
     Span::raw(text).width()
-}
-
-/// Whether `status` fits whole in the `room` columns left on the status line.
-pub fn fits_inline(status: &str, room: usize) -> bool {
-    !status.is_empty() && cols(status) <= room
 }
 
 /// Footer: "up next │ status" when both fit; otherwise the status (it has
@@ -72,10 +66,4 @@ mod tests {
         assert_eq!(text(&footer(Some("A continuación: X".to_string()), "", 80)), "A continuación: X");
     }
 
-    #[test]
-    fn fits_inline_only_when_whole() {
-        assert!(fits_inline("[AAC 256k | Caché]", 30));
-        assert!(!fits_inline(LONG, 30));
-        assert!(!fits_inline("", 30));
-    }
 }
