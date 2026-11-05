@@ -1,20 +1,12 @@
-use std::io::Cursor;
 use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
-use symphonia::core::{
-    audio::SampleBuffer,
-    codecs::{DecoderOptions, CODEC_TYPE_NULL},
-    errors::Error as SymphoniaError,
-    formats::FormatOptions,
-    io::MediaSourceStream,
-    meta::MetadataOptions,
-    probe::Hint,
-};
 use tracing::info;
+use crate::decode::{decode_track, DecodedTrack};
 use crate::error::{CalyxError, CalyxResult};
 use crate::models::PlaybackStatus;
+use crate::spectrum::{SpectrumFrame, FRAME_MS, SPECTRUM_BANDS};
 
 const STATE_STOPPED: u8 = 0;
 const STATE_PLAYING: u8 = 1;
@@ -29,7 +21,7 @@ pub struct NativeAudioEngine {
     started_at: Mutex<Option<std::time::Instant>>,
     accumulated_ms: AtomicU64,
     state: AtomicU8,
-    spectrum_frames: Mutex<Vec<[u8; 32]>>,
+    spectrum_frames: Mutex<Vec<SpectrumFrame>>,
 }
 
 impl NativeAudioEngine {
@@ -51,117 +43,33 @@ impl NativeAudioEngine {
         })
     }
 
-    fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
-        if bytes.is_empty() {
-            return Err(CalyxError::Audio("Empty audio buffer".to_string()));
-        }
-
-        let cursor = Cursor::new(bytes);
-        let mss = MediaSourceStream::new(Box::new(cursor), Default::default());
-
-        let mut hint = Hint::new();
-        hint.with_extension("m4a");
-
-        let probed = symphonia::default::get_probe()
-            .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
-            .map_err(|e| CalyxError::Audio(format!("MP4/M4A probe error: {e}")))?;
-
-        let mut format = probed.format;
-        let track = format
-            .tracks()
-            .iter()
-            .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
-            .ok_or_else(|| CalyxError::Audio("No supported audio track in M4A container".to_string()))?;
-
-        let track_id = track.id;
-        let mut decoder = symphonia::default::get_codecs()
-            .make(&track.codec_params, &DecoderOptions::default())
-            .map_err(|e| CalyxError::Audio(format!("AAC/ALAC codec init error: {e}")))?;
-
-        let mut pcm_samples: Vec<i16> = Vec::new();
-        let mut channels: u16 = 2;
-        let mut sample_rate: u32 = 44_100;
-
-        let mut consecutive_errs = 0usize;
-        loop {
-            let packet = match format.next_packet() {
-                Ok(p) => { consecutive_errs = 0; p }
-                Err(SymphoniaError::IoError(_)) => break,
-                Err(SymphoniaError::ResetRequired) => {
-                    decoder.reset();
-                    continue;
-                }
-                Err(_) => {
-                    consecutive_errs += 1;
-                    if consecutive_errs > 50 { break; }
-                    decoder.reset();
-                    continue;
-                }
-            };
-
-            if packet.track_id() != track_id {
-                continue;
-            }
-
-            let prev_hook = std::panic::take_hook();
-            std::panic::set_hook(Box::new(|_| {}));
-            let decoded_samples = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                match decoder.decode(&packet) {
-                    Ok(decoded) => {
-                        let spec = *decoded.spec();
-                        let mut sample_buf = SampleBuffer::<i16>::new(decoded.capacity() as u64, spec);
-                        sample_buf.copy_interleaved_ref(decoded);
-                        Some((spec.channels.count() as u16, spec.rate, sample_buf.samples().to_vec()))
-                    }
-                    Err(_) => None,
-                }
-            }));
-            std::panic::set_hook(prev_hook);
-
-            match decoded_samples {
-                Ok(Some((ch, rate, samples))) => {
-                    channels = ch.max(1);
-                    sample_rate = rate.max(8_000);
-                    pcm_samples.extend_from_slice(&samples);
-                }
-                Ok(None) => {}
-                Err(_) => {
-                    decoder.reset();
-                }
-            }
-        }
-
-        if pcm_samples.is_empty() {
-            return Err(CalyxError::Audio("Decoded 0 PCM samples from stream".to_string()));
-        }
-        Ok((channels, sample_rate, pcm_samples))
+    pub fn play_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
+        self.play_decoded(decode_track(bytes)?)
     }
 
-pub fn play_encoded_bytes(&self, bytes: Vec<u8>) -> CalyxResult<()> {
-    let (channels, sample_rate, pcm_samples) = Self::decode_m4a_to_pcm(bytes)?;
-    let dur_s = pcm_samples.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
-    self.duration_secs.store(dur_s, Ordering::Relaxed);
+    pub fn play_decoded(&self, track: DecodedTrack) -> CalyxResult<()> {
+        let DecodedTrack { channels, sample_rate, pcm, spectrum } = track;
+        let dur_s = pcm.len() as u64 / (channels as u64 * sample_rate as u64).max(1);
+        self.duration_secs.store(dur_s, Ordering::Relaxed);
+        *self.spectrum_frames.lock().unwrap() = spectrum;
 
-    let spectrum_frames = Self::compute_spectrum_frames(&pcm_samples, channels, sample_rate);
-    *self.spectrum_frames.lock().unwrap() = spectrum_frames;
+        if let Some(handle) = &self.handle {
+            let new_sink = Sink::try_new(handle)
+                .map_err(|e| CalyxError::Audio(format!("Failed to create audio sink: {e}")))?;
+            let vol = *self.volume.lock().unwrap();
+            new_sink.set_volume(vol);
+            new_sink.append(SamplesBuffer::new(channels, sample_rate, pcm));
+            new_sink.play();
 
-    if let Some(handle) = &self.handle {
-        let new_sink = Sink::try_new(handle)
-            .map_err(|e| CalyxError::Audio(format!("Failed to create audio sink: {e}")))?;
-        let vol = *self.volume.lock().unwrap();
-        new_sink.set_volume(vol);
-        new_sink.append(SamplesBuffer::new(channels, sample_rate, pcm_samples));
-        new_sink.play();
-
-        let mut guard = self.sink.lock().unwrap();
-        if let Some(old) = guard.take() { old.stop(); }
-        *guard = Some(new_sink);
+            let mut guard = self.sink.lock().unwrap();
+            if let Some(old) = guard.take() { old.stop(); }
+            *guard = Some(new_sink);
+        }
+        self.accumulated_ms.store(0, Ordering::Relaxed);
+        *self.started_at.lock().unwrap() = Some(std::time::Instant::now());
+        self.state.store(STATE_PLAYING, Ordering::Relaxed);
+        Ok(())
     }
-    self.accumulated_ms.store(0, Ordering::Relaxed);
-    *self.started_at.lock().unwrap() = Some(std::time::Instant::now());
-    self.state.store(STATE_PLAYING, Ordering::Relaxed);
-    Ok(())
-}
 
     pub fn toggle_pause(&self) {
         let current = self.state.load(Ordering::Relaxed);
@@ -222,40 +130,14 @@ pub fn status(&self) -> PlaybackStatus {
     }
 }
 
-pub fn current_spectrum(&self) -> [u8; 32] {
+pub fn current_spectrum(&self) -> SpectrumFrame {
+    const SILENT: SpectrumFrame = [0u8; SPECTRUM_BANDS];
     if self.state.load(Ordering::Relaxed) == STATE_STOPPED {
-        return [0u8; 32];
+        return SILENT;
     }
-    let idx = (self.progress().0.as_millis() / 50) as usize;
+    let idx = (self.progress().0.as_millis() / FRAME_MS as u128) as usize;
     let guard = self.spectrum_frames.lock().unwrap();
-    guard.get(idx).copied().unwrap_or([0u8; 32])
-}
-
-fn compute_spectrum_frames(pcm: &[i16], channels: u16, sample_rate: u32) -> Vec<[u8; 32]> {
-    let win = ((sample_rate as usize / 20) * channels.max(1) as usize).max(64);
-    let mut out = Vec::with_capacity(pcm.len() / win + 1);
-    let mut prev = [0u8; 32];
-    for chunk in pcm.chunks(win) {
-        let mut row = [0u8; 32];
-        let sub_len = (chunk.len() / 32).max(1);
-        for (b, sub) in chunk.chunks(sub_len).take(32).enumerate() {
-            let (mut sum, mut diff, mut last) = (0u64, 0u64, 0i32);
-            let step = (32 - b).clamp(1, 16);
-            for &s in sub.iter().step_by(step) {
-                let v = (s as i32) - last;
-                sum += (s as i32).unsigned_abs() as u64;
-                diff += v.unsigned_abs() as u64;
-                last = s as i32;
-            }
-            let n = (sub.len() / step).max(1) as u64;
-            let energy = ((sum / n) * (32 - b as u64) + (diff / n) * (b as u64 + 6)) / 24;
-            let scaled = ((energy / 210) as u8).clamp(1, 24);
-            row[b] = ((prev[b] as u16 * 2 + scaled as u16 * 3) / 5) as u8;
-            prev[b] = row[b];
-        }
-        out.push(row);
-    }
-    out
+    guard.get(idx).copied().unwrap_or(SILENT)
 }
 }
 

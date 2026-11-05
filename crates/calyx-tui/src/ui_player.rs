@@ -2,6 +2,8 @@ use ratatui::{layout::{Alignment, Constraint, Direction, Layout, Rect}, style::{
 use crate::app::TuiApp;
 use crate::ui::truncate;
 
+const BAR_GLYPHS: [&str; 9] = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+
 pub fn render_player_panel(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let bottom_chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -97,11 +99,9 @@ let lerp_col = |c1: Color, c2: Color, t: f64| -> Color {
 let srow = |r: u8, c: Color, v_spans: Vec<Span<'static>>| -> Line<'static> {
     let mut v = get_glyph_spans(r);
     v.push(Span::raw("  "));
-    for b in 0..12 {
-        let val = spec[(b * 32) / 12];
+    for (b, &val) in spec.iter().enumerate() {
         let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
-        let ch = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'][idx];
-        let ch_str = ch.to_string();
+        let glyph = BAR_GLYPHS[idx];
         for col_idx in 0..4 {
             let cell = (b * 4 + col_idx) as f64;
             let col = if cell + 1.0 <= progress_cell {
@@ -111,9 +111,9 @@ let srow = |r: u8, c: Color, v_spans: Vec<Span<'static>>| -> Line<'static> {
             } else {
                 dim_col
             };
-            v.push(Span::styled(ch_str.clone(), Style::default().fg(col)));
+            v.push(Span::styled(glyph, Style::default().fg(col)));
         }
-        if b < 11 {
+        if b + 1 < spec.len() {
             v.push(Span::raw(" "));
         }
     }
