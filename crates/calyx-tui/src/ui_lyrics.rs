@@ -37,6 +37,13 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     ];
 
     if app.current_lyrics.is_empty() {
+        // A track is loaded but has no lyrics: dance instead of an empty pane.
+        let active = app.current_track.is_some()
+            && !matches!(app.playback_status(), calyx_core::models::PlaybackStatus::Stopped);
+        if active && crate::ui_dancer::fits(area) {
+            crate::ui_dancer::render_dancer(frame, area, app);
+            return;
+        }
         frame.render_widget(
             Paragraph::new(empty_lines).block(Block::default()
                 .borders(Borders::LEFT)
