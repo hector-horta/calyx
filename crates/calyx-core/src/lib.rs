@@ -46,8 +46,11 @@ pub mod audio_cache;
 pub mod wv_crypto;
 /// Built-in Android 9 L3 WVD device credentials.
 pub mod wvd_builtin;
+/// Pluggable Service Facade contract and native backend providers.
+pub mod backend;
 
 /// Re-exported public items from the library's modules.
+pub use backend::{StreamingBackend, AppleMusicBackend, AudioStreamSource, SectionType};
 pub use api::AppleMusicClient;
 pub use audio::NativeAudioEngine;
 pub use auth::{fetch_apple_developer_token, SessionConfig};
