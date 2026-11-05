@@ -24,7 +24,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
             Line::from("  [d] Quitar Pista       [c] Limpiar Todo      [y] Fonética (Dual/Romaji)"),
             Line::from(""),
             Line::from(Span::styled("  🎵 Controles del Reproductor", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
-            Line::from("  [Enter] Play           [Espacio] Pausa   [< / >] Ant/Sig"),
+            Line::from("  [Enter] Reproducir     [Espacio] Pausa   [< / >] Anterior/Siguiente"),
             Line::from("  [s] Aleatorio          [r] Repetir       [- / +] Volumen"),
             Line::from(""),
             Line::from(Span::styled("  ⚙️  Sistema & Configuración", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))),
