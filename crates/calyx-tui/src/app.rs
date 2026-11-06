@@ -1,9 +1,14 @@
+use std::sync::Arc;
+
 use calyx_core::{
-    AppleMusicClient, CalyxResult, CatalogStore, DrmMode, NativeAudioEngine,
-    PlaybackQueue, PlaybackStatus, RepeatMode, SessionConfig, Track, UserPlaylist,
+    CalyxResult, CatalogStore, NativeAudioEngine, PlaybackQueue, PlaybackStatus,
+    RepeatMode, SessionConfig, StreamingBackend, Track, UserPlaylist,
 };
 use ratatui::widgets::ListState;
 use crate::artwork::TerminalCoverArt;
+
+/// The streaming service behind the facade; the only place to swap it.
+pub type Backend = calyx_core::AppleMusicBackend;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveView {
@@ -51,27 +56,24 @@ pub struct TuiApp {
     pub pause_icon: crate::artwork::TerminalIcon,
     pub current_lyrics: Vec<calyx_core::LyricLine>,
     pub status_message: String,
-    #[allow(dead_code)]
-    pub drm_mode: DrmMode,
     pub language: calyx_core::Language,
     pub phonetic_mode: PhoneticMode,
-    pub session: SessionConfig,
     pub volume: f32,
     pub should_quit: bool,
-    pub(crate) client: AppleMusicClient,
+    pub(crate) backend: Arc<Backend>,
     pub(crate) store: CatalogStore,
     pub(crate) audio: NativeAudioEngine,
-    pub(crate) bg_tx: tokio::sync::mpsc::UnboundedSender<crate::playback::BgEvent>,
-    pub(crate) bg_rx: tokio::sync::mpsc::UnboundedReceiver<crate::playback::BgEvent>,
+    pub(crate) bg_tx: tokio::sync::mpsc::UnboundedSender<crate::bg_events::BgEvent>,
+    pub(crate) bg_rx: tokio::sync::mpsc::UnboundedReceiver<crate::bg_events::BgEvent>,
     pub(crate) play_task: Option<tokio::task::JoinHandle<()>>,
-    pub(crate) audio_cache: calyx_core::AudioCache,
+    /// A login window is open; a second one would fight over the CDP port.
+    pub(crate) login_in_progress: bool,
 }
 
 impl TuiApp {
     pub fn new(storefront: &str) -> CalyxResult<Self> {
         let session = SessionConfig::load_or_default(storefront);
-        let mut client = AppleMusicClient::new(&session.storefront)?;
-        client.set_tokens(session.developer_token.clone(), session.media_user_token.clone());
+        let language = session.language.unwrap_or_else(calyx_core::Language::detect_system);
         let store = CatalogStore::open_path("calyx_cache.db")?;
         let cached = store.search_tracks("", 50).unwrap_or_default();
         let mut list_state = ListState::default();
@@ -83,16 +85,9 @@ impl TuiApp {
         let audio_cache = calyx_core::AudioCache::new(2 * 1024 * 1024 * 1024);
         let cache_bg = audio_cache.clone();
         tokio::task::spawn_blocking(move || { cache_bg.evict_if_needed(); });
-        if session.developer_token.as_ref().map(|s| s.is_empty()).unwrap_or(true) {
-            let mut c_bg = client.clone();
-            let mut s_bg = session.clone();
-            tokio::spawn(async move {
-                if let Ok(tok) = c_bg.sync_developer_token().await {
-                    s_bg.developer_token = Some(tok);
-                    let _ = s_bg.save();
-                }
-            });
-        }
+        let backend = Arc::new(Backend::new(session, audio_cache)?);
+        let backend_bg = backend.clone();
+        tokio::spawn(async move { let _ = backend_bg.ensure_developer_token().await; });
 
         Ok(Self {
             search_input: String::with_capacity(1024),
@@ -121,19 +116,17 @@ impl TuiApp {
             ),
             current_lyrics: Vec::new(),
             status_message: String::new(),
-            drm_mode: DrmMode::WidevineL3Cbcs,
-            language: session.language.unwrap_or_else(calyx_core::Language::detect_system),
+            language,
             phonetic_mode: PhoneticMode::default(),
-            session,
             volume: 0.85,
             should_quit: false,
-            client,
+            backend,
             store,
             audio: NativeAudioEngine::new()?,
             bg_tx,
             bg_rx,
             play_task: None,
-            audio_cache,
+            login_in_progress: false,
         })
     }
 
@@ -265,48 +258,16 @@ pub fn selected_track(&self) -> Option<Track> {
 
     pub fn toggle_language(&mut self) {
         self.language = self.language.toggle();
-        self.session.language = Some(self.language);
-        let _ = self.session.save();
+        let _ = self.backend.set_language(self.language);
         self.status_message = match self.language {
             calyx_core::Language::Es => "Idioma: Español ('L' para cambiar)".to_string(),
             calyx_core::Language::En => "Language: English ('L' to switch)".to_string(),
         };
     }
 
-    pub async fn execute_search(&mut self) {
-        let query = self.search_input.trim().to_string();
-        if query.is_empty() { return; }
-        self.status_message = format!("Buscando '{}'...", query);
-        match self.client.search_catalog(&query, 25).await {
-            Ok(results) => {
-                for track in &results { let _ = self.store.upsert_track(track); }
-                self.status_message = format!("{} pistas encontradas.", results.len());
-                self.tracks = results;
-                self.selected_index = 0;
-                self.list_state.select(Some(0));
-                self.active_view = ActiveView::Home;
-            }
-            Err(e) => self.status_message = format!("Error de búsqueda: {e}"),
-        }
-    }
-
-    pub async fn sync_user_auth(&mut self) {
-        match self.client.login_and_verify_user().await {
-            Ok((dev_tok, user_tok, verified_sf, browser_guard)) => {
-                self.session.developer_token = Some(dev_tok);
-                self.session.media_user_token = Some(user_tok.clone());
-                self.session.storefront = verified_sf.clone();
-                let _ = self.session.save();
-                if let Some(g) = browser_guard { g.kill_after_save().await; }
-                let p = &user_tok[..user_tok.len().min(16)];
-                self.status_message = format!("Sesión Apple Music verificada ({p}..., Storefront '{verified_sf}')");
-            }
-            Err(e) => self.status_message = format!("Error login Apple: {e}"),
-        }
-    }
-
-    pub async fn toggle_pause(&mut self) { self.audio.toggle_pause(); }
-    pub async fn adjust_volume(&mut self, delta: f32) {
+    pub fn is_logged_in(&self) -> bool { self.backend.is_logged_in() }
+    pub fn toggle_pause(&mut self) { self.audio.toggle_pause(); }
+    pub fn adjust_volume(&mut self, delta: f32) {
         self.volume = (self.volume + delta).clamp(0.0, 1.0);
         self.audio.set_volume(self.volume);
     }

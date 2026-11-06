@@ -2,7 +2,7 @@
 
 use calyx_core::{decode_track, DecodedTrack, LyricLine, Track};
 use crate::app::TuiApp;
-use crate::playback::BgEvent;
+use crate::bg_events::BgEvent;
 
 impl TuiApp {
     /// Decodes `bytes` on tokio's blocking pool and reports back via `BgEvent::AudioDecoded`.
