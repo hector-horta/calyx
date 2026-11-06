@@ -52,6 +52,8 @@ pub mod spectrum;
 mod stream_resolver;
 /// Phonetic transliteration engine (Romaji, Hangul RR).
 pub mod transliteration;
+/// Full-track playback (webPlayback, Widevine license, HLS download).
+mod webplay;
 /// Pure-Rust Widevine L3 cryptographic primitives.
 pub mod wv_crypto;
 /// Built-in Android 9 L3 WVD device credentials.
