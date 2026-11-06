@@ -22,6 +22,8 @@ pub enum BgEvent {
     /// A playlist started with 'p' (queue all and play).
     PlaylistReady(String, Result<Vec<Track>, String>),
     LoginDone(Result<(), String>),
+    /// Album opened with 'o': its name and songs.
+    AlbumOpened(Result<(String, Vec<Track>), String>),
     /// The prefetch of this track id finished (cached, or failed).
     PrefetchDone(String),
 }
@@ -139,6 +141,22 @@ impl TuiApp {
                     Err(e) => self.say(Msg::LoginError(&e)),
                 }
             }
+            // The album replaces the visible list; from the queue it opens in Home.
+            BgEvent::AlbumOpened(Ok((name, list))) if !list.is_empty() => {
+                self.say(Msg::AlbumOpened {
+                    name: &name,
+                    count: list.len(),
+                });
+                let view = match self.active_view {
+                    ActiveView::Queue | ActiveView::Help | ActiveView::Playlists => {
+                        ActiveView::Home
+                    }
+                    v => v,
+                };
+                self.show_tracks(list, view);
+            }
+            BgEvent::AlbumOpened(Ok((name, _))) => self.say(Msg::AlbumEmpty(&name)),
+            BgEvent::AlbumOpened(Err(e)) => self.say(Msg::AlbumError(&e)),
             // A newer prefetch may already own the spinner; only clear our own.
             BgEvent::PrefetchDone(id) => {
                 if self.caching.as_ref().is_some_and(|(c, _)| *c == id) {

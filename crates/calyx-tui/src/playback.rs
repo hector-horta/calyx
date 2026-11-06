@@ -108,6 +108,21 @@ impl TuiApp {
         self.play_next();
     }
 
+    /// 'A': enqueue the whole visible track list (an album, a playlist...).
+    pub fn enqueue_visible_list(&mut self) {
+        if matches!(
+            self.active_view,
+            ActiveView::Queue | ActiveView::Help | ActiveView::Playlists
+        ) || self.tracks.is_empty()
+        {
+            return;
+        }
+        for t in &self.tracks {
+            self.queue.enqueue_back(t.clone());
+        }
+        self.say(Msg::ListEnqueued(self.tracks.len()));
+    }
+
     pub fn trigger_prefetch_next(&mut self) {
         let Some(next) = self.queue.peek_next().cloned() else {
             return;
