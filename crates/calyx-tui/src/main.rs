@@ -122,6 +122,7 @@ fn run_event_loop(
             KeyCode::Char('a') => app.enqueue_selected_back(),
             KeyCode::Char('A') => app.enqueue_visible_list(),
             KeyCode::Char('o') => app.open_selected_album(),
+            KeyCode::Char('f') => app.add_selected_album_to_library(),
             KeyCode::Char('n') => app.enqueue_selected_next(),
             KeyCode::Char('d') => app.remove_selected_from_queue(),
             KeyCode::Char('c') => app.clear_current_list(),

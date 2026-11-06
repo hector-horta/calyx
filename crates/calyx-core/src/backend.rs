@@ -71,6 +71,11 @@ pub trait StreamingBackend: Send + Sync + 'static {
         &self,
         track: &Track,
     ) -> impl std::future::Future<Output = CalyxResult<(String, Vec<Track>)>> + Send;
+    /// Adds the album `track` belongs to to the user's library (needs login).
+    fn add_album_to_library(
+        &self,
+        track: &Track,
+    ) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
     /// Fills missing preview/artwork URLs from the catalog.
     fn complete_track(&self, track: Track) -> impl std::future::Future<Output = Track> + Send;
     /// Playable audio: cache, then full stream, then preview.
@@ -161,15 +166,6 @@ const MAX_LIBRARY_SONGS: usize = 1000;
 const MAX_PLAYLISTS: usize = 300;
 const MAX_PLAYLIST_TRACKS: usize = 1000;
 
-/// "top hits <current year>" without pulling in a date crate.
-fn new_releases_query() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    format!("top hits {}", 1970 + secs / 31_556_952)
-}
-
 impl StreamingBackend for AppleMusicBackend {
     fn service_name(&self) -> &'static str {
         "Apple Music"
@@ -184,12 +180,9 @@ impl StreamingBackend for AppleMusicBackend {
     }
 
     async fn fetch_section(&self, section: SectionType) -> CalyxResult<Vec<Track>> {
-        let query = match section {
-            SectionType::Home => "top hits".to_string(),
-            SectionType::NewReleases => new_releases_query(),
-            SectionType::Radio => "electronic chill radio mix".to_string(),
-        };
-        self.client().search_catalog(&query, 25).await
+        self.client()
+            .search_catalog(&section.search_query(), 25)
+            .await
     }
 
     async fn fetch_user_library(&self) -> CalyxResult<Vec<Track>> {
@@ -224,6 +217,14 @@ impl StreamingBackend for AppleMusicBackend {
 
     async fn fetch_album_of(&self, track: &Track) -> CalyxResult<(String, Vec<Track>)> {
         crate::catalog_album::fetch_album_of(&self.client(), track).await
+    }
+
+    async fn add_album_to_library(&self, track: &Track) -> CalyxResult<()> {
+        let (dev, usr, _) = self.user_ctx();
+        crate::library::require_session(&dev, &usr, "agregar a tu biblioteca")?;
+        let client = self.client();
+        let album_id = crate::catalog_album::resolve_album_id(&client, track).await?;
+        crate::library_write::add_album_to_library(client.http(), &dev, &usr, &album_id).await
     }
 
     async fn complete_track(&self, track: Track) -> Track {

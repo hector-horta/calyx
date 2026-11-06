@@ -34,6 +34,8 @@ pub mod hls;
 pub mod i18n;
 /// Personal Apple Music Library & Playlists synchronization.
 pub mod library;
+/// Writes to the user's library (add album).
+mod library_write;
 /// Interactive zero-friction Apple Music Sign-In.
 pub mod login;
 /// Gecko/Firefox family cookie extraction and login support.
@@ -50,6 +52,8 @@ pub mod models;
 pub mod paths;
 /// Playback queue management with repeat and shuffle support.
 pub mod queue;
+/// Catalog searches behind the curated sections.
+mod sections;
 /// Precomputed visualizer frames.
 pub mod spectrum;
 /// Cache → full stream → preview strategy behind the facade.

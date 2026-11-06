@@ -24,6 +24,8 @@ pub enum BgEvent {
     LoginDone(Result<(), String>),
     /// Album opened with 'o': its name and songs.
     AlbumOpened(Result<(String, Vec<Track>), String>),
+    /// Result of 'f' (album name, outcome).
+    AlbumAddedToLibrary(String, Result<(), String>),
     /// The prefetch of this track id finished (cached, or failed).
     PrefetchDone(String),
 }
@@ -157,6 +159,13 @@ impl TuiApp {
             }
             BgEvent::AlbumOpened(Ok((name, _))) => self.say(Msg::AlbumEmpty(&name)),
             BgEvent::AlbumOpened(Err(e)) => self.say(Msg::AlbumError(&e)),
+            BgEvent::AlbumAddedToLibrary(album, Ok(())) => {
+                self.say(Msg::AlbumAddedToLibrary(&album))
+            }
+            BgEvent::AlbumAddedToLibrary(album, Err(err)) => self.say(Msg::AlbumAddError {
+                album: &album,
+                err: &err,
+            }),
             // A newer prefetch may already own the spinner; only clear our own.
             BgEvent::PrefetchDone(id) => {
                 if self.caching.as_ref().is_some_and(|(c, _)| *c == id) {

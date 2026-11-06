@@ -32,7 +32,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
             )),
             Line::from("  [p] Reproducir Lista   [a] Encolar   [n] A continuación"),
             Line::from("  [d] Quitar Pista       [c] Limpiar Todo      [y] Fonética (Dual/Romaji)"),
-            Line::from("  [o] Abrir Álbum        [A] Encolar Lista Entera"),
+            Line::from("  [o] Abrir Álbum        [A] Encolar Lista Entera  [f] Álbum a Biblioteca"),
             Line::from(""),
             Line::from(Span::styled(
                 "  🎵 Controles del Reproductor",
@@ -72,7 +72,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
             Line::from(
                 "  [d] Remove Track       [c] Clear All         [y] Phonetics (Dual/Romaji)",
             ),
-            Line::from("  [o] Open Album         [A] Enqueue Whole List"),
+            Line::from("  [o] Open Album         [A] Enqueue Whole List    [f] Album to Library"),
             Line::from(""),
             Line::from(Span::styled(
                 "  🎵 Player Controls",

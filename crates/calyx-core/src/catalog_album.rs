@@ -57,7 +57,10 @@ async fn get_catalog(client: &AppleMusicClient, path: &str, what: &str) -> Calyx
 
 /// The track's album id, asking the catalog when the list did not carry it
 /// (only possible when the track id is a catalog song id).
-async fn resolve_album_id(client: &AppleMusicClient, track: &Track) -> CalyxResult<String> {
+pub(crate) async fn resolve_album_id(
+    client: &AppleMusicClient,
+    track: &Track,
+) -> CalyxResult<String> {
     if let Some(id) = track
         .album_id
         .as_deref()
