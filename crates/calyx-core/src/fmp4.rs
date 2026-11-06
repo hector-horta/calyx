@@ -106,7 +106,11 @@ pub fn decrypt_apple_fmp4_stream(
     Ok(decrypted_samples)
 }
 
-fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>, Vec<Vec<(u16, u32)>>) {
+/// (sample description index, sample sizes, per-sample IVs, per-sample
+/// subsample (clear, encrypted) byte ranges) of one `moof` box.
+type CencMeta = (u32, Vec<usize>, Vec<[u8; 16]>, Vec<Vec<(u16, u32)>>);
+
+fn parse_moof_cenc_meta(moof: &[u8]) -> CencMeta {
     let mut desc_index = 2u32;
     let mut default_size = 0usize;
     let mut sizes = Vec::new();
@@ -156,8 +160,8 @@ fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>, Vec<Vec
     }
     let mut ivs = Vec::with_capacity(sizes.len());
     let mut all_subs = Vec::with_capacity(sizes.len());
-    if let Some(senc) = raw_senc {
-        if senc.len() >= 8 {
+    if let Some(senc) = raw_senc
+        && senc.len() >= 8 {
             let flags = u32::from_be_bytes([0, senc[1], senc[2], senc[3]]);
             let has_sub = (flags & 0x02) != 0;
             let body = &senc[8..];
@@ -181,7 +185,6 @@ fn parse_moof_cenc_meta(moof: &[u8]) -> (u32, Vec<usize>, Vec<[u8; 16]>, Vec<Vec
                 all_subs.push(subs);
             }
         }
-    }
     (desc_index, sizes, ivs, all_subs)
 }
 

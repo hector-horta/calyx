@@ -79,15 +79,10 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
             .header("Origin", "https://music.apple.com")
             .header("Referer", "https://music.apple.com/")
             .send().await
-        {
-            if let Ok(val) = resp.json::<serde_json::Value>().await {
-                if let Some(songs_obj) = val.pointer("/results/songs") {
-                    if let Ok(list) = crate::library::parse_library_songs_json(&songs_obj.to_string(), &self.storefront) {
-                        if !list.is_empty() { return Ok(list); }
-                    }
-                }
-            }
-        }
+            && let Ok(val) = resp.json::<serde_json::Value>().await
+                && let Some(songs_obj) = val.pointer("/results/songs")
+                    && let Ok(list) = crate::library::parse_library_songs_json(&songs_obj.to_string(), &self.storefront)
+                        && !list.is_empty() { return Ok(list); }
     }
 
     // Fallback to itunes.apple.com/search
@@ -135,11 +130,10 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
             Some(t) if !t.is_empty() => t.clone(),
             _ => self.sync_developer_token().await?,
         };
-        if let Some(existing) = self.media_user_token.clone().filter(|t| !t.is_empty()) {
-            if crate::login::token_is_live(&self.http, &dev_token, &existing).await {
+        if let Some(existing) = self.media_user_token.clone().filter(|t| !t.is_empty())
+            && crate::login::token_is_live(&self.http, &dev_token, &existing).await {
                 return Ok((dev_token, existing, self.storefront.clone(), None));
             }
-        }
         let (extracted_dev, user_token, guard) =
             crate::login::interactive_apple_login(&self.http, &self.storefront, &dev_token).await?;
         let dev_token = extracted_dev.unwrap_or(dev_token);
@@ -174,7 +168,7 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
             (Some(d), Some(n)) => wvd.build_signed_challenge(pssh, d, n),
             _ => (wvd.build_license_challenge(pssh)?, Vec::new()),
         };
-        let lic_b64 = self.request_widevine_license(&license_url, track_id, key_uri, pssh, &challenge, dev_token, user_token).await?;
+        let lic_b64 = self.request_widevine_license(&license_url, track_id, key_uri, pssh, &challenge, (dev_token, user_token)).await?;
         let track_key = wvd.extract_content_key_from_license(&lic_b64, &lic_req)?;
 
         let mut full_audio = Vec::new();
@@ -228,7 +222,9 @@ async fn resolve_webplay_manifest(&self, track_id: &str, dev_token: &str, user_t
     Ok((hls_url, license_url))
 }
 
-    async fn request_widevine_license(&self, license_url: &str, track_id: &str, key_uri: &str, pssh: &crate::drm::PsshBox, challenge: &[u8], dev_token: &str, user_token: &str) -> CalyxResult<String> {
+    /// `tokens` = (developer token, media-user token).
+    async fn request_widevine_license(&self, license_url: &str, track_id: &str, key_uri: &str, pssh: &crate::drm::PsshBox, challenge: &[u8], tokens: (&str, &str)) -> CalyxResult<String> {
+        let (dev_token, user_token) = tokens;
         let uri_field = if !key_uri.is_empty() { key_uri.to_string() } else { format!("data:text/plain;base64,{}", BASE64.encode(&pssh.raw_bytes)) };
         let body = serde_json::json!({
             "adamId": track_id, "challenge": BASE64.encode(challenge), "isLibrary": track_id.starts_with("i."),

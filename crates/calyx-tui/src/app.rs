@@ -202,8 +202,8 @@ pub fn selected_track(&self) -> Option<Track> {
 
     pub fn remove_selected_from_queue(&mut self) {
         if self.active_view == ActiveView::Queue {
-            if let Some(idx) = self.queue_state.selected() {
-                if let Some(removed) = self.queue.remove(idx) {
+            if let Some(idx) = self.queue_state.selected()
+                && let Some(removed) = self.queue.remove(idx) {
                     self.say(Msg::RemovedFromQueue(&removed.title));
                     if self.queue.is_empty() {
                         self.queue_state.select(None);
@@ -211,7 +211,6 @@ pub fn selected_track(&self) -> Option<Track> {
                         self.queue_state.select(Some(self.queue.len() - 1));
                     }
                 }
-            }
         } else if self.active_view == ActiveView::Home && !self.tracks.is_empty() {
             let removed = self.tracks.remove(self.selected_index);
             let _ = self.store.delete_track(&removed.id);

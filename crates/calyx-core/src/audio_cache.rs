@@ -61,11 +61,10 @@ impl AudioCache {
         let mut size = 0;
         if let Ok(entries) = fs::read_dir(&self.dir) {
             for entry in entries.flatten() {
-                if entry.path().extension().and_then(|s| s.to_str()) == Some("bin") {
-                    if let Ok(meta) = entry.metadata() {
+                if entry.path().extension().and_then(|s| s.to_str()) == Some("bin")
+                    && let Ok(meta) = entry.metadata() {
                         size += meta.len();
                     }
-                }
             }
         }
         size
@@ -93,7 +92,7 @@ pub fn evict_if_needed(&self) -> usize {
 
     for (_, len, path) in &files {
         if total <= target { break; }
-        if fs::remove_file(&path).is_ok() {
+        if fs::remove_file(path).is_ok() {
             evicted += 1;
             total = total.saturating_sub(*len);
         }
@@ -104,13 +103,11 @@ pub fn evict_if_needed(&self) -> usize {
         let now = SystemTime::now();
         for entry in entries.flatten() {
             let path = entry.path();
-            if let Ok(meta) = entry.metadata() {
-                if let Ok(mtime) = meta.modified() {
-                    if now.duration_since(mtime).map(|d| d.as_secs() > 3600).unwrap_or(false) {
+            if let Ok(meta) = entry.metadata()
+                && let Ok(mtime) = meta.modified()
+                    && now.duration_since(mtime).map(|d| d.as_secs() > 3600).unwrap_or(false) {
                         fs::remove_file(path).ok();
                     }
-                }
-            }
         }
     }
 

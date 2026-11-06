@@ -147,15 +147,13 @@ impl WidevineDeviceL3 {
         cmac_input.extend_from_slice(&[0x00, 0x00, 0x00, 0x80]);
         let enc_key = aes128_cmac(&session_key, &cmac_input);
         for container in find_all_proto_bytes(&lic_msg, 3) {
-            if find_proto_varint(&container, 4) == Some(2) {
-                if let (Some(iv_b), Some(key_ct)) = (find_proto_bytes(&container, 2), find_proto_bytes(&container, 3)) {
-                    if iv_b.len() >= 16 {
+            if find_proto_varint(&container, 4) == Some(2)
+                && let (Some(iv_b), Some(key_ct)) = (find_proto_bytes(&container, 2), find_proto_bytes(&container, 3))
+                    && iv_b.len() >= 16 {
                         let mut iv = [0u8; 16];
                         iv.copy_from_slice(&iv_b[..16]);
                         return decrypt_aes128_cbc_key(&enc_key, &iv, &key_ct);
                     }
-                }
-            }
         }
         Err(CalyxError::Drm("No CONTENT key found in Widevine license".to_string()))
     }

@@ -130,18 +130,18 @@ pub fn rsa2048_modpow(base_be: &[u8; 256], exp_be: &[u8; 256], mod_be: &[u8; 256
 
 fn bytes_to_limbs(be: &[u8; 256]) -> [u64; 32] {
     let mut limbs = [0u64; 32];
-    for i in 0..32 {
+    for (i, limb) in limbs.iter_mut().enumerate() {
         let idx = 256 - (i + 1) * 8;
-        limbs[i] = u64::from_be_bytes(be[idx..idx + 8].try_into().unwrap_or([0; 8]));
+        *limb = u64::from_be_bytes(be[idx..idx + 8].try_into().unwrap_or([0; 8]));
     }
     limbs
 }
 
 fn limbs_to_bytes(limbs: &[u64; 32]) -> [u8; 256] {
     let mut out = [0u8; 256];
-    for i in 0..32 {
+    for (i, limb) in limbs.iter().enumerate() {
         let idx = 256 - (i + 1) * 8;
-        out[idx..idx + 8].copy_from_slice(&limbs[i].to_be_bytes());
+        out[idx..idx + 8].copy_from_slice(&limb.to_be_bytes());
     }
     out
 }
@@ -240,8 +240,8 @@ pub fn aes128_cmac(key: &[u8; 16], data: &[u8]) -> [u8; 16] {
     cipher.encrypt_block(GenericArray::from_mut_slice(&mut l));
     let k1 = dbl_block(l);
     let k2 = dbl_block(k1);
-    let n_blocks = if data.is_empty() { 1 } else { (data.len() + 15) / 16 };
-    let complete = !data.is_empty() && (data.len() % 16 == 0);
+    let n_blocks = if data.is_empty() { 1 } else { data.len().div_ceil(16) };
+    let complete = !data.is_empty() && data.len().is_multiple_of(16);
     let mut x = [0u8; 16];
     for i in 0..n_blocks {
         let mut m_block = [0u8; 16];

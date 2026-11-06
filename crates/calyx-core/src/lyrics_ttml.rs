@@ -76,11 +76,10 @@ pub fn parse_ttml(raw: &str) -> Vec<LyricLine> {
 
                     if let Some(quote_end_pos) = time_str.find('"') {
                         let time_str = &time_str[..quote_end_pos];
-                        if let Some(time_ms) = parse_ttml_time(time_str) {
-                            if !text.is_empty() {
+                        if let Some(time_ms) = parse_ttml_time(time_str)
+                            && !text.is_empty() {
                                 lines.push(LyricLine::new(time_ms, text));
                             }
-                        }
                     }
                 }
 

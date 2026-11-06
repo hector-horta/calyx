@@ -45,11 +45,11 @@ fn loud_and_quiet_use_same_range() {
 #[test]
 fn falloff_is_gradual() {
     let mut pcm = signal(22_050);
-    pcm.extend(std::iter::repeat(0i16).take(22_050));
+    pcm.extend(std::iter::repeat_n(0i16, 22_050));
     let frames = compute_spectrum_frames(&pcm, 1, 44_100);
     for pair in frames.windows(2) {
-        for k in 0..SPECTRUM_BANDS {
-            assert!(pair[0][k].saturating_sub(pair[1][k]) <= FALL_PER_FRAME);
+        for (before, after) in pair[0].iter().zip(&pair[1]) {
+            assert!(before.saturating_sub(*after) <= FALL_PER_FRAME);
         }
     }
 }

@@ -88,16 +88,14 @@ pub fn find_webkit_cookie_files() -> Vec<PathBuf> {
 pub fn extract_token_from_webkit() -> Option<String> {
     for path in find_webkit_cookie_files() {
         if path.extension().and_then(|s| s.to_str()) == Some("binarycookies") {
-            if let Ok(bytes) = std::fs::read(&path) {
-                if let Some(token) = parse_binary_cookies(&bytes) {
+            if let Ok(bytes) = std::fs::read(&path)
+                && let Some(token) = parse_binary_cookies(&bytes) {
                     return Some(token);
                 }
-            }
-        } else if path.extension().and_then(|s| s.to_str()) == Some("sqlite") {
-            if let Some(token) = crate::login_firefox::extract_token_from_db_file(&path) {
+        } else if path.extension().and_then(|s| s.to_str()) == Some("sqlite")
+            && let Some(token) = crate::login_firefox::extract_token_from_db_file(&path) {
                 return Some(token);
             }
-        }
     }
     None
 }

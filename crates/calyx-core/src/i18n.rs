@@ -39,9 +39,8 @@ impl Language {
     pub fn name(&self) -> &'static str { match self { Self::Es => "Español", Self::En => "English" } }
     pub fn detect_system() -> Self {
         for k in ["LANG", "LC_ALL", "LC_MESSAGES"] {
-            if let Ok(v) = std::env::var(k) {
-                if v.to_lowercase().starts_with("es") { return Self::Es; }
-            }
+            if let Ok(v) = std::env::var(k)
+                && v.to_lowercase().starts_with("es") { return Self::Es; }
         }
         Self::En
     }

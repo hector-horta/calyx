@@ -16,16 +16,16 @@ pub struct TerminalCoverArt {
 
 impl TerminalCoverArt {
     pub fn from_jpeg_or_seed(bytes: Option<&[u8]>, seed_text: &str) -> Self {
-        if let Some(raw) = bytes {
-            if let Ok(img) = image::load_from_memory(raw) {
+        if let Some(raw) = bytes
+            && let Ok(img) = image::load_from_memory(raw) {
                 let resized = img
                     .resize_exact(ART_WIDTH as u32, ART_HEIGHT_PIXELS as u32, FilterType::Lanczos3)
                     .to_rgb8();
                 let mut grid = vec![vec![(0u8, 0u8, 0u8); ART_WIDTH]; ART_HEIGHT_PIXELS];
-                for y in 0..ART_HEIGHT_PIXELS {
-                    for x in 0..ART_WIDTH {
+                for (y, row) in grid.iter_mut().enumerate() {
+                    for (x, cell) in row.iter_mut().enumerate() {
                         let p = resized.get_pixel(x as u32, y as u32);
-                        grid[y][x] = (p[0], p[1], p[2]);
+                        *cell = (p[0], p[1], p[2]);
                     }
                 }
                 return Self {
@@ -33,7 +33,6 @@ impl TerminalCoverArt {
                     is_real_image: true,
                 };
             }
-        }
         Self::procedural_fallback(seed_text)
     }
 
@@ -49,17 +48,17 @@ impl TerminalCoverArt {
         let g_accent = ((hash >> 32) & 0xFF) as u8;
         let b_accent = ((hash >> 40) & 0xFF) as u8;
 
-        for y in 0..ART_HEIGHT_PIXELS {
-            for x in 0..ART_WIDTH {
+        for (y, row) in grid.iter_mut().enumerate() {
+            for (x, cell) in row.iter_mut().enumerate() {
                 let dx = (x as isize - (ART_WIDTH as isize / 2)).unsigned_abs();
                 let dy = (y as isize - (ART_HEIGHT_PIXELS as isize / 2)).unsigned_abs();
                 let dist = dx + dy;
 
                 if dist <= 3 {
-                    grid[y][x] = (r_accent, g_accent, b_accent);
+                    *cell = (r_accent, g_accent, b_accent);
                 } else if dist <= 8 {
                     let groove = (dist * 24) as u8;
-                    grid[y][x] = (
+                    *cell = (
                         r_base.wrapping_add(groove),
                         g_base.wrapping_add(groove / 2),
                         b_base.wrapping_add(groove),
@@ -67,7 +66,7 @@ impl TerminalCoverArt {
                 } else {
                     let gx = (x * 11) as u8;
                     let gy = (y * 11) as u8;
-                    grid[y][x] = (
+                    *cell = (
                         r_base.wrapping_add(gx),
                         g_accent.wrapping_add(gy),
                         b_base.wrapping_add(gx ^ gy),
@@ -119,11 +118,10 @@ pub struct TerminalIcon {
 impl TerminalIcon {
     pub fn load_or_fallback(paths: &[&str], width: usize, height_pixels: usize, fallback_lines: [&'static str; 3], fallback_col: Color) -> Self {
         for path in paths {
-            if let Ok(bytes) = std::fs::read(path) {
-                if let Ok(img) = image::load_from_memory(&bytes) {
+            if let Ok(bytes) = std::fs::read(path)
+                && let Ok(img) = image::load_from_memory(&bytes) {
                     return Self::from_image(img, width, height_pixels);
                 }
-            }
         }
         let rows = fallback_lines.iter().map(|&s| vec![Span::styled(s, Style::default().fg(fallback_col).add_modifier(ratatui::style::Modifier::BOLD))]).collect();
         Self { rows }

@@ -120,14 +120,13 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
                 global_char_idx += 1;
                 visual_lines.push(Line::from(spans));
             }
-            if app.phonetic_mode == crate::app::PhoneticMode::Dual {
-                if let Some(phonetic) = &line.phonetic {
+            if app.phonetic_mode == crate::app::PhoneticMode::Dual
+                && let Some(phonetic) = &line.phonetic {
                     visual_lines.push(Line::from(vec![
                         Span::raw("   "),
                         Span::styled(format!("⤷ {phonetic}"), Style::default().fg(Color::Yellow)),
                     ]));
                 }
-            }
         } else {
             let text = if app.phonetic_mode == crate::app::PhoneticMode::Phonetic {
                 line.phonetic.as_deref().unwrap_or(&line.text)

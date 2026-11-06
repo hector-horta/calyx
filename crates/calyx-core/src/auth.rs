@@ -91,13 +91,11 @@ impl SessionConfig {
     }
 
     pub fn load_wvd_device(&self) -> CalyxResult<WidevineDeviceL3> {
-        if let Some(path) = self.resolve_wvd_path() {
-            if let Ok(raw) = fs::read(&path) {
-                if let Ok(dev) = WidevineDeviceL3::from_wvd_bytes(&raw) {
+        if let Some(path) = self.resolve_wvd_path()
+            && let Ok(raw) = fs::read(&path)
+                && let Ok(dev) = WidevineDeviceL3::from_wvd_bytes(&raw) {
                     return Ok(dev);
                 }
-            }
-        }
         WidevineDeviceL3::builtin()
     }
 }

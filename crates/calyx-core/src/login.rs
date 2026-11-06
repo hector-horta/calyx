@@ -82,8 +82,8 @@ pub async fn interactive_apple_login(
     // close it. Only that browser: its port comes from our own profile dir.
     if let Some(old_port) = profile_devtools_port(&profile_dir) {
         let old_targets = format!("http://127.0.0.1:{old_port}/json");
-        if let Ok(resp) = http.get(&old_targets).send().await {
-            if let Ok(targets) = resp.json::<Vec<CdpTarget>>().await {
+        if let Ok(resp) = http.get(&old_targets).send().await
+            && let Ok(targets) = resp.json::<Vec<CdpTarget>>().await {
                 // The port file may be stale (another program could own the
                 // port now): only close our own login window, on apple.com.
                 let ours = targets.iter().filter(|t| t.url.as_deref().is_some_and(|u| u.starts_with("https://music.apple.com")));
@@ -94,7 +94,6 @@ pub async fn interactive_apple_login(
                 }
                 tokio::time::sleep(Duration::from_millis(600)).await;
             }
-        }
     }
 
     let port = free_local_port()
@@ -129,8 +128,8 @@ pub async fn interactive_apple_login(
             let is_page = target.target_type.as_deref() == Some("page");
             let url = target.url.as_deref().unwrap_or("");
             let is_main_music_origin = url.starts_with("https://music.apple.com");
-            if is_page && is_main_music_origin {
-                if let Some(ws_url) = target.ws_url.as_deref() {
+            if is_page && is_main_music_origin
+                && let Some(ws_url) = target.ws_url.as_deref() {
                     let Some((opt_dev, token)) = probe_cdp_for_verified_token(ws_url).await else { continue };
                     if rejected.as_deref() == Some(token.as_str()) {
                         continue;
@@ -144,7 +143,6 @@ pub async fn interactive_apple_login(
                     let guard = LoginBrowserGuard { ws_url: ws_url.to_string(), child: Some(child) };
                     return Ok((opt_dev, token, guard));
                 }
-            }
         }
     }
 
@@ -168,7 +166,7 @@ pub async fn token_is_live(http: &Client, dev_token: &str, user_token: &str) -> 
         .unwrap_or(false)
 }
 
-fn spawn_app_window(bin: &PathBuf, profile_dir: &PathBuf, url: &str, port: u16) -> CalyxResult<Child> {
+fn spawn_app_window(bin: &std::path::Path, profile_dir: &std::path::Path, url: &str, port: u16) -> CalyxResult<Child> {
     Command::new(bin)
         .arg(format!("--app={url}"))
         .arg(format!("--user-data-dir={}", profile_dir.display()))
@@ -198,21 +196,19 @@ async fn probe_cdp_for_verified_token(ws_url: &str) -> Option<(Option<String>, S
 
 async fn probe_cdp_for_tokens(ws_url: &str) -> Option<(Option<String>, String)> {
     let js_cmd = r#"{"id":3,"method":"Runtime.evaluate","params":{"expression":"(() => { try { const mk = window.MusicKit && window.MusicKit.getInstance && window.MusicKit.getInstance(); let d = (mk && mk.developerToken) || ''; let u = (mk && mk.musicUserToken) || ''; for (let i = 0; i < localStorage.length; i++) { const k = (localStorage.key(i) || '').toLowerCase(); if (!d && (k.includes('developer-token') || k.includes('developertoken'))) d = localStorage.getItem(localStorage.key(i)) || ''; if (!u && k.includes('media-user-token')) u = localStorage.getItem(localStorage.key(i)) || ''; } return JSON.stringify({ dev: d.length > 50 ? d : null, user: u.length > 20 ? u : null }); } catch(e) { return ''; } })()","returnByValue":true}}"#;
-    if let Some(raw) = send_cdp_command(ws_url, js_cmd).await {
-        if let Some(res) = extract_tokens_from_cdp_eval(&raw) {
+    if let Some(raw) = send_cdp_command(ws_url, js_cmd).await
+        && let Some(res) = extract_tokens_from_cdp_eval(&raw) {
             return Some(res);
         }
-    }
     for cmd in [
         // js_cmd already probed
         r#"{"id":1,"method":"Storage.getCookies"}"#,
         r#"{"id":2,"method":"Network.getAllCookies"}"#,
     ] {
-        if let Some(raw) = send_cdp_command(ws_url, cmd).await {
-            if let Some(tok) = extract_token_from_cdp_json(&raw) {
+        if let Some(raw) = send_cdp_command(ws_url, cmd).await
+            && let Some(tok) = extract_token_from_cdp_json(&raw) {
                 return Some((None, tok));
             }
-        }
     }
     None
 }
@@ -232,14 +228,13 @@ pub fn extract_token_from_cdp_json(raw_json: &str) -> Option<String> {
     if let Some(cookies) = val.pointer("/result/cookies").and_then(|c| c.as_array()) {
         for cookie in cookies {
             let name = cookie.get("name").and_then(|n| n.as_str()).unwrap_or("");
-            if name.eq_ignore_ascii_case("media-user-token") {
-                if let Some(tok) = cookie.get("value").and_then(|v| v.as_str()) {
+            if name.eq_ignore_ascii_case("media-user-token")
+                && let Some(tok) = cookie.get("value").and_then(|v| v.as_str()) {
                     let clean = tok.trim();
                     if clean.len() > 20 {
                         return Some(clean.to_string());
                     }
                 }
-            }
         }
     }
     if let Some(eval_str) = val.pointer("/result/result/value").and_then(|v| v.as_str()) {
