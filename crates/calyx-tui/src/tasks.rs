@@ -120,6 +120,22 @@ impl TuiApp {
         });
     }
 
+    /// 'f': add the album of the selected track to the user's library.
+    pub fn add_selected_album_to_library(&mut self) {
+        let Some(track) = self.selected_track() else {
+            return;
+        };
+        self.say(Msg::AddingAlbumToLibrary(&track.album));
+        let backend = self.backend.clone();
+        self.spawn_event(async move {
+            let res = backend
+                .add_album_to_library(&track)
+                .await
+                .map_err(|e| e.to_string());
+            BgEvent::AlbumAddedToLibrary(track.album, res)
+        });
+    }
+
     pub fn start_login(&mut self) {
         if self.login_in_progress {
             return;

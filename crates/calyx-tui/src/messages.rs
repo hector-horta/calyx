@@ -63,6 +63,9 @@ pub enum Msg<'a> {
     AlbumError(&'a str),
     AlbumEmpty(&'a str),
     ListEnqueued(usize),
+    AddingAlbumToLibrary(&'a str),
+    AlbumAddedToLibrary(&'a str),
+    AlbumAddError { album: &'a str, err: &'a str },
     LoginOk,
     LoginError(&'a str),
     HelpOpened,
@@ -182,6 +185,24 @@ impl Msg<'_> {
             (Msg::AlbumError(err), En) => format!("Could not open the album: {err}"),
             (Msg::AlbumEmpty(name), Es) => format!("El álbum '{name}' no tiene canciones."),
             (Msg::AlbumEmpty(name), En) => format!("Album '{name}' has no songs."),
+            (Msg::AddingAlbumToLibrary(album), Es) => {
+                format!("⏳ Agregando '{album}' a tu biblioteca...")
+            }
+            (Msg::AddingAlbumToLibrary(album), En) => {
+                format!("⏳ Adding '{album}' to your library...")
+            }
+            (Msg::AlbumAddedToLibrary(album), Es) => {
+                format!("Álbum '{album}' agregado a tu biblioteca ('4' para verla).")
+            }
+            (Msg::AlbumAddedToLibrary(album), En) => {
+                format!("Album '{album}' added to your library ('4' to see it).")
+            }
+            (Msg::AlbumAddError { album, err }, Es) => {
+                format!("No se pudo agregar '{album}' a tu biblioteca: {err}")
+            }
+            (Msg::AlbumAddError { album, err }, En) => {
+                format!("Could not add '{album}' to your library: {err}")
+            }
             (Msg::ListEnqueued(n), Es) => format!("{n} canciones encoladas al final."),
             (Msg::ListEnqueued(n), En) => format!("{n} songs added to the end of the queue."),
             (Msg::LoginOk, Es) => "Sesión de Apple Music verificada.".to_string(),
@@ -253,6 +274,17 @@ mod tests {
                 .contains("'p' plays it, 'A' enqueues it")
         );
         assert_eq!(album_label(Language::Es), "Álbum");
+        let added = Msg::AlbumAddedToLibrary("Let's Dance");
+        assert!(
+            added
+                .text(Language::Es)
+                .contains("agregado a tu biblioteca ('4'")
+        );
+        assert!(
+            added
+                .text(Language::En)
+                .contains("added to your library ('4'")
+        );
     }
 
     #[test]
