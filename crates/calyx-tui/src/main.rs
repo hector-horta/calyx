@@ -3,6 +3,7 @@ mod artwork;
 mod audio_pipeline;
 mod bg_events;
 mod hints;
+mod labels;
 mod messages;
 mod navigation;
 mod playback;
