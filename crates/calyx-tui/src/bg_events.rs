@@ -24,6 +24,12 @@ pub enum BgEvent {
     LoginDone(Result<(), String>),
     /// Album opened with 'o': its name and songs.
     AlbumOpened(Result<(String, Vec<Track>), String>),
+    /// Result of adding a song to a playlist from the 'm' picker.
+    AddedToPlaylist {
+        title: String,
+        playlist: String,
+        res: Result<(), String>,
+    },
     /// Result of 'f' (album name, outcome).
     AlbumAddedToLibrary(String, Result<(), String>),
     /// The prefetch of this track id finished (cached, or failed).
@@ -110,8 +116,31 @@ impl TuiApp {
                 self.playlist_state
                     .select(if playlists.is_empty() { None } else { Some(0) });
                 self.playlists = playlists;
+                // Loaded for the 'm' picker: keep its instructions on screen.
+                if let Some(title) = self.picker.as_ref().map(|p| p.track.title.clone()) {
+                    self.say(Msg::PickPlaylist(&title));
+                }
             }
-            BgEvent::PlaylistsReady(Err(e)) => self.say(Msg::PlaylistsError(&e)),
+            BgEvent::PlaylistsReady(Err(e)) => {
+                self.picker = None;
+                self.say(Msg::PlaylistsError(&e));
+            }
+            BgEvent::AddedToPlaylist {
+                title,
+                playlist,
+                res: Ok(()),
+            } => self.say(Msg::AddedToPlaylist {
+                title: &title,
+                playlist: &playlist,
+            }),
+            BgEvent::AddedToPlaylist {
+                playlist,
+                res: Err(err),
+                ..
+            } => self.say(Msg::AddToPlaylistError {
+                playlist: &playlist,
+                err: &err,
+            }),
             BgEvent::PlaylistOpened(name, Ok(list)) => {
                 self.say(Msg::PlaylistOpened {
                     name: &name,

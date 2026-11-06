@@ -37,6 +37,22 @@ pub fn hint_bar(items: &[(&'static str, &'static str, Style)]) -> Line<'static> 
     Line::from(spans)
 }
 
+/// Like `hint_bar`, but drops hints from the end until it fits in `max_width`
+/// columns (put the important keys first). The first hint is always kept.
+pub fn hint_bar_fit(
+    items: &[(&'static str, &'static str, Style)],
+    max_width: usize,
+) -> Line<'static> {
+    let mut count = items.len();
+    loop {
+        let line = hint_bar(&items[..count]);
+        if count <= 1 || line.width() <= max_width {
+            return line;
+        }
+        count -= 1;
+    }
+}
+
 /// A navigation tab: same `[key] label` format; the active tab is shown inverted.
 pub fn tab(key: &'static str, label: &'static str, active: bool) -> [Span<'static>; 3] {
     if active {
@@ -83,6 +99,21 @@ mod tests {
             ("n", "A continuación", LABEL_STYLE),
         ]);
         assert_eq!(text(&line), "─[a] Encolar ── [n] A continuación─");
+    }
+
+    #[test]
+    fn fitted_bar_drops_trailing_hints_until_it_fits() {
+        let items = [
+            ("a", "Encolar", LABEL_STYLE),
+            ("n", "A continuación", LABEL_STYLE),
+            ("c", "Limpiar", LABEL_STYLE),
+        ];
+        let full = hint_bar(&items);
+        assert_eq!(text(&hint_bar_fit(&items, 200)), text(&full));
+        let two = text(&hint_bar_fit(&items, full.width() - 1));
+        assert_eq!(two, "─[a] Encolar ── [n] A continuación─");
+        // Never drops the first hint, even if it does not fit.
+        assert_eq!(text(&hint_bar_fit(&items, 3)), "─[a] Encolar─");
     }
 
     #[test]

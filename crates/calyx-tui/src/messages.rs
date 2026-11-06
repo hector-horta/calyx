@@ -58,6 +58,10 @@ pub enum Msg<'a> {
     AddingAlbumToLibrary(&'a str),
     AlbumAddedToLibrary(&'a str),
     AlbumAddError { album: &'a str, err: &'a str },
+    PickPlaylist(&'a str),
+    AddingToPlaylist { title: &'a str, playlist: &'a str },
+    AddedToPlaylist { title: &'a str, playlist: &'a str },
+    AddToPlaylistError { playlist: &'a str, err: &'a str },
     LoginOk,
     LoginError(&'a str),
     HelpOpened,
@@ -195,6 +199,30 @@ impl Msg<'_> {
             (Msg::AlbumAddError { album, err }, En) => {
                 format!("Could not add '{album}' to your library: {err}")
             }
+            (Msg::PickPlaylist(title), Es) => {
+                format!("Elige una playlist para '{title}' (Enter agrega, Esc cancela).")
+            }
+            (Msg::PickPlaylist(title), En) => {
+                format!("Choose a playlist for '{title}' (Enter adds, Esc cancels).")
+            }
+            (Msg::AddingToPlaylist { title, playlist }, Es) => {
+                format!("⏳ Agregando '{title}' a '{playlist}'...")
+            }
+            (Msg::AddingToPlaylist { title, playlist }, En) => {
+                format!("⏳ Adding '{title}' to '{playlist}'...")
+            }
+            (Msg::AddedToPlaylist { title, playlist }, Es) => {
+                format!("'{title}' agregada a la playlist '{playlist}'.")
+            }
+            (Msg::AddedToPlaylist { title, playlist }, En) => {
+                format!("'{title}' added to playlist '{playlist}'.")
+            }
+            (Msg::AddToPlaylistError { playlist, err }, Es) => {
+                format!("No se pudo agregar a '{playlist}': {err}")
+            }
+            (Msg::AddToPlaylistError { playlist, err }, En) => {
+                format!("Could not add to '{playlist}': {err}")
+            }
             (Msg::ListEnqueued(n), Es) => format!("{n} canciones encoladas al final."),
             (Msg::ListEnqueued(n), En) => format!("{n} songs added to the end of the queue."),
             (Msg::LoginOk, Es) => "Sesión de Apple Music verificada.".to_string(),
@@ -232,59 +260,5 @@ impl Msg<'_> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn messages_follow_the_language() {
-        let msg = Msg::PlaylistOpened {
-            name: "Mix",
-            count: 3,
-        };
-        assert!(
-            msg.text(Language::Es)
-                .starts_with("Playlist 'Mix' cargada (3 canciones)")
-        );
-        assert!(
-            msg.text(Language::En)
-                .starts_with("Playlist 'Mix' loaded (3 songs)")
-        );
-    }
-
-    #[test]
-    fn album_messages_name_the_keys() {
-        let msg = Msg::AlbumOpened {
-            name: "Let's Dance",
-            count: 8,
-        };
-        assert!(
-            msg.text(Language::Es)
-                .contains("'p' lo reproduce, 'A' lo encola")
-        );
-        assert!(
-            msg.text(Language::En)
-                .contains("'p' plays it, 'A' enqueues it")
-        );
-        let added = Msg::AlbumAddedToLibrary("Let's Dance");
-        assert!(
-            added
-                .text(Language::Es)
-                .contains("agregado a tu biblioteca ('4'")
-        );
-        assert!(
-            added
-                .text(Language::En)
-                .contains("added to your library ('4'")
-        );
-    }
-
-    #[test]
-    fn list_kind_is_localized_inside_messages() {
-        let msg = Msg::ListLoaded {
-            kind: ListKind::Library,
-            count: 50,
-        };
-        assert_eq!(msg.text(Language::Es), "Biblioteca: 50 pistas.");
-        assert_eq!(msg.text(Language::En), "Library: 50 tracks.");
-    }
-}
+#[path = "messages_tests.rs"]
+mod tests;

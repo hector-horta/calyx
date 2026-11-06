@@ -71,6 +71,8 @@ pub struct TuiApp {
     pub(crate) login_in_progress: bool,
     /// Next track being prefetched into the audio cache (spinner in the lists).
     pub(crate) caching: crate::spinner::Caching,
+    /// Open 'm' picker (add the selected song to a playlist).
+    pub(crate) picker: Option<crate::picker::PlaylistPicker>,
 }
 
 impl TuiApp {
@@ -149,6 +151,7 @@ impl TuiApp {
             play_task: None,
             login_in_progress: false,
             caching: None,
+            picker: None,
         })
     }
 

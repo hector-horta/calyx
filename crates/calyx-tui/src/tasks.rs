@@ -8,7 +8,7 @@ use crate::messages::{ListKind, Msg};
 use calyx_core::{SectionType, StreamingBackend};
 
 impl TuiApp {
-    fn spawn_event<F>(&self, fut: F)
+    pub(crate) fn spawn_event<F>(&self, fut: F)
     where
         F: std::future::Future<Output = BgEvent> + Send + 'static,
     {
@@ -67,6 +67,11 @@ impl TuiApp {
 
     pub fn sync_playlists(&mut self) {
         self.active_view = ActiveView::Playlists;
+        self.fetch_playlists();
+    }
+
+    /// Loads the user's playlists without changing the view (also used by 'm').
+    pub(crate) fn fetch_playlists(&mut self) {
         self.say(Msg::SyncingPlaylists);
         let backend = self.backend.clone();
         self.spawn_event(async move {
