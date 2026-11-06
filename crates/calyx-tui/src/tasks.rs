@@ -1,0 +1,81 @@
+//! Remote operations started from the UI. Each one runs on a tokio task
+//! against the streaming facade and reports back with a `BgEvent`, so the
+//! event loop never waits on the network.
+
+use calyx_core::{SectionType, StreamingBackend};
+use crate::app::{ActiveView, TuiApp};
+use crate::bg_events::BgEvent;
+
+impl TuiApp {
+    fn spawn_event<F>(&self, fut: F)
+    where
+        F: std::future::Future<Output = BgEvent> + Send + 'static,
+    {
+        let tx = self.bg_tx.clone();
+        tokio::spawn(async move {
+            let _ = tx.send(fut.await);
+        });
+    }
+
+    pub fn start_search(&mut self) {
+        let query = self.search_input.trim().to_string();
+        if query.is_empty() {
+            return;
+        }
+        self.status_message = format!("Buscando '{query}'...");
+        let backend = self.backend.clone();
+        self.spawn_event(async move {
+            let res = backend.search(&query, 25).await.map_err(|e| e.to_string());
+            BgEvent::TracksReady { view: ActiveView::Home, label: "Búsqueda", res }
+        });
+    }
+
+    pub fn open_section(&mut self, view: ActiveView, section: SectionType, label: &'static str) {
+        self.active_view = view;
+        self.status_message = format!("Cargando {label}...");
+        let backend = self.backend.clone();
+        self.spawn_event(async move {
+            let res = backend.fetch_section(section).await.map_err(|e| e.to_string());
+            BgEvent::TracksReady { view, label, res }
+        });
+    }
+
+    pub fn sync_library(&mut self) {
+        self.active_view = ActiveView::Library;
+        self.status_message = "Sincronizando biblioteca personal de Apple Music...".to_string();
+        let backend = self.backend.clone();
+        self.spawn_event(async move {
+            let res = backend.fetch_user_library().await.map_err(|e| e.to_string());
+            BgEvent::TracksReady { view: ActiveView::Library, label: "Biblioteca", res }
+        });
+    }
+
+    pub fn sync_playlists(&mut self) {
+        self.active_view = ActiveView::Playlists;
+        self.status_message = "Sincronizando tus playlists de Apple Music...".to_string();
+        let backend = self.backend.clone();
+        self.spawn_event(async move {
+            BgEvent::PlaylistsReady(backend.fetch_user_playlists().await.map_err(|e| e.to_string()))
+        });
+    }
+
+    /// Loads the selected playlist; `play` queues it all instead of browsing it.
+    pub fn load_selected_playlist(&mut self, play: bool) {
+        let Some(pl) = self.playlists.get(self.playlist_state.selected().unwrap_or(0)).cloned() else { return };
+        self.status_message = format!("⏳ Cargando playlist '{}'...", pl.name);
+        let backend = self.backend.clone();
+        self.spawn_event(async move {
+            let res = backend.fetch_playlist_tracks(&pl.id).await.map_err(|e| e.to_string());
+            if play { BgEvent::PlaylistReady(pl.name, res) } else { BgEvent::PlaylistOpened(pl.name, res) }
+        });
+    }
+
+    pub fn start_login(&mut self) {
+        if self.login_in_progress {
+            return;
+        }
+        self.login_in_progress = true;
+        let backend = self.backend.clone();
+        self.spawn_event(async move { BgEvent::LoginDone(backend.login().await.map_err(|e| e.to_string())) });
+    }
+}

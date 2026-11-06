@@ -2,11 +2,13 @@ mod app;
 mod artwork;
 mod hints;
 mod audio_pipeline;
+mod bg_events;
 mod navigation;
 mod playback;
 mod player_footer;
 mod player_spectrum;
 mod player_status;
+mod tasks;
 mod ui;
 mod ui_dancer;
 mod ui_lists;
@@ -22,6 +24,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use calyx_core::SectionType;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 #[tokio::main]
@@ -41,7 +44,7 @@ async fn main() -> Result<()> {
         .context("Failed to enter alternate screen")
         .and_then(|_| Terminal::new(CrosstermBackend::new(io::stdout())).context("Failed to create Ratatui terminal"))
     {
-        Ok(mut terminal) => run_event_loop(&mut terminal, &mut app).await,
+        Ok(mut terminal) => run_event_loop(&mut terminal, &mut app),
         Err(e) => Err(e),
     };
     restore_terminal();
@@ -67,102 +70,79 @@ fn install_panic_hook() {
     }));
 }
 
-async fn run_event_loop(
+fn run_event_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     app: &mut app::TuiApp,
 ) -> Result<()> {
+    // Nothing in this loop awaits the network: remote work runs on tasks
+    // (see tasks.rs) and comes back through poll_bg_events.
     while !app.should_quit {
-        app.poll_bg_events().await;
-        app.check_auto_advance().await;
+        app.poll_bg_events();
+        app.check_auto_advance();
         terminal.draw(|f| ui::render(f, app))?;
 
-        if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(key_event) = event::read()? {
-                if key_event.kind != KeyEventKind::Press {
-                    continue;
+        if !event::poll(Duration::from_millis(50))? {
+            continue;
+        }
+        let Event::Key(key_event) = event::read()? else { continue };
+        if key_event.kind != KeyEventKind::Press {
+            continue;
+        }
+
+        if app.is_editing {
+            match key_event.code {
+                KeyCode::Enter => {
+                    app.is_editing = false;
+                    app.start_search();
                 }
-
-                if app.is_editing {
-                    match key_event.code {
-                        KeyCode::Enter => {
-                            app.is_editing = false;
-                            app.execute_search().await;
-                        }
-                        KeyCode::Esc => app.is_editing = false,
-                        KeyCode::Backspace => { let _ = app.search_input.pop(); },
-                        KeyCode::Char(c) => app.search_input.push(c),
-                        _ => {}
-                    }
-                } else {
-                    match key_event.code {
-                        KeyCode::Char('q') => app.should_quit = true,
-                        KeyCode::Char('/') => app.is_editing = true,
-
-                        KeyCode::Char('a') => app.enqueue_selected_back(),
-                        KeyCode::Char('n') => app.enqueue_selected_next(),
-                        KeyCode::Char('d') => app.remove_selected_from_queue(),
-                        KeyCode::Char('c') => app.clear_current_list(),
-                        KeyCode::Char('y') | KeyCode::Char('Y') => app.toggle_phonetic_mode(),
-                        KeyCode::Char('s') => { app.toggle_shuffle(); },
-                        KeyCode::Char('r') => { app.toggle_repeat(); },
-                        KeyCode::Char('1') => app.open_home(),
-                        KeyCode::Char('2') => {
-                            app.status_message = "Cargando 2 — Novedades en Apple Music...".to_string();
-                            terminal.draw(|f| ui::render(f, app))?;
-                            app.open_section_query(app::ActiveView::New, "top hits 2026", "Novedades").await;
-                        }
-                        KeyCode::Char('3') => {
-                            app.status_message = "Cargando 3 — Estaciones y Mezclas de Radio...".to_string();
-                            terminal.draw(|f| ui::render(f, app))?;
-                            app.open_section_query(app::ActiveView::Radio, "electronic chill radio mix", "Estaciones de Radio").await;
-                        }
-                        KeyCode::Char('l') | KeyCode::Char('L') => app.toggle_language(),
-                        KeyCode::Char('4') => {
-                            app.status_message = "Sincronizando 4 — Biblioteca personal de Apple Music...".to_string();
-                            terminal.draw(|f| ui::render(f, app))?;
-                            app.sync_library().await;
-                        }
-KeyCode::Char('5') => {
-    app.status_message = "Sincronizando 5 — Tus Playlists de Apple Music...".to_string();
-    terminal.draw(|f| ui::render(f, app))?;
-    app.sync_playlists().await;
-},
-
-KeyCode::Char('p') | KeyCode::Char('P') => {
-    app.status_message = "Reproduciendo toda la playlist / lista actual...".to_string();
-    terminal.draw(|f| ui::render(f, app))?;
-    app.play_all().await;
-}
-                        KeyCode::Char('?') => {
-                            app.active_view = app::ActiveView::Help;
-                            app.status_message = "Ayuda de atajos de teclado (Presiona 1-5 o Tab para volver).".to_string();
-                        }
-                        KeyCode::Char('>') | KeyCode::Char('.') => app.skip_next().await,
-                        KeyCode::Char('<') | KeyCode::Char(',') => app.play_previous().await,
-                        KeyCode::Tab => app.toggle_view(),
-                        KeyCode::Char('u') => {
-                            let b = calyx_core::browser_discovery::discover_browser();
-                            if matches!(b, Some(calyx_core::browser_discovery::BrowserType::WebKit(_))) {
-                                app.status_message = app.language.msg_login_safari_alert().to_string();
-                            } else {
-                                app.status_message = app.language.msg_login_opening().to_string();
-                            }
-                            terminal.draw(|f| ui::render(f, app))?;
-                            app.sync_user_auth().await;
-                        }
-                        KeyCode::Down | KeyCode::Char('j') => app.next_track(),
-                        KeyCode::Up | KeyCode::Char('k') => app.previous_track(),
-                        KeyCode::Enter => {
-                            terminal.draw(|f| ui::render(f, app))?;
-                            app.play_selected().await;
-                        }
-                        KeyCode::Char(' ') => app.toggle_pause().await,
-                        KeyCode::Char('+') | KeyCode::Char('=') => app.adjust_volume(0.05).await,
-                        KeyCode::Char('-') => app.adjust_volume(-0.05).await,
-                        _ => {}
-                    }
-                }
+                KeyCode::Esc => app.is_editing = false,
+                KeyCode::Backspace => { app.search_input.pop(); }
+                KeyCode::Char(c) => app.search_input.push(c),
+                _ => {}
             }
+            continue;
+        }
+
+        match key_event.code {
+            KeyCode::Char('q') => app.should_quit = true,
+            KeyCode::Char('/') => app.is_editing = true,
+            KeyCode::Char('a') => app.enqueue_selected_back(),
+            KeyCode::Char('n') => app.enqueue_selected_next(),
+            KeyCode::Char('d') => app.remove_selected_from_queue(),
+            KeyCode::Char('c') => app.clear_current_list(),
+            KeyCode::Char('y') | KeyCode::Char('Y') => app.toggle_phonetic_mode(),
+            KeyCode::Char('s') => { app.toggle_shuffle(); }
+            KeyCode::Char('r') => { app.toggle_repeat(); }
+            KeyCode::Char('l') | KeyCode::Char('L') => app.toggle_language(),
+            KeyCode::Char('1') => app.open_home(),
+            KeyCode::Char('2') => app.open_section(app::ActiveView::New, SectionType::NewReleases, "Novedades"),
+            KeyCode::Char('3') => app.open_section(app::ActiveView::Radio, SectionType::Radio, "Estaciones de Radio"),
+            KeyCode::Char('4') => app.sync_library(),
+            KeyCode::Char('5') => app.sync_playlists(),
+            KeyCode::Char('p') | KeyCode::Char('P') => app.play_all(),
+            KeyCode::Char('?') => {
+                app.active_view = app::ActiveView::Help;
+                app.status_message = "Ayuda de atajos de teclado (Presiona 1-5 o Tab para volver).".to_string();
+            }
+            KeyCode::Char('>') | KeyCode::Char('.') => app.skip_next(),
+            KeyCode::Char('<') | KeyCode::Char(',') => app.play_previous(),
+            KeyCode::Tab => app.toggle_view(),
+            KeyCode::Char('u') if !app.login_in_progress => {
+                let browser = calyx_core::browser_discovery::discover_browser();
+                app.status_message = if matches!(browser, Some(calyx_core::browser_discovery::BrowserType::WebKit(_))) {
+                    app.language.msg_login_safari_alert().to_string()
+                } else {
+                    app.language.msg_login_opening().to_string()
+                };
+                app.start_login();
+            }
+            KeyCode::Down | KeyCode::Char('j') => app.next_track(),
+            KeyCode::Up | KeyCode::Char('k') => app.previous_track(),
+            KeyCode::Enter => app.play_selected(),
+            KeyCode::Char(' ') => app.toggle_pause(),
+            KeyCode::Char('+') | KeyCode::Char('=') => app.adjust_volume(0.05),
+            KeyCode::Char('-') => app.adjust_volume(-0.05),
+            _ => {}
         }
     }
     Ok(())
