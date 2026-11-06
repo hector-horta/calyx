@@ -144,7 +144,7 @@ async fn get_paged(
     Ok(bodies)
 }
 
-fn require_session(dev_token: &str, user_token: &str, what: &str) -> CalyxResult<()> {
+pub(crate) fn require_session(dev_token: &str, user_token: &str, what: &str) -> CalyxResult<()> {
     if dev_token.is_empty() || user_token.is_empty() {
         return Err(CalyxError::Auth(format!(
             "Se requiere sesión activa ('u') para {what}"

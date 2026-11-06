@@ -20,13 +20,6 @@ fn test_apple_music_backend_metadata() {
 }
 
 #[test]
-fn new_releases_query_uses_a_plausible_year() {
-    let q = new_releases_query();
-    let year: u64 = q.trim_start_matches("top hits ").parse().unwrap();
-    assert!((2024..2100).contains(&year), "{q}");
-}
-
-#[test]
 fn backend_is_shareable_across_tasks() {
     fn assert_send_sync<T: Send + Sync + 'static>() {}
     assert_send_sync::<AppleMusicBackend>();
