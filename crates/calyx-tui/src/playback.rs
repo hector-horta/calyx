@@ -112,7 +112,12 @@ impl TuiApp {
         let Some(next) = self.queue.peek_next().cloned() else {
             return;
         };
-        let backend = self.backend.clone();
-        tokio::spawn(async move { backend.prefetch_audio(&next).await });
+        let id = next.id.clone();
+        self.caching = Some((id.clone(), std::time::Instant::now()));
+        let (backend, tx) = (self.backend.clone(), self.bg_tx.clone());
+        tokio::spawn(async move {
+            backend.prefetch_audio(&next).await;
+            let _ = tx.send(BgEvent::PrefetchDone(id));
+        });
     }
 }

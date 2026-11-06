@@ -22,6 +22,8 @@ pub enum BgEvent {
     /// A playlist started with 'p' (queue all and play).
     PlaylistReady(String, Result<Vec<Track>, String>),
     LoginDone(Result<(), String>),
+    /// The prefetch of this track id finished (cached, or failed).
+    PrefetchDone(String),
 }
 
 /// Quality hint shown in the status line for a resolved buffer.
@@ -135,6 +137,12 @@ impl TuiApp {
                 match res {
                     Ok(()) => self.say(Msg::LoginOk),
                     Err(e) => self.say(Msg::LoginError(&e)),
+                }
+            }
+            // A newer prefetch may already own the spinner; only clear our own.
+            BgEvent::PrefetchDone(id) => {
+                if self.caching.as_ref().is_some_and(|(c, _)| *c == id) {
+                    self.caching = None;
                 }
             }
         }

@@ -1,6 +1,7 @@
 //! Track, queue and playlist lists of the central panel, with column headers.
 
 use crate::app::TuiApp;
+use crate::spinner::cache_cell;
 use crate::ui::truncate;
 use ratatui::{
     Frame,
@@ -14,8 +15,21 @@ const HEADER_STYLE: Style = Style::new()
     .fg(Color::Rgb(120, 160, 160))
     .add_modifier(Modifier::BOLD);
 const EMPTY_STYLE: Style = Style::new().fg(Color::DarkGray);
+const SPIN_STYLE: Style = Style::new().fg(Color::Green);
 /// Blank gutter matching the list highlight symbol ("▶ ") so headers line up.
 const MARK: &str = "  ";
+/// Blank header cell over the cache-spinner column (spinner + space).
+const SPIN_COL: &str = "  ";
+
+/// List row with the cache-spinner column between `lead` and `rest`.
+fn row(lead: String, cell: &'static str, rest: String) -> ListItem<'static> {
+    ListItem::new(Line::from(vec![
+        Span::raw(lead),
+        Span::styled(cell, SPIN_STYLE),
+        Span::raw(" "),
+        Span::raw(rest),
+    ]))
+}
 
 fn split_header(area: Rect) -> (Rect, Rect) {
     let parts = Layout::default()
@@ -73,12 +87,13 @@ pub fn render_queue(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         let wt = (avail * 60) / 100;
         (wt, avail.saturating_sub(wt))
     };
+    let wt = wt.saturating_sub(SPIN_COL.len());
     let (head, body) = split_header(area);
     header(
         frame,
         head,
         format!(
-            "{MARK}{:>2}  {:<wt$} │ {:<wa$} │ {}",
+            "{MARK}{:>2}  {SPIN_COL}{:<wt$} │ {:<wa$} │ {}",
             "#",
             truncate(l.col_title(), wt.saturating_sub(1)),
             truncate(l.col_artist(), wa.saturating_sub(1)),
@@ -95,13 +110,16 @@ pub fn render_queue(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
             .iter()
             .enumerate()
             .map(|(i, t)| {
-                ListItem::new(Line::from(format!(
-                    "{:>2}. {:<wt$} │ {:<wa$} │ {}",
-                    i + 1,
-                    truncate(&t.title, wt.saturating_sub(1)),
-                    truncate(&t.artist, wa.saturating_sub(1)),
-                    t.formatted_duration()
-                )))
+                row(
+                    format!("{:>2}. ", i + 1),
+                    cache_cell(&app.caching, &t.id),
+                    format!(
+                        "{:<wt$} │ {:<wa$} │ {}",
+                        truncate(&t.title, wt.saturating_sub(1)),
+                        truncate(&t.artist, wa.saturating_sub(1)),
+                        t.formatted_duration()
+                    ),
+                )
             })
             .collect()
     };
@@ -119,12 +137,13 @@ pub fn render_tracks(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         let wa = (avail * 24) / 100;
         (wt, wa, avail.saturating_sub(wt + wa))
     };
+    let wt = wt.saturating_sub(SPIN_COL.len());
     let (head, body) = split_header(area);
     header(
         frame,
         head,
         format!(
-            "{MARK}{:<wt$} │ {:<wa$} │ {:<wal$} │ {}",
+            "{MARK}{SPIN_COL}{:<wt$} │ {:<wa$} │ {:<wal$} │ {}",
             truncate(l.col_title(), wt.saturating_sub(1)),
             truncate(l.col_artist(), wa.saturating_sub(1)),
             truncate(l.col_album(), wal.saturating_sub(1)),
@@ -135,13 +154,17 @@ pub fn render_tracks(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         .tracks
         .iter()
         .map(|t| {
-            ListItem::new(Line::from(format!(
-                "{:<wt$} │ {:<wa$} │ {:<wal$} │ {}",
-                truncate(&t.title, wt.saturating_sub(1)),
-                truncate(&t.artist, wa.saturating_sub(1)),
-                truncate(&t.album, wal.saturating_sub(1)),
-                t.formatted_duration()
-            )))
+            row(
+                String::new(),
+                cache_cell(&app.caching, &t.id),
+                format!(
+                    "{:<wt$} │ {:<wa$} │ {:<wal$} │ {}",
+                    truncate(&t.title, wt.saturating_sub(1)),
+                    truncate(&t.artist, wa.saturating_sub(1)),
+                    truncate(&t.album, wal.saturating_sub(1)),
+                    t.formatted_duration()
+                ),
+            )
         })
         .collect();
     let mut state = app.list_state.clone();
