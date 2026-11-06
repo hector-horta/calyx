@@ -68,6 +68,9 @@ impl TuiApp {
     }
 
     fn handle_bg_event(&mut self, ev: BgEvent) {
+        if let Some(job) = ev.finished_job() {
+            self.activity.finish(job);
+        }
         match ev {
             BgEvent::AudioReady(track, res, lyrics) if self.is_current(&track.id) => match res {
                 Ok(audio) => {
@@ -75,6 +78,7 @@ impl TuiApp {
                     self.spawn_decode(track, audio.bytes, lyrics, hint);
                 }
                 Err(e) => {
+                    self.activity.finish(crate::activity::Job::Audio);
                     self.current_lyrics = lyrics;
                     self.status_message = e;
                 }

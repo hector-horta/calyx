@@ -5,6 +5,8 @@ use crate::error::CalyxResult;
 use crate::library::UserPlaylist;
 use crate::lyrics::LyricLine;
 use crate::models::Track;
+use crate::progress::LoadProgress;
+use std::sync::Arc;
 
 pub trait StreamingBackend: Send + Sync + 'static {
     /// Human-readable service name.
@@ -23,8 +25,10 @@ pub trait StreamingBackend: Send + Sync + 'static {
         section: SectionType,
     ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
     /// Songs in the user's library.
+    /// `progress` is updated page by page while it loads.
     fn fetch_user_library(
         &self,
+        progress: Arc<LoadProgress>,
     ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
     /// The user's playlists.
     fn fetch_user_playlists(
@@ -34,6 +38,7 @@ pub trait StreamingBackend: Send + Sync + 'static {
     fn fetch_playlist_tracks(
         &self,
         playlist_id: &str,
+        progress: Arc<LoadProgress>,
     ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
     /// Name and songs of the album `track` belongs to.
     fn fetch_album_of(

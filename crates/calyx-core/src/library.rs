@@ -1,5 +1,6 @@
 use crate::error::{CalyxError, CalyxResult};
 use crate::models::Track;
+use crate::progress::LoadProgress;
 use reqwest::Client;
 use serde_json::Value;
 
@@ -88,61 +89,7 @@ pub fn parse_library_songs_json(raw_json: &str, storefront: &str) -> CalyxResult
     Ok(tracks)
 }
 
-const API_ROOT: &str = "https://amp-api.music.apple.com";
-const PAGE_SIZE: usize = 100;
-
-/// Items on one page and the path of the next one. Only relative `/v1/`
-/// paths are followed, so a response can never redirect us to another host.
-fn page_info(body: &str) -> CalyxResult<(usize, Option<String>)> {
-    let val: Value = serde_json::from_str(body)
-        .map_err(|e| CalyxError::Validation(format!("Invalid Apple Music page JSON: {e}")))?;
-    let count = val
-        .get("data")
-        .and_then(|d| d.as_array())
-        .map_or(0, |a| a.len());
-    let next = val
-        .get("next")
-        .and_then(|n| n.as_str())
-        .filter(|n| n.starts_with("/v1/"))
-        .map(str::to_string);
-    Ok((count, next))
-}
-
-/// GETs `first_path` and every following page until `max_items` or the end.
-async fn get_paged(
-    http: &Client,
-    dev_token: &str,
-    user_token: &str,
-    first_path: String,
-    max_items: usize,
-    what: &str,
-) -> CalyxResult<Vec<String>> {
-    let mut bodies = Vec::new();
-    let mut seen = 0;
-    let mut next = Some(first_path);
-    while let Some(path) = next.take() {
-        let resp = http
-            .get(format!("{API_ROOT}{path}"))
-            .header("Authorization", format!("Bearer {dev_token}"))
-            .header("Media-User-Token", user_token)
-            .header("Origin", "https://music.apple.com")
-            .header("Referer", "https://music.apple.com/")
-            .send()
-            .await?;
-        if !resp.status().is_success() {
-            return Err(CalyxError::Auth(format!(
-                "{what} HTTP status: {}",
-                resp.status()
-            )));
-        }
-        let body = resp.text().await?;
-        let (count, next_path) = page_info(&body)?;
-        seen += count;
-        bodies.push(body);
-        next = next_path.filter(|_| count > 0 && seen < max_items);
-    }
-    Ok(bodies)
-}
+use crate::paging::{PAGE_SIZE, get_paged};
 
 pub(crate) fn require_session(dev_token: &str, user_token: &str, what: &str) -> CalyxResult<()> {
     if dev_token.is_empty() || user_token.is_empty() {
@@ -160,11 +107,16 @@ pub async fn fetch_user_library_songs(
     user_token: &str,
     storefront: &str,
     limit: usize,
+    progress: Option<&LoadProgress>,
 ) -> CalyxResult<Vec<Track>> {
     require_session(dev_token, user_token, "sincronizar tu biblioteca")?;
     let first = format!("/v1/me/library/songs?include=catalog&limit={PAGE_SIZE}");
     let mut tracks = Vec::new();
-    for body in get_paged(http, dev_token, user_token, first, limit, "Library").await? {
+    for body in get_paged(
+        http, dev_token, user_token, first, limit, "Library", progress,
+    )
+    .await?
+    {
         tracks.extend(parse_library_songs_json(&body, storefront)?);
     }
     tracks.truncate(limit);
@@ -227,7 +179,7 @@ pub async fn fetch_user_playlists(
     require_session(dev_token, user_token, "ver tus Playlists")?;
     let first = format!("/v1/me/library/playlists?limit={PAGE_SIZE}");
     let mut playlists = Vec::new();
-    for body in get_paged(http, dev_token, user_token, first, limit, "Playlists").await? {
+    for body in get_paged(http, dev_token, user_token, first, limit, "Playlists", None).await? {
         playlists.extend(parse_user_playlists_json(&body)?);
     }
     playlists.truncate(limit);
@@ -252,6 +204,7 @@ pub async fn fetch_playlist_tracks(
     playlist_id: &str,
     storefront: &str,
     limit: usize,
+    progress: Option<&LoadProgress>,
 ) -> CalyxResult<Vec<Track>> {
     if !valid_playlist_id(playlist_id) {
         return Err(CalyxError::Validation(format!(
@@ -261,7 +214,16 @@ pub async fn fetch_playlist_tracks(
     let first =
         format!("/v1/me/library/playlists/{playlist_id}/tracks?include=catalog&limit={PAGE_SIZE}");
     let mut tracks = Vec::new();
-    for body in get_paged(http, dev_token, user_token, first, limit, "Playlist tracks").await? {
+    let pages = get_paged(
+        http,
+        dev_token,
+        user_token,
+        first,
+        limit,
+        "Playlist tracks",
+        progress,
+    );
+    for body in pages.await? {
         tracks.extend(parse_library_songs_json(&body, storefront)?);
     }
     tracks.truncate(limit);

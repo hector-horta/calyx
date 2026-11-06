@@ -145,8 +145,8 @@ impl Msg<'_> {
             (Msg::PlaylistsSynced(n), En) => format!("Playlists synced: {n} (Enter to open)."),
             (Msg::PlaylistsError(err), Es) => format!("Error sincronizando playlists: {err}"),
             (Msg::PlaylistsError(err), En) => format!("Could not sync playlists: {err}"),
-            (Msg::LoadingPlaylist(name), Es) => format!("⏳ Cargando playlist '{name}'..."),
-            (Msg::LoadingPlaylist(name), En) => format!("⏳ Loading playlist '{name}'..."),
+            (Msg::LoadingPlaylist(name), Es) => format!("Cargando playlist '{name}'..."),
+            (Msg::LoadingPlaylist(name), En) => format!("Loading playlist '{name}'..."),
             (Msg::PlaylistOpened { name, count }, Es) => format!(
                 "Playlist '{name}' cargada ({count} canciones). Presiona 'p' para reproducirla entera."
             ),
@@ -169,8 +169,8 @@ impl Msg<'_> {
                 format!("No se pudo reproducir la playlist '{name}'.")
             }
             (Msg::PlaylistPlayFailed(name), En) => format!("Could not play playlist '{name}'."),
-            (Msg::LoadingAlbum(title), Es) => format!("⏳ Cargando el álbum de '{title}'..."),
-            (Msg::LoadingAlbum(title), En) => format!("⏳ Loading the album of '{title}'..."),
+            (Msg::LoadingAlbum(title), Es) => format!("Cargando el álbum de '{title}'..."),
+            (Msg::LoadingAlbum(title), En) => format!("Loading the album of '{title}'..."),
             (Msg::AlbumOpened { name, count }, Es) => {
                 format!("Álbum '{name}' ({count} canciones): 'p' lo reproduce, 'A' lo encola.")
             }
@@ -182,10 +182,10 @@ impl Msg<'_> {
             (Msg::AlbumEmpty(name), Es) => format!("El álbum '{name}' no tiene canciones."),
             (Msg::AlbumEmpty(name), En) => format!("Album '{name}' has no songs."),
             (Msg::AddingAlbumToLibrary(album), Es) => {
-                format!("⏳ Agregando '{album}' a tu biblioteca...")
+                format!("Agregando '{album}' a tu biblioteca...")
             }
             (Msg::AddingAlbumToLibrary(album), En) => {
-                format!("⏳ Adding '{album}' to your library...")
+                format!("Adding '{album}' to your library...")
             }
             (Msg::AlbumAddedToLibrary(album), Es) => {
                 format!("Álbum '{album}' agregado a tu biblioteca ('4' para verla).")
@@ -206,10 +206,10 @@ impl Msg<'_> {
                 format!("Choose a playlist for '{title}' (Enter adds, Esc cancels).")
             }
             (Msg::AddingToPlaylist { title, playlist }, Es) => {
-                format!("⏳ Agregando '{title}' a '{playlist}'...")
+                format!("Agregando '{title}' a '{playlist}'...")
             }
             (Msg::AddingToPlaylist { title, playlist }, En) => {
-                format!("⏳ Adding '{title}' to '{playlist}'...")
+                format!("Adding '{title}' to '{playlist}'...")
             }
             (Msg::AddedToPlaylist { title, playlist }, Es) => {
                 format!("'{title}' agregada a la playlist '{playlist}'.")
@@ -232,10 +232,10 @@ impl Msg<'_> {
             (Msg::HelpOpened, Es) => "Ayuda de atajos (1-5 o Tab para volver).".to_string(),
             (Msg::HelpOpened, En) => "Keyboard help (1-5 or Tab to go back).".to_string(),
             (Msg::LoadingAudio { artist, title }, Es) => {
-                format!("⏳ Cargando audio: {artist} — {title}...")
+                format!("Cargando audio: {artist} — {title}...")
             }
             (Msg::LoadingAudio { artist, title }, En) => {
-                format!("⏳ Loading audio: {artist} — {title}...")
+                format!("Loading audio: {artist} — {title}...")
             }
             (Msg::PlayingList, Es) => "Reproduciendo la lista actual...".to_string(),
             (Msg::PlayingList, En) => "Playing the current list...".to_string(),

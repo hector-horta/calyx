@@ -156,7 +156,7 @@ pub fn status_lines(app: &TuiApp, density: Density) -> Vec<Line<'static>> {
 
 pub fn footer_line(app: &TuiApp, width: u16) -> Line<'static> {
     let l = app.language;
-    let status = app.status_message.as_str();
+    let status = app.activity.decorate(&app.status_message);
     let next = app.queue.peek_next().map(|n| {
         format!(
             "{}: {} — {} ({} {})",
@@ -167,5 +167,5 @@ pub fn footer_line(app: &TuiApp, width: u16) -> Line<'static> {
             l.lbl_in_queue()
         )
     });
-    footer(next, status, width as usize)
+    footer(next, &status, width as usize)
 }

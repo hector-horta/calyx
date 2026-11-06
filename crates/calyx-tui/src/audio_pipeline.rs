@@ -38,6 +38,7 @@ impl TuiApp {
             return;
         }
 
+        self.activity.finish(crate::activity::Job::Audio);
         self.current_lyrics = lyrics;
         match res {
             Ok(decoded) => match self.audio.play_decoded(decoded) {

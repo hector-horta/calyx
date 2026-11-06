@@ -2,6 +2,7 @@
 //! against the streaming facade and reports back with a `BgEvent`, so the
 //! event loop never waits on the network.
 
+use crate::activity::Job;
 use crate::app::{ActiveView, TuiApp};
 use crate::bg_events::BgEvent;
 use crate::messages::{ListKind, Msg};
@@ -24,6 +25,7 @@ impl TuiApp {
             return;
         }
         self.say(Msg::Searching(&query));
+        self.activity.start(Job::List);
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend.search(&query, 25).await.map_err(|e| e.to_string());
@@ -38,6 +40,7 @@ impl TuiApp {
     pub fn open_section(&mut self, view: ActiveView, section: SectionType, kind: ListKind) {
         self.active_view = view;
         self.say(Msg::Loading(kind));
+        self.activity.start(Job::List);
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend
@@ -51,10 +54,11 @@ impl TuiApp {
     pub fn sync_library(&mut self) {
         self.active_view = ActiveView::Library;
         self.say(Msg::Loading(ListKind::Library));
+        let progress = self.activity.start_counted();
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend
-                .fetch_user_library()
+                .fetch_user_library(progress)
                 .await
                 .map_err(|e| e.to_string());
             BgEvent::TracksReady {
@@ -73,6 +77,7 @@ impl TuiApp {
     /// Loads the user's playlists without changing the view (also used by 'm').
     pub(crate) fn fetch_playlists(&mut self) {
         self.say(Msg::SyncingPlaylists);
+        self.activity.start(Job::Playlists);
         let backend = self.backend.clone();
         self.spawn_event(async move {
             BgEvent::PlaylistsReady(
@@ -94,10 +99,11 @@ impl TuiApp {
             return;
         };
         self.say(Msg::LoadingPlaylist(&pl.name));
+        let progress = self.activity.start_counted();
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend
-                .fetch_playlist_tracks(&pl.id)
+                .fetch_playlist_tracks(&pl.id, progress)
                 .await
                 .map_err(|e| e.to_string());
             if play {
@@ -114,6 +120,7 @@ impl TuiApp {
             return;
         };
         self.say(Msg::LoadingAlbum(&track.title));
+        self.activity.start(Job::List);
         let backend = self.backend.clone();
         self.spawn_event(async move {
             BgEvent::AlbumOpened(
@@ -131,6 +138,7 @@ impl TuiApp {
             return;
         };
         self.say(Msg::AddingAlbumToLibrary(&track.album));
+        self.activity.start(Job::Write);
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend

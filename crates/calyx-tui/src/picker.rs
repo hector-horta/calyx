@@ -82,6 +82,7 @@ impl TuiApp {
             title: &track.title,
             playlist: &playlist.name,
         });
+        self.activity.start(crate::activity::Job::Write);
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend

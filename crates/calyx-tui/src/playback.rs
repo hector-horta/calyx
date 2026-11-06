@@ -27,6 +27,7 @@ impl TuiApp {
             artist: &track.artist,
             title: &track.title,
         });
+        self.activity.start(crate::activity::Job::Audio);
 
         let (backend, tx) = (self.backend.clone(), self.bg_tx.clone());
         self.play_task = Some(tokio::spawn(async move {

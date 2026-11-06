@@ -50,8 +50,12 @@ pub mod lyrics;
 pub mod lyrics_ttml;
 /// Data models for tracks, playlists, and metadata.
 pub mod models;
+/// Paginated GETs on the user-scoped API.
+mod paging;
 /// Per-platform locations for session, history and caches.
 pub mod paths;
+/// Progress of paginated loads, shared with the UI.
+pub mod progress;
 /// Playback queue management with repeat and shuffle support.
 pub mod queue;
 /// Catalog searches behind the curated sections.
@@ -93,6 +97,7 @@ pub use login::LoginBrowserGuard;
 pub use lyrics::{LyricLine, fetch_track_lyrics, parse_lrc};
 pub use lyrics_ttml::{fetch_apple_music_lyrics, parse_ttml, parse_ttml_time};
 pub use models::{DrmMode, PlaybackStatus, Track};
+pub use progress::LoadProgress;
 pub use queue::{PlaybackQueue, RepeatMode};
 pub use spectrum::{SPECTRUM_BANDS, SpectrumFrame};
 pub use transliteration::transliterate;
