@@ -102,7 +102,8 @@ fn render_central_with_lyrics(
         _ => hint_bar(&[
             ("a", l.btn_enqueue(), LABEL_STYLE),
             ("n", l.btn_next_in_queue(), LABEL_STYLE),
-            ("o", crate::messages::album_label(l), LABEL_STYLE),
+            ("o", crate::labels::album(l), LABEL_STYLE),
+            ("f", crate::labels::album_to_library(l), LABEL_STYLE),
             ("p", l.btn_play_list(), LABEL_STYLE),
             ("y", phonetic, yellow),
             ("c", l.btn_clear_all(), LABEL_STYLE),

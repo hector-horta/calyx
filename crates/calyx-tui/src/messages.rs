@@ -27,14 +27,6 @@ impl ListKind {
     }
 }
 
-/// Bottom-bar label of the 'o' key.
-pub fn album_label(lang: Language) -> &'static str {
-    match lang {
-        Language::Es => "Álbum",
-        Language::En => "Album",
-    }
-}
-
 pub enum Msg<'a> {
     Enqueued { artist: &'a str, title: &'a str },
     EnqueuedNext { artist: &'a str, title: &'a str },
@@ -273,7 +265,6 @@ mod tests {
             msg.text(Language::En)
                 .contains("'p' plays it, 'A' enqueues it")
         );
-        assert_eq!(album_label(Language::Es), "Álbum");
         let added = Msg::AlbumAddedToLibrary("Let's Dance");
         assert!(
             added
