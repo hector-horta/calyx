@@ -21,14 +21,19 @@ fn album_messages_name_the_keys() {
     let msg = Msg::AlbumOpened {
         name: "Let's Dance",
         count: 8,
+        back: "Biblioteca",
     };
     assert!(
         msg.text(Language::Es)
-            .contains("'p' lo reproduce, 'A' lo encola")
+            .contains("'p' lo reproduce, 'A' lo encola, 'o' vuelve a Biblioteca.")
     );
     assert!(
         msg.text(Language::En)
-            .contains("'p' plays it, 'A' enqueues it")
+            .contains("'p' plays it, 'A' enqueues it, 'o' goes back to Biblioteca.")
+    );
+    assert_eq!(
+        Msg::BackToList("Biblioteca").text(Language::Es),
+        "De vuelta en Biblioteca."
     );
     let added = Msg::AlbumAddedToLibrary("Let's Dance");
     assert!(

@@ -106,7 +106,7 @@ fn render_central_with_lyrics(
                 ("a", l.btn_enqueue(), LABEL_STYLE),
                 ("n", l.btn_next_in_queue(), LABEL_STYLE),
                 ("p", l.btn_play_list(), LABEL_STYLE),
-                ("o", crate::labels::album(l), LABEL_STYLE),
+                ("o", album_key_label(app), LABEL_STYLE),
                 ("m", crate::labels::to_playlist(l), LABEL_STYLE),
                 ("f", crate::labels::album_to_library(l), LABEL_STYLE),
                 ("y", phonetic, yellow),
@@ -131,6 +131,14 @@ fn render_central_with_lyrics(
         _ => render_tracks(frame, cols[0], app),
     }
     crate::ui_lyrics::render_lyrics(frame, cols[1], app);
+}
+
+/// "Álbum", or "← Biblioteca" (where 'o' goes back to) while an album is shown.
+fn album_key_label(app: &TuiApp) -> &'static str {
+    match app.album_back.as_ref().filter(|_| app.showing_album()) {
+        Some(saved) => crate::labels::back_to(app.language, saved.view),
+        None => crate::labels::album(app.language),
+    }
 }
 
 pub fn truncate(s: &str, max_chars: usize) -> String {

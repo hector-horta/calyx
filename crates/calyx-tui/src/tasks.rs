@@ -114,24 +114,6 @@ impl TuiApp {
         });
     }
 
-    /// 'o': show the album of the selected track, to play ('p') or enqueue ('A') it.
-    pub fn open_selected_album(&mut self) {
-        let Some(track) = self.selected_track() else {
-            return;
-        };
-        self.say(Msg::LoadingAlbum(&track.title));
-        self.activity.start(Job::List);
-        let backend = self.backend.clone();
-        self.spawn_event(async move {
-            BgEvent::AlbumOpened(
-                backend
-                    .fetch_album_of(&track)
-                    .await
-                    .map_err(|e| e.to_string()),
-            )
-        });
-    }
-
     /// 'f': add the album of the selected track to the user's library.
     pub fn add_selected_album_to_library(&mut self) {
         let Some(track) = self.selected_track() else {

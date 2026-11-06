@@ -1,35 +1,18 @@
 //! Every status-line message of the TUI, in both languages, in one place.
 //! Callers build a `Msg` with its data; `text(lang)` renders it.
 
+pub use crate::list_kind::ListKind;
 use calyx_core::{Language, RepeatMode};
 
-/// Which track list a background load filled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ListKind {
-    Search,
-    NewReleases,
-    Radio,
-    Library,
-}
-
-impl ListKind {
-    pub fn name(self, lang: Language) -> &'static str {
-        match (self, lang) {
-            (Self::Search, Language::Es) => "Búsqueda",
-            (Self::Search, Language::En) => "Search",
-            (Self::NewReleases, Language::Es) => "Novedades",
-            (Self::NewReleases, Language::En) => "New releases",
-            (Self::Radio, Language::Es) => "Estaciones de radio",
-            (Self::Radio, Language::En) => "Radio stations",
-            (Self::Library, Language::Es) => "Biblioteca",
-            (Self::Library, Language::En) => "Library",
-        }
-    }
-}
-
 pub enum Msg<'a> {
-    Enqueued { artist: &'a str, title: &'a str },
-    EnqueuedNext { artist: &'a str, title: &'a str },
+    Enqueued {
+        artist: &'a str,
+        title: &'a str,
+    },
+    EnqueuedNext {
+        artist: &'a str,
+        title: &'a str,
+    },
     RemovedFromQueue(&'a str),
     RemovedFromRecent(&'a str),
     QueueCleared,
@@ -39,33 +22,68 @@ pub enum Msg<'a> {
     LanguageSet,
     Searching(&'a str),
     Loading(ListKind),
-    ListLoaded { kind: ListKind, count: usize },
+    ListLoaded {
+        kind: ListKind,
+        count: usize,
+    },
     ListEmpty(ListKind),
-    ListError { kind: ListKind, err: &'a str },
+    ListError {
+        kind: ListKind,
+        err: &'a str,
+    },
     SyncingPlaylists,
     PlaylistsSynced(usize),
     PlaylistsError(&'a str),
     LoadingPlaylist(&'a str),
-    PlaylistOpened { name: &'a str, count: usize },
-    PlaylistError { name: &'a str, err: &'a str },
-    PlayingPlaylist { name: &'a str, count: usize },
+    PlaylistOpened {
+        name: &'a str,
+        count: usize,
+    },
+    PlaylistError {
+        name: &'a str,
+        err: &'a str,
+    },
+    PlayingPlaylist {
+        name: &'a str,
+        count: usize,
+    },
     PlaylistPlayFailed(&'a str),
     LoadingAlbum(&'a str),
-    AlbumOpened { name: &'a str, count: usize },
+    AlbumOpened {
+        name: &'a str,
+        count: usize,
+        back: &'a str,
+    },
+    BackToList(&'a str),
     AlbumError(&'a str),
     AlbumEmpty(&'a str),
     ListEnqueued(usize),
     AddingAlbumToLibrary(&'a str),
     AlbumAddedToLibrary(&'a str),
-    AlbumAddError { album: &'a str, err: &'a str },
+    AlbumAddError {
+        album: &'a str,
+        err: &'a str,
+    },
     PickPlaylist(&'a str),
-    AddingToPlaylist { title: &'a str, playlist: &'a str },
-    AddedToPlaylist { title: &'a str, playlist: &'a str },
-    AddToPlaylistError { playlist: &'a str, err: &'a str },
+    AddingToPlaylist {
+        title: &'a str,
+        playlist: &'a str,
+    },
+    AddedToPlaylist {
+        title: &'a str,
+        playlist: &'a str,
+    },
+    AddToPlaylistError {
+        playlist: &'a str,
+        err: &'a str,
+    },
     LoginOk,
     LoginError(&'a str),
     HelpOpened,
-    LoadingAudio { artist: &'a str, title: &'a str },
+    LoadingAudio {
+        artist: &'a str,
+        title: &'a str,
+    },
     PlayingList,
     RecentOpened,
     AudioError(&'a str),
@@ -171,12 +189,14 @@ impl Msg<'_> {
             (Msg::PlaylistPlayFailed(name), En) => format!("Could not play playlist '{name}'."),
             (Msg::LoadingAlbum(title), Es) => format!("Cargando el álbum de '{title}'..."),
             (Msg::LoadingAlbum(title), En) => format!("Loading the album of '{title}'..."),
-            (Msg::AlbumOpened { name, count }, Es) => {
-                format!("Álbum '{name}' ({count} canciones): 'p' lo reproduce, 'A' lo encola.")
-            }
-            (Msg::AlbumOpened { name, count }, En) => {
-                format!("Album '{name}' ({count} songs): 'p' plays it, 'A' enqueues it.")
-            }
+            (Msg::AlbumOpened { name, count, back }, Es) => format!(
+                "Álbum '{name}' ({count} canciones): 'p' lo reproduce, 'A' lo encola, 'o' vuelve a {back}."
+            ),
+            (Msg::AlbumOpened { name, count, back }, En) => format!(
+                "Album '{name}' ({count} songs): 'p' plays it, 'A' enqueues it, 'o' goes back to {back}."
+            ),
+            (Msg::BackToList(view), Es) => format!("De vuelta en {view}."),
+            (Msg::BackToList(view), En) => format!("Back to {view}."),
             (Msg::AlbumError(err), Es) => format!("No se pudo abrir el álbum: {err}"),
             (Msg::AlbumError(err), En) => format!("Could not open the album: {err}"),
             (Msg::AlbumEmpty(name), Es) => format!("El álbum '{name}' no tiene canciones."),

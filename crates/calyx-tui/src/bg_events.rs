@@ -60,7 +60,9 @@ impl TuiApp {
             .unwrap_or(true)
     }
 
+    /// Shows a newly loaded list; an album's saved list is no longer reachable.
     fn show_tracks(&mut self, tracks: Vec<Track>, view: ActiveView) {
+        self.album_back = None;
         self.tracks = tracks;
         self.selected_index = 0;
         self.list_state.select(Some(0));
@@ -176,19 +178,9 @@ impl TuiApp {
                     Err(e) => self.say(Msg::LoginError(&e)),
                 }
             }
-            // The album replaces the visible list; from the queue it opens in Home.
+            // The album replaces the visible list, which 'o' brings back.
             BgEvent::AlbumOpened(Ok((name, list))) if !list.is_empty() => {
-                self.say(Msg::AlbumOpened {
-                    name: &name,
-                    count: list.len(),
-                });
-                let view = match self.active_view {
-                    ActiveView::Queue | ActiveView::Help | ActiveView::Playlists => {
-                        ActiveView::Home
-                    }
-                    v => v,
-                };
-                self.show_tracks(list, view);
+                self.show_album(&name, list)
             }
             BgEvent::AlbumOpened(Ok((name, _))) => self.say(Msg::AlbumEmpty(&name)),
             BgEvent::AlbumOpened(Err(e)) => self.say(Msg::AlbumError(&e)),
