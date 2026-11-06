@@ -14,6 +14,8 @@ pub mod auth;
 pub mod backend;
 /// Multi-browser dynamic discovery (Chromium & Firefox/Gecko).
 pub mod browser_discovery;
+/// Tracks of the catalog album a song belongs to.
+mod catalog_album;
 /// Minimal Chrome DevTools Protocol transport.
 pub mod cdp;
 /// Database operations and catalog management.

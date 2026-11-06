@@ -178,7 +178,7 @@ impl AppleMusicClient {
             .ok_or_else(|| CalyxError::Drm("Licencia Widevine rechazada o vacía".to_string()))
     }
 
-    async fn parse_apple_json(
+    pub(crate) async fn parse_apple_json(
         &self,
         resp: reqwest::Response,
         endpoint: &str,

@@ -66,6 +66,11 @@ pub trait StreamingBackend: Send + Sync + 'static {
         &self,
         playlist_id: &str,
     ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
+    /// Name and songs of the album `track` belongs to.
+    fn fetch_album_of(
+        &self,
+        track: &Track,
+    ) -> impl std::future::Future<Output = CalyxResult<(String, Vec<Track>)>> + Send;
     /// Fills missing preview/artwork URLs from the catalog.
     fn complete_track(&self, track: Track) -> impl std::future::Future<Output = Track> + Send;
     /// Playable audio: cache, then full stream, then preview.
@@ -215,6 +220,10 @@ impl StreamingBackend for AppleMusicBackend {
             MAX_PLAYLIST_TRACKS,
         )
         .await
+    }
+
+    async fn fetch_album_of(&self, track: &Track) -> CalyxResult<(String, Vec<Track>)> {
+        crate::catalog_album::fetch_album_of(&self.client(), track).await
     }
 
     async fn complete_track(&self, track: Track) -> Track {

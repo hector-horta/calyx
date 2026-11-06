@@ -8,7 +8,7 @@ use tracing::info;
 #[derive(Clone)]
 pub struct AppleMusicClient {
     pub(crate) http: Client,
-    storefront: String,
+    pub(crate) storefront: String,
     pub(crate) developer_token: Option<String>,
     pub(crate) media_user_token: Option<String>,
 }
