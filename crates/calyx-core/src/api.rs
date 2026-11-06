@@ -23,6 +23,7 @@ struct ItunesSearchPayload {
 #[serde(rename_all = "camelCase")]
 struct ItunesSongItem {
     track_id: Option<u64>,
+    collection_id: Option<u64>,
     track_name: Option<String>,
     artist_name: Option<String>,
     collection_name: Option<String>,
@@ -142,6 +143,7 @@ impl AppleMusicClient {
                     artwork_url: item.artwork_url100,
                     hls_manifest_url: None,
                     is_lossless: true,
+                    album_id: item.collection_id.map(|id| id.to_string()),
                 };
                 if track.validate().is_ok() {
                     tracks.push(track);

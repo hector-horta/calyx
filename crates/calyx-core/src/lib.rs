@@ -1,5 +1,7 @@
 //! Core library for the Calyx music player.
 
+/// Catalog album id of a song (relationships or song URL).
+mod album_id;
 /// Public API module.
 pub mod api;
 /// Audio processing and playback engine.

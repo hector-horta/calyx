@@ -153,6 +153,7 @@ mod tests {
             artwork_url: None,
             hls_manifest_url: None,
             is_lossless: false,
+            album_id: None,
         }
     }
 

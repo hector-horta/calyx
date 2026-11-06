@@ -3,6 +3,10 @@ use crate::models::Track;
 use rusqlite::{Connection, Row, params};
 use tracing::debug;
 
+/// Column order shared by every INSERT/SELECT; `row_to_track` reads by index.
+const COLUMNS: &str = "id, title, artist, album, duration_ms, storefront, preview_url, \
+                       artwork_url, hls_manifest_url, is_lossless, album_id";
+
 pub struct CatalogStore {
     conn: Connection,
 }
@@ -57,6 +61,13 @@ impl CatalogStore {
             }
             conn.execute_batch("PRAGMA user_version = 1;")?;
         }
+        if version < 2 {
+            // v2: catalog album id (open the album a song belongs to).
+            conn.execute_batch(
+                "ALTER TABLE tracks ADD COLUMN album_id TEXT;
+                 PRAGMA user_version = 2;",
+            )?;
+        }
         Ok(())
     }
 
@@ -85,9 +96,10 @@ impl CatalogStore {
     pub fn upsert_track(&self, track: &Track) -> CalyxResult<()> {
         track.validate()?;
         self.conn.execute(
-            "INSERT OR REPLACE INTO tracks (
-                id, title, artist, album, duration_ms, storefront, preview_url, artwork_url, hls_manifest_url, is_lossless
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            &format!(
+                "INSERT OR REPLACE INTO tracks ({COLUMNS})
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"
+            ),
             params![
                 track.id,
                 track.title,
@@ -98,7 +110,8 @@ impl CatalogStore {
                 &track.preview_url,
                 &track.artwork_url,
                 &track.hls_manifest_url,
-                if track.is_lossless { 1 } else { 0 }
+                if track.is_lossless { 1 } else { 0 },
+                &track.album_id,
             ],
         )?;
         Ok(())
@@ -118,6 +131,7 @@ impl CatalogStore {
             artwork_url: row.get::<_, Option<String>>(7)?,
             hls_manifest_url: row.get::<_, Option<String>>(8)?,
             is_lossless: lossless_i64 != 0,
+            album_id: row.get::<_, Option<String>>(10)?,
         })
     }
 
@@ -127,10 +141,9 @@ impl CatalogStore {
             debug!("Listing cached tracks (limit={})", limit);
             // Most recent first: INSERT OR REPLACE re-inserts the row, so a higher
             // rowid always means "searched more recently".
-            let mut stmt = self.conn.prepare(
-                "SELECT id, title, artist, album, duration_ms, storefront, preview_url, artwork_url, hls_manifest_url, is_lossless
-                 FROM tracks ORDER BY rowid DESC LIMIT ?1"
-            )?;
+            let mut stmt = self.conn.prepare(&format!(
+                "SELECT {COLUMNS} FROM tracks ORDER BY rowid DESC LIMIT ?1"
+            ))?;
             let rows = stmt.query_map(params![limit_i64], Self::row_to_track)?;
             let mut results = Vec::new();
             for item in rows {
@@ -140,12 +153,11 @@ impl CatalogStore {
         }
 
         let pattern = format!("%{}%", query.trim());
-        let mut stmt = self.conn.prepare(
-            "SELECT id, title, artist, album, duration_ms, storefront, preview_url, artwork_url, hls_manifest_url, is_lossless
-             FROM tracks
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT {COLUMNS} FROM tracks
              WHERE title LIKE ?1 OR artist LIKE ?1 OR album LIKE ?1
              ORDER BY title ASC LIMIT ?2"
-        )?;
+        ))?;
         let rows = stmt.query_map(params![pattern, limit_i64], Self::row_to_track)?;
         let mut results = Vec::new();
         for item in rows {
@@ -172,6 +184,7 @@ mod tests {
             artwork_url: None,
             hls_manifest_url: None,
             is_lossless: true,
+            album_id: None,
         };
         store.upsert_track(&track).expect("upsert");
 
@@ -192,6 +205,7 @@ mod tests {
             artwork_url: None,
             hls_manifest_url: None,
             is_lossless: false,
+            album_id: None,
         }
     }
 
@@ -213,14 +227,48 @@ mod tests {
     }
 
     #[test]
-    fn fresh_database_is_at_schema_v1() {
+    fn fresh_database_is_at_schema_v2() {
         let store = CatalogStore::open_in_memory().unwrap();
         let v: i64 = store
             .conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(v, 1);
+        assert_eq!(v, 2);
         assert!(CatalogStore::has_column(&store.conn, "tracks", "artwork_url").unwrap());
+        assert!(CatalogStore::has_column(&store.conn, "tracks", "album_id").unwrap());
+    }
+
+    #[test]
+    fn album_id_round_trips() {
+        let store = CatalogStore::open_in_memory().unwrap();
+        let mut t = track("5", "Let's Dance");
+        t.album_id = Some("1440857781".to_string());
+        store.upsert_track(&t).unwrap();
+        store.upsert_track(&track("6", "No Album")).unwrap();
+        let found = store.search_tracks("", 10).unwrap();
+        assert_eq!(found[0].album_id, None);
+        assert_eq!(found[1].album_id.as_deref(), Some("1440857781"));
+    }
+
+    #[test]
+    fn v1_database_gains_album_id_and_keeps_rows() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE tracks (id TEXT PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+             album TEXT NOT NULL, duration_ms INTEGER NOT NULL, storefront TEXT NOT NULL,
+             preview_url TEXT, artwork_url TEXT, hls_manifest_url TEXT, is_lossless INTEGER NOT NULL);
+             INSERT INTO tracks VALUES ('7', 'Old', 'A', 'B', 1000, 'us', NULL, NULL, NULL, 0);
+             PRAGMA user_version = 1;",
+        )
+        .unwrap();
+        CatalogStore::migrate(&conn).unwrap();
+        let store = CatalogStore { conn };
+        let rows = store.search_tracks("", 10).unwrap();
+        assert_eq!(
+            (rows[0].title.as_str(), rows[0].album_id.as_deref()),
+            ("Old", None)
+        );
+        CatalogStore::migrate(&store.conn).unwrap();
     }
 
     #[test]
@@ -255,6 +303,7 @@ mod tests {
             artwork_url: None,
             hls_manifest_url: None,
             is_lossless: false,
+            album_id: None,
         }];
         for track in tracks {
             store.upsert_track(&track).unwrap();
