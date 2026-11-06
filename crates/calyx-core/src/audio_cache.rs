@@ -38,7 +38,7 @@ impl AudioCache {
         if !file.exists() {
             return None;
         }
-        let _ = fs::File::open(&file).and_then(|f| f.set_modified(SystemTime::now()));
+        let _ = fs::OpenOptions::new().write(true).open(&file).and_then(|f| f.set_modified(SystemTime::now()));
         fs::read(&file).ok()
     }
 
@@ -135,6 +135,28 @@ mod tests {
         assert!(!cache.contains("non_existent"));
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn get_refreshes_mtime_for_lru() {
+        let dir = std::env::temp_dir().join(format!("calyx_test_touch_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+
+        let cache = AudioCache::with_dir(dir.clone(), 1024);
+        cache.put("t1", b"abc").unwrap();
+
+        let file = dir.join("t1.bin");
+
+        // Age the file so a refreshed mtime is detectable.
+        let old = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
+        std::fs::OpenOptions::new().write(true).open(&file).unwrap().set_modified(old).unwrap();
+
+        assert!(cache.get("t1").is_some());
+
+        let after = std::fs::metadata(&file).unwrap().modified().unwrap();
+        assert!(after > old, "get() must refresh mtime so eviction is LRU");
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
