@@ -1,5 +1,5 @@
 use crate::app::{ActiveView, PhoneticMode, TuiApp};
-use crate::hints::{LABEL_STYLE, hint, hint_bar, tab, tab_bar};
+use crate::hints::{LABEL_STYLE, hint, hint_bar, hint_bar_fit, tab, tab_bar};
 use crate::ui_lists::{render_playlists, render_queue, render_tracks};
 use crate::ui_player::render_player_panel;
 use ratatui::{
@@ -74,6 +74,7 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
         _ => render_central_with_lyrics(frame, chunks[1], app, nav_line),
     }
     render_player_panel(frame, chunks[2], app);
+    crate::ui_picker::render_picker(frame, app);
 }
 
 fn render_central_with_lyrics(
@@ -99,15 +100,20 @@ fn render_central_with_lyrics(
             ("y", phonetic, yellow),
             ("c", l.btn_clear_all(), LABEL_STYLE),
         ]),
-        _ => hint_bar(&[
-            ("a", l.btn_enqueue(), LABEL_STYLE),
-            ("n", l.btn_next_in_queue(), LABEL_STYLE),
-            ("o", crate::labels::album(l), LABEL_STYLE),
-            ("f", crate::labels::album_to_library(l), LABEL_STYLE),
-            ("p", l.btn_play_list(), LABEL_STYLE),
-            ("y", phonetic, yellow),
-            ("c", l.btn_clear_all(), LABEL_STYLE),
-        ]),
+        // Most used first: in narrow terminals the last hints are dropped.
+        _ => hint_bar_fit(
+            &[
+                ("a", l.btn_enqueue(), LABEL_STYLE),
+                ("n", l.btn_next_in_queue(), LABEL_STYLE),
+                ("p", l.btn_play_list(), LABEL_STYLE),
+                ("o", crate::labels::album(l), LABEL_STYLE),
+                ("m", crate::labels::to_playlist(l), LABEL_STYLE),
+                ("f", crate::labels::album_to_library(l), LABEL_STYLE),
+                ("y", phonetic, yellow),
+                ("c", l.btn_clear_all(), LABEL_STYLE),
+            ],
+            area.width.saturating_sub(2) as usize,
+        ),
     };
     let outer = Block::default()
         .borders(Borders::ALL)

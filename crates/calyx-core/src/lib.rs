@@ -26,6 +26,8 @@ pub mod decode;
 pub mod drm;
 /// Custom error types and utilities.
 pub mod error;
+/// The streaming facade contract (`StreamingBackend`).
+mod facade;
 /// MP4 file format processing.
 pub mod fmp4;
 /// HLS streaming support.

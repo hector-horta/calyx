@@ -4,8 +4,10 @@ mod audio_pipeline;
 mod bg_events;
 mod hints;
 mod labels;
+mod list_actions;
 mod messages;
 mod navigation;
+mod picker;
 mod playback;
 mod player_footer;
 mod player_spectrum;
@@ -17,6 +19,7 @@ mod ui_dancer;
 mod ui_help;
 mod ui_lists;
 mod ui_lyrics;
+mod ui_picker;
 mod ui_player;
 
 use anyhow::{Context, Result};
@@ -117,8 +120,14 @@ fn run_event_loop(
             continue;
         }
 
+        if app.picker.is_some() {
+            app.picker_key(key_event.code);
+            continue;
+        }
+
         match key_event.code {
             KeyCode::Char('q') => app.should_quit = true,
+            KeyCode::Char('m') => app.open_playlist_picker(),
             KeyCode::Char('/') => app.is_editing = true,
             KeyCode::Char('a') => app.enqueue_selected_back(),
             KeyCode::Char('A') => app.enqueue_visible_list(),

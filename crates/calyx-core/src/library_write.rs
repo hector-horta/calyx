@@ -32,6 +32,56 @@ fn check_status(status: StatusCode) -> CalyxResult<()> {
     )))
 }
 
+/// URL and body of `POST /v1/me/library/playlists/{id}/tracks` for one song.
+/// Catalog ids are numeric ("songs"); library-only ids look like `i.AbC` ("library-songs").
+fn add_to_playlist_request(
+    playlist_id: &str,
+    song_id: &str,
+) -> CalyxResult<(String, serde_json::Value)> {
+    if !crate::library::valid_playlist_id(playlist_id) {
+        return Err(CalyxError::Validation(format!(
+            "Invalid playlist id: {playlist_id:?}"
+        )));
+    }
+    let library_id = song_id
+        .strip_prefix("i.")
+        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_alphanumeric()));
+    let kind = if is_catalog_album_id(song_id) {
+        "songs"
+    } else if library_id {
+        "library-songs"
+    } else {
+        return Err(CalyxError::Validation(format!(
+            "Invalid song id: {song_id:?}"
+        )));
+    };
+    let url = format!("{LIBRARY_URL}/playlists/{playlist_id}/tracks");
+    let body = serde_json::json!({ "data": [{ "id": song_id, "type": kind }] });
+    Ok((url, body))
+}
+
+/// Appends one song to a library playlist the user owns (Apple answers 204).
+pub(crate) async fn add_track_to_playlist(
+    http: &Client,
+    dev_token: &str,
+    user_token: &str,
+    playlist_id: &str,
+    song_id: &str,
+) -> CalyxResult<()> {
+    crate::library::require_session(dev_token, user_token, "agregar a una playlist")?;
+    let (url, body) = add_to_playlist_request(playlist_id, song_id)?;
+    let resp = http
+        .post(url)
+        .header("Authorization", format!("Bearer {dev_token}"))
+        .header("Media-User-Token", user_token)
+        .header("Origin", "https://music.apple.com")
+        .header("Referer", "https://music.apple.com/")
+        .json(&body)
+        .send()
+        .await?;
+    check_status(resp.status())
+}
+
 /// Adds a catalog album to the user's library.
 pub(crate) async fn add_album_to_library(
     http: &Client,
@@ -86,6 +136,29 @@ mod tests {
             check_status(StatusCode::INTERNAL_SERVER_ERROR),
             Err(CalyxError::Validation(_))
         ));
+    }
+
+    #[test]
+    fn playlist_request_uses_the_song_kind() {
+        let (url, body) = add_to_playlist_request("p.V7VY2", "1475002920").unwrap();
+        assert_eq!(
+            url,
+            "https://amp-api.music.apple.com/v1/me/library/playlists/p.V7VY2/tracks"
+        );
+        assert_eq!(
+            body,
+            serde_json::json!({"data": [{"id": "1475002920", "type": "songs"}]})
+        );
+        let (_, body) = add_to_playlist_request("p.V7VY2", "i.AbC123").unwrap();
+        assert_eq!(body["data"][0]["type"], "library-songs");
+    }
+
+    #[test]
+    fn playlist_request_rejects_bad_ids() {
+        assert!(add_to_playlist_request("p.x/../../me", "1").is_err());
+        assert!(add_to_playlist_request("p.ok", "1?x=2").is_err());
+        assert!(add_to_playlist_request("p.ok", "i.").is_err());
+        assert!(add_to_playlist_request("p.ok", "").is_err());
     }
 
     #[tokio::test]

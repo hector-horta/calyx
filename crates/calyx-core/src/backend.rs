@@ -37,69 +37,7 @@ pub struct ResolvedAudio {
     pub note: Option<String>,
 }
 
-pub trait StreamingBackend: Send + Sync + 'static {
-    /// Human-readable service name.
-    fn service_name(&self) -> &'static str;
-    /// Whether a user session is available.
-    fn is_logged_in(&self) -> bool;
-    /// Catalog search.
-    fn search(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
-    /// Curated section (home, new releases, radio).
-    fn fetch_section(
-        &self,
-        section: SectionType,
-    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
-    /// Songs in the user's library.
-    fn fetch_user_library(
-        &self,
-    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
-    /// The user's playlists.
-    fn fetch_user_playlists(
-        &self,
-    ) -> impl std::future::Future<Output = CalyxResult<Vec<UserPlaylist>>> + Send;
-    /// Tracks of one playlist.
-    fn fetch_playlist_tracks(
-        &self,
-        playlist_id: &str,
-    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
-    /// Name and songs of the album `track` belongs to.
-    fn fetch_album_of(
-        &self,
-        track: &Track,
-    ) -> impl std::future::Future<Output = CalyxResult<(String, Vec<Track>)>> + Send;
-    /// Adds the album `track` belongs to to the user's library (needs login).
-    fn add_album_to_library(
-        &self,
-        track: &Track,
-    ) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
-    /// Fills missing preview/artwork URLs from the catalog.
-    fn complete_track(&self, track: Track) -> impl std::future::Future<Output = Track> + Send;
-    /// Playable audio: cache, then full stream, then preview.
-    fn resolve_audio(
-        &self,
-        track: &Track,
-    ) -> impl std::future::Future<Output = CalyxResult<ResolvedAudio>> + Send;
-    /// Caches the full stream ahead of time (best effort).
-    fn prefetch_audio(&self, track: &Track) -> impl std::future::Future<Output = ()> + Send;
-    /// Raw cover-art bytes.
-    fn fetch_artwork(
-        &self,
-        url: &str,
-    ) -> impl std::future::Future<Output = CalyxResult<Vec<u8>>> + Send;
-    /// Synced lyrics; empty when none exist.
-    fn fetch_lyrics(
-        &self,
-        track: &Track,
-    ) -> impl std::future::Future<Output = Vec<LyricLine>> + Send;
-    /// Interactive login; persists the new session.
-    fn login(&self) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
-    /// Fetches the public developer token if the session has none.
-    fn ensure_developer_token(&self) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
-}
+pub use crate::facade::StreamingBackend;
 
 /// Apple Music implementation of the facade. Session and client live behind
 /// locks so the backend can be shared (`Arc`) by background tasks; every
@@ -225,6 +163,12 @@ impl StreamingBackend for AppleMusicBackend {
         let client = self.client();
         let album_id = crate::catalog_album::resolve_album_id(&client, track).await?;
         crate::library_write::add_album_to_library(client.http(), &dev, &usr, &album_id).await
+    }
+
+    async fn add_to_playlist(&self, playlist_id: &str, track: &Track) -> CalyxResult<()> {
+        let (dev, usr, _) = self.user_ctx();
+        let http = self.client().http().clone();
+        crate::library_write::add_track_to_playlist(&http, &dev, &usr, playlist_id, &track.id).await
     }
 
     async fn complete_track(&self, track: Track) -> Track {
