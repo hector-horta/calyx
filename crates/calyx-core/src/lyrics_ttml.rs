@@ -1,12 +1,14 @@
 // lyrics_ttml.rs
 
+use crate::lyrics::LyricLine;
 use reqwest::Client;
 use serde_json::Value;
-use crate::lyrics::LyricLine;
 
 pub fn parse_ttml_time(s: &str) -> Option<u64> {
     let s = s.trim();
-    if s.is_empty() { return None; }
+    if s.is_empty() {
+        return None;
+    }
 
     if s.contains(':') {
         let parts: Vec<&str> = s.split(':').collect();
@@ -23,7 +25,7 @@ pub fn parse_ttml_time(s: &str) -> Option<u64> {
                 let sec: f64 = parts[2].parse().ok()?;
                 Some(((h * 3600.0 + m * 60.0 + sec) * 1000.0) as u64)
             }
-            _ => None
+            _ => None,
         }
     } else {
         let sec: f64 = s.parse().ok()?;
@@ -33,10 +35,10 @@ pub fn parse_ttml_time(s: &str) -> Option<u64> {
 
 pub fn decode_xml_entities(s: &str) -> String {
     s.replace("&amp;", "&")
-     .replace("&quot;", "\"")
-     .replace("&apos;", "'")
-     .replace("&lt;", "<")
-     .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
 }
 
 pub fn strip_xml_tags(s: &str) -> String {
@@ -77,9 +79,10 @@ pub fn parse_ttml(raw: &str) -> Vec<LyricLine> {
                     if let Some(quote_end_pos) = time_str.find('"') {
                         let time_str = &time_str[..quote_end_pos];
                         if let Some(time_ms) = parse_ttml_time(time_str)
-                            && !text.is_empty() {
-                                lines.push(LyricLine::new(time_ms, text));
-                            }
+                            && !text.is_empty()
+                        {
+                            lines.push(LyricLine::new(time_ms, text));
+                        }
                     }
                 }
 
@@ -110,9 +113,8 @@ pub async fn fetch_apple_music_lyrics(
         return None;
     }
 
-    let url = format!(
-        "https://amp-api.music.apple.com/v1/catalog/{storefront}/songs/{song_id}/lyrics"
-    );
+    let url =
+        format!("https://amp-api.music.apple.com/v1/catalog/{storefront}/songs/{song_id}/lyrics");
 
     let resp = http
         .get(&url)
@@ -129,14 +131,19 @@ pub async fn fetch_apple_music_lyrics(
     }
 
     let val: Value = resp.json().await.ok()?;
-    let ttml = val.get("data")?
+    let ttml = val
+        .get("data")?
         .get(0)?
         .get("attributes")?
         .get("ttml")?
         .as_str()?;
 
     let parsed = parse_ttml(ttml);
-    if parsed.is_empty() { None } else { Some(parsed) }
+    if parsed.is_empty() {
+        None
+    } else {
+        Some(parsed)
+    }
 }
 
 #[cfg(test)]

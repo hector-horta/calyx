@@ -8,7 +8,11 @@ const SIDE_COLS: u16 = 4;
 const SPECTRUM_BANDS: usize = 12;
 
 fn used_cols(l: BarLayout) -> u16 {
-    if l.show_sides { SIDE_COLS + l.bars_width() } else { l.bars_width() }
+    if l.show_sides {
+        SIDE_COLS + l.bars_width()
+    } else {
+        l.bars_width()
+    }
 }
 
 #[test]
@@ -35,7 +39,10 @@ fn narrow_panel_drops_sides_and_gaps() {
 #[test]
 fn never_wider_than_panel() {
     for w in 12..=200u16 {
-        assert!(used_cols(BarLayout::for_width(w)) <= w, "overflow at width {w}");
+        assert!(
+            used_cols(BarLayout::for_width(w)) <= w,
+            "overflow at width {w}"
+        );
     }
 }
 
@@ -51,12 +58,20 @@ fn row_width_matches_layout() {
 fn pending_bars_are_tinted_not_full_color() {
     let l = BarLayout::for_width(100);
     let row = spectrum_row(&[12; SPECTRUM_BANDS], 0, GREEN, l, 0.0);
-    assert!(row.iter().filter(|s| s.content != " ").all(|s| s.style.fg != Some(GREEN)));
+    assert!(
+        row.iter()
+            .filter(|s| s.content != " ")
+            .all(|s| s.style.fg != Some(GREEN))
+    );
 }
 
 #[test]
 fn played_bars_use_full_color() {
     let l = BarLayout::for_width(100);
     let row = spectrum_row(&[12; SPECTRUM_BANDS], 0, GREEN, l, 1.0);
-    assert!(row.iter().filter(|s| s.content != " ").all(|s| s.style.fg == Some(GREEN)));
+    assert!(
+        row.iter()
+            .filter(|s| s.content != " ")
+            .all(|s| s.style.fg == Some(GREEN))
+    );
 }

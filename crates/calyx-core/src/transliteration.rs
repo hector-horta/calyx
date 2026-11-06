@@ -19,9 +19,18 @@ pub fn transliterate(text: &str) -> Option<String> {
 }
 
 fn transliterate_korean(text: &str) -> String {
-    const CHOSUNG: [&str; 19] = ["g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", "", "j", "jj", "ch", "k", "t", "p", "h"];
-    const JUNGSUNG: [&str; 21] = ["a", "ae", "ya", "yae", "eo", "e", "yeo", "ye", "o", "wa", "wae", "oe", "yo", "u", "wo", "we", "wi", "yu", "eu", "ui", "i"];
-    const JONGSUNG: [&str; 28] = ["", "k", "k", "ks", "n", "nj", "nh", "t", "l", "lg", "lm", "lb", "ls", "lt", "lp", "lh", "m", "p", "ps", "t", "t", "ng", "t", "t", "k", "t", "p", "h"];
+    const CHOSUNG: [&str; 19] = [
+        "g", "kk", "n", "d", "tt", "r", "m", "b", "pp", "s", "ss", "", "j", "jj", "ch", "k", "t",
+        "p", "h",
+    ];
+    const JUNGSUNG: [&str; 21] = [
+        "a", "ae", "ya", "yae", "eo", "e", "yeo", "ye", "o", "wa", "wae", "oe", "yo", "u", "wo",
+        "we", "wi", "yu", "eu", "ui", "i",
+    ];
+    const JONGSUNG: [&str; 28] = [
+        "", "k", "k", "ks", "n", "nj", "nh", "t", "l", "lg", "lm", "lb", "ls", "lt", "lp", "lh",
+        "m", "p", "ps", "t", "t", "ng", "t", "t", "k", "t", "p", "h",
+    ];
 
     let mut result = String::new();
     for c in text.chars() {
@@ -51,7 +60,10 @@ mod tests {
 
     #[test]
     fn test_korean_hangul() {
-        assert_eq!(transliterate("안녕하세요"), Some("annyeonghaseyo".to_string()));
+        assert_eq!(
+            transliterate("안녕하세요"),
+            Some("annyeonghaseyo".to_string())
+        );
     }
 
     #[test]

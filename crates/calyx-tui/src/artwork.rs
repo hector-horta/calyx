@@ -17,22 +17,27 @@ pub struct TerminalCoverArt {
 impl TerminalCoverArt {
     pub fn from_jpeg_or_seed(bytes: Option<&[u8]>, seed_text: &str) -> Self {
         if let Some(raw) = bytes
-            && let Ok(img) = image::load_from_memory(raw) {
-                let resized = img
-                    .resize_exact(ART_WIDTH as u32, ART_HEIGHT_PIXELS as u32, FilterType::Lanczos3)
-                    .to_rgb8();
-                let mut grid = vec![vec![(0u8, 0u8, 0u8); ART_WIDTH]; ART_HEIGHT_PIXELS];
-                for (y, row) in grid.iter_mut().enumerate() {
-                    for (x, cell) in row.iter_mut().enumerate() {
-                        let p = resized.get_pixel(x as u32, y as u32);
-                        *cell = (p[0], p[1], p[2]);
-                    }
+            && let Ok(img) = image::load_from_memory(raw)
+        {
+            let resized = img
+                .resize_exact(
+                    ART_WIDTH as u32,
+                    ART_HEIGHT_PIXELS as u32,
+                    FilterType::Lanczos3,
+                )
+                .to_rgb8();
+            let mut grid = vec![vec![(0u8, 0u8, 0u8); ART_WIDTH]; ART_HEIGHT_PIXELS];
+            for (y, row) in grid.iter_mut().enumerate() {
+                for (x, cell) in row.iter_mut().enumerate() {
+                    let p = resized.get_pixel(x as u32, y as u32);
+                    *cell = (p[0], p[1], p[2]);
                 }
-                return Self {
-                    grid,
-                    is_real_image: true,
-                };
             }
+            return Self {
+                grid,
+                is_real_image: true,
+            };
+        }
         Self::procedural_fallback(seed_text)
     }
 
@@ -116,14 +121,31 @@ pub struct TerminalIcon {
 }
 
 impl TerminalIcon {
-    pub fn load_or_fallback(paths: &[&str], width: usize, height_pixels: usize, fallback_lines: [&'static str; 3], fallback_col: Color) -> Self {
+    pub fn load_or_fallback(
+        paths: &[&str],
+        width: usize,
+        height_pixels: usize,
+        fallback_lines: [&'static str; 3],
+        fallback_col: Color,
+    ) -> Self {
         for path in paths {
             if let Ok(bytes) = std::fs::read(path)
-                && let Ok(img) = image::load_from_memory(&bytes) {
-                    return Self::from_image(img, width, height_pixels);
-                }
+                && let Ok(img) = image::load_from_memory(&bytes)
+            {
+                return Self::from_image(img, width, height_pixels);
+            }
         }
-        let rows = fallback_lines.iter().map(|&s| vec![Span::styled(s, Style::default().fg(fallback_col).add_modifier(ratatui::style::Modifier::BOLD))]).collect();
+        let rows = fallback_lines
+            .iter()
+            .map(|&s| {
+                vec![Span::styled(
+                    s,
+                    Style::default()
+                        .fg(fallback_col)
+                        .add_modifier(ratatui::style::Modifier::BOLD),
+                )]
+            })
+            .collect();
         Self { rows }
     }
 
@@ -147,30 +169,43 @@ impl TerminalIcon {
         } else {
             img
         };
-        let rgba = cropped.resize_exact(width as u32, height_pixels as u32, FilterType::Lanczos3).to_rgba8();
+        let rgba = cropped
+            .resize_exact(width as u32, height_pixels as u32, FilterType::Lanczos3)
+            .to_rgba8();
 
-    let mut rows = Vec::with_capacity(height_pixels / 2);
-    for y in (0..height_pixels).step_by(2) {
-        let mut spans = Vec::with_capacity(width);
-        for x in 0..width {
-            let top = rgba.get_pixel(x as u32, y as u32);
-            let bot = rgba.get_pixel(x as u32, (y + 1) as u32);
+        let mut rows = Vec::with_capacity(height_pixels / 2);
+        for y in (0..height_pixels).step_by(2) {
+            let mut spans = Vec::with_capacity(width);
+            for x in 0..width {
+                let top = rgba.get_pixel(x as u32, y as u32);
+                let bot = rgba.get_pixel(x as u32, (y + 1) as u32);
 
-            let top_vis = top[3] >= 64 && (top[0] > 25 || top[1] > 25 || top[2] > 25);
-            let bot_vis = bot[3] >= 64 && (bot[0] > 25 || bot[1] > 25 || bot[2] > 25);
+                let top_vis = top[3] >= 64 && (top[0] > 25 || top[1] > 25 || top[2] > 25);
+                let bot_vis = bot[3] >= 64 && (bot[0] > 25 || bot[1] > 25 || bot[2] > 25);
 
-            match (top_vis, bot_vis) {
-                (true, true) => spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(top[0], top[1], top[2])).bg(Color::Rgb(bot[0], bot[1], bot[2])))),
-                (true, false) => spans.push(Span::styled("▀", Style::default().fg(Color::Rgb(top[0], top[1], top[2])))),
-                (false, true) => spans.push(Span::styled("▄", Style::default().fg(Color::Rgb(bot[0], bot[1], bot[2])))),
-                (false, false) => spans.push(Span::raw(" ")),
+                match (top_vis, bot_vis) {
+                    (true, true) => spans.push(Span::styled(
+                        "▀",
+                        Style::default()
+                            .fg(Color::Rgb(top[0], top[1], top[2]))
+                            .bg(Color::Rgb(bot[0], bot[1], bot[2])),
+                    )),
+                    (true, false) => spans.push(Span::styled(
+                        "▀",
+                        Style::default().fg(Color::Rgb(top[0], top[1], top[2])),
+                    )),
+                    (false, true) => spans.push(Span::styled(
+                        "▄",
+                        Style::default().fg(Color::Rgb(bot[0], bot[1], bot[2])),
+                    )),
+                    (false, false) => spans.push(Span::raw(" ")),
+                }
             }
+            rows.push(spans);
         }
-        rows.push(spans);
-    }
 
-    Self { rows }
-}
+        Self { rows }
+    }
 }
 
 #[cfg(test)]
@@ -180,8 +215,12 @@ mod tests {
     #[test]
     fn test_icon_load_dimensions() {
         let icon = TerminalIcon::load_or_fallback(
-            &["../../assets/icons/transparent-play.png", "assets/icons/transparent-play.png"],
-            6, 6,
+            &[
+                "../../assets/icons/transparent-play.png",
+                "assets/icons/transparent-play.png",
+            ],
+            6,
+            6,
             [" █◣   ", " ██◣  ", " █◤   "],
             Color::Cyan,
         );

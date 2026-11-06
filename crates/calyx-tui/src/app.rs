@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use calyx_core::{
-    CalyxResult, CatalogStore, NativeAudioEngine, PlaybackQueue, PlaybackStatus,
-    RepeatMode, SessionConfig, StreamingBackend, Track, UserPlaylist,
-};
-use ratatui::widgets::ListState;
 use crate::artwork::TerminalCoverArt;
 use crate::messages::Msg;
+use calyx_core::{
+    CalyxResult, CatalogStore, NativeAudioEngine, PlaybackQueue, PlaybackStatus, RepeatMode,
+    SessionConfig, StreamingBackend, Track, UserPlaylist,
+};
+use ratatui::widgets::ListState;
 
 /// The streaming service behind the facade; the only place to swap it.
 pub type Backend = calyx_core::AppleMusicBackend;
@@ -74,7 +74,9 @@ pub struct TuiApp {
 impl TuiApp {
     pub fn new(storefront: &str) -> CalyxResult<Self> {
         let session = SessionConfig::load_or_default(storefront);
-        let language = session.language.unwrap_or_else(calyx_core::Language::detect_system);
+        let language = session
+            .language
+            .unwrap_or_else(calyx_core::Language::detect_system);
         let db_path = calyx_core::paths::catalog_db();
         // Versions before 0.1.7 kept the history next to where calyx was launched.
         // The WAL is only copied together with its own database file.
@@ -92,10 +94,14 @@ impl TuiApp {
 
         let audio_cache = calyx_core::AudioCache::new(2 * 1024 * 1024 * 1024);
         let cache_bg = audio_cache.clone();
-        tokio::task::spawn_blocking(move || { cache_bg.evict_if_needed(); });
+        tokio::task::spawn_blocking(move || {
+            cache_bg.evict_if_needed();
+        });
         let backend = Arc::new(Backend::new(session, audio_cache)?);
         let backend_bg = backend.clone();
-        tokio::spawn(async move { let _ = backend_bg.ensure_developer_token().await; });
+        tokio::spawn(async move {
+            let _ = backend_bg.ensure_developer_token().await;
+        });
 
         Ok(Self {
             search_input: String::with_capacity(1024),
@@ -112,13 +118,18 @@ impl TuiApp {
             current_artwork: None,
             play_icon: crate::artwork::TerminalIcon::load_or_fallback(
                 &["assets/icons/transparent-play.png", "assets/icons/play.png"],
-                6, 6,
+                6,
+                6,
                 [" █◣   ", " ██◣  ", " █◤   "],
                 ratatui::style::Color::Cyan,
             ),
             pause_icon: crate::artwork::TerminalIcon::load_or_fallback(
-                &["assets/icons/transparent - pause.png", "assets/icons/pause.png"],
-                6, 6,
+                &[
+                    "assets/icons/transparent - pause.png",
+                    "assets/icons/pause.png",
+                ],
+                6,
+                6,
                 [" █ █  ", " █ █  ", " █ █  "],
                 ratatui::style::Color::Yellow,
             ),
@@ -138,64 +149,103 @@ impl TuiApp {
         })
     }
 
-pub fn selected_track(&self) -> Option<Track> {
-    match self.active_view {
-        ActiveView::Help | ActiveView::Playlists => None,
-        ActiveView::Queue => self.queue.upcoming().get(self.queue_state.selected().unwrap_or(0)).cloned(),
-        _ => self.tracks.get(self.selected_index).cloned(),
+    pub fn selected_track(&self) -> Option<Track> {
+        match self.active_view {
+            ActiveView::Help | ActiveView::Playlists => None,
+            ActiveView::Queue => self
+                .queue
+                .upcoming()
+                .get(self.queue_state.selected().unwrap_or(0))
+                .cloned(),
+            _ => self.tracks.get(self.selected_index).cloned(),
+        }
     }
-}
 
     pub fn next_track(&mut self) {
         match self.active_view {
             ActiveView::Help => {}
-            ActiveView::Playlists => if !self.playlists.is_empty() {
-                let next = (self.playlist_state.selected().unwrap_or(0) + 1) % self.playlists.len();
-                self.playlist_state.select(Some(next));
-            },
-            ActiveView::Queue => if !self.queue.is_empty() {
-                let next = (self.queue_state.selected().unwrap_or(0) + 1) % self.queue.len();
-                self.queue_state.select(Some(next));
-            },
-            _ => if !self.tracks.is_empty() {
-                self.selected_index = (self.selected_index + 1) % self.tracks.len();
-                self.list_state.select(Some(self.selected_index));
-            },
+            ActiveView::Playlists => {
+                if !self.playlists.is_empty() {
+                    let next =
+                        (self.playlist_state.selected().unwrap_or(0) + 1) % self.playlists.len();
+                    self.playlist_state.select(Some(next));
+                }
+            }
+            ActiveView::Queue => {
+                if !self.queue.is_empty() {
+                    let next = (self.queue_state.selected().unwrap_or(0) + 1) % self.queue.len();
+                    self.queue_state.select(Some(next));
+                }
+            }
+            _ => {
+                if !self.tracks.is_empty() {
+                    self.selected_index = (self.selected_index + 1) % self.tracks.len();
+                    self.list_state.select(Some(self.selected_index));
+                }
+            }
         }
     }
 
     pub fn previous_track(&mut self) {
         match self.active_view {
             ActiveView::Help => {}
-            ActiveView::Playlists => if !self.playlists.is_empty() {
-                let cur = self.playlist_state.selected().unwrap_or(0);
-                self.playlist_state.select(Some(if cur == 0 { self.playlists.len() - 1 } else { cur - 1 }));
-            },
-            ActiveView::Queue => if !self.queue.is_empty() {
-                let cur = self.queue_state.selected().unwrap_or(0);
-                self.queue_state.select(Some(if cur == 0 { self.queue.len() - 1 } else { cur - 1 }));
-            },
-            _ => if !self.tracks.is_empty() {
-                self.selected_index = if self.selected_index == 0 { self.tracks.len() - 1 } else { self.selected_index - 1 };
-                self.list_state.select(Some(self.selected_index));
-            },
+            ActiveView::Playlists => {
+                if !self.playlists.is_empty() {
+                    let cur = self.playlist_state.selected().unwrap_or(0);
+                    self.playlist_state.select(Some(if cur == 0 {
+                        self.playlists.len() - 1
+                    } else {
+                        cur - 1
+                    }));
+                }
+            }
+            ActiveView::Queue => {
+                if !self.queue.is_empty() {
+                    let cur = self.queue_state.selected().unwrap_or(0);
+                    self.queue_state.select(Some(if cur == 0 {
+                        self.queue.len() - 1
+                    } else {
+                        cur - 1
+                    }));
+                }
+            }
+            _ => {
+                if !self.tracks.is_empty() {
+                    self.selected_index = if self.selected_index == 0 {
+                        self.tracks.len() - 1
+                    } else {
+                        self.selected_index - 1
+                    };
+                    self.list_state.select(Some(self.selected_index));
+                }
+            }
         }
     }
 
     pub fn toggle_view(&mut self) {
-        self.active_view = if self.active_view == ActiveView::Queue { ActiveView::Home } else { ActiveView::Queue };
+        self.active_view = if self.active_view == ActiveView::Queue {
+            ActiveView::Home
+        } else {
+            ActiveView::Queue
+        };
     }
 
     pub fn enqueue_selected_back(&mut self) {
         if let Some(track) = self.tracks.get(self.selected_index).cloned() {
-            self.say(Msg::Enqueued { artist: &track.artist, title: &track.title });
+            self.say(Msg::Enqueued {
+                artist: &track.artist,
+                title: &track.title,
+            });
             self.queue.enqueue_back(track);
         }
     }
 
     pub fn enqueue_selected_next(&mut self) {
         if let Some(track) = self.tracks.get(self.selected_index).cloned() {
-            self.say(Msg::EnqueuedNext { artist: &track.artist, title: &track.title });
+            self.say(Msg::EnqueuedNext {
+                artist: &track.artist,
+                title: &track.title,
+            });
             self.queue.enqueue_next(track);
         }
     }
@@ -203,14 +253,15 @@ pub fn selected_track(&self) -> Option<Track> {
     pub fn remove_selected_from_queue(&mut self) {
         if self.active_view == ActiveView::Queue {
             if let Some(idx) = self.queue_state.selected()
-                && let Some(removed) = self.queue.remove(idx) {
-                    self.say(Msg::RemovedFromQueue(&removed.title));
-                    if self.queue.is_empty() {
-                        self.queue_state.select(None);
-                    } else if idx >= self.queue.len() {
-                        self.queue_state.select(Some(self.queue.len() - 1));
-                    }
+                && let Some(removed) = self.queue.remove(idx)
+            {
+                self.say(Msg::RemovedFromQueue(&removed.title));
+                if self.queue.is_empty() {
+                    self.queue_state.select(None);
+                } else if idx >= self.queue.len() {
+                    self.queue_state.select(Some(self.queue.len() - 1));
                 }
+            }
         } else if self.active_view == ActiveView::Home && !self.tracks.is_empty() {
             let removed = self.tracks.remove(self.selected_index);
             let _ = self.store.delete_track(&removed.id);
@@ -254,13 +305,26 @@ pub fn selected_track(&self) -> Option<Track> {
     pub fn toggle_phonetic_mode(&mut self) {
         self.phonetic_mode = self.phonetic_mode.next();
         self.status_message = match (self.language, self.phonetic_mode) {
-            (calyx_core::Language::Es, PhoneticMode::Dual) => "Modo Fonética: Dual (Original + Romaji/Pinyin)",
-            (calyx_core::Language::Es, PhoneticMode::Phonetic) => "Modo Fonética: Solo Fonético (Romaji/Pinyin)",
-            (calyx_core::Language::Es, PhoneticMode::Original) => "Modo Fonética: Desactivado (Solo Original)",
-            (calyx_core::Language::En, PhoneticMode::Dual) => "Phonetic Mode: Dual (Original + Romaji/Pinyin)",
-            (calyx_core::Language::En, PhoneticMode::Phonetic) => "Phonetic Mode: Phonetic Only (Romaji/Pinyin)",
-            (calyx_core::Language::En, PhoneticMode::Original) => "Phonetic Mode: Off (Original Only)",
-        }.to_string();
+            (calyx_core::Language::Es, PhoneticMode::Dual) => {
+                "Modo Fonética: Dual (Original + Romaji/Pinyin)"
+            }
+            (calyx_core::Language::Es, PhoneticMode::Phonetic) => {
+                "Modo Fonética: Solo Fonético (Romaji/Pinyin)"
+            }
+            (calyx_core::Language::Es, PhoneticMode::Original) => {
+                "Modo Fonética: Desactivado (Solo Original)"
+            }
+            (calyx_core::Language::En, PhoneticMode::Dual) => {
+                "Phonetic Mode: Dual (Original + Romaji/Pinyin)"
+            }
+            (calyx_core::Language::En, PhoneticMode::Phonetic) => {
+                "Phonetic Mode: Phonetic Only (Romaji/Pinyin)"
+            }
+            (calyx_core::Language::En, PhoneticMode::Original) => {
+                "Phonetic Mode: Off (Original Only)"
+            }
+        }
+        .to_string();
     }
 
     pub fn toggle_language(&mut self) {
@@ -274,17 +338,30 @@ pub fn selected_track(&self) -> Option<Track> {
         self.status_message = msg.text(self.language);
     }
 
-    pub fn is_logged_in(&self) -> bool { self.backend.is_logged_in() }
-    pub fn toggle_pause(&mut self) { self.audio.toggle_pause(); }
+    pub fn is_logged_in(&self) -> bool {
+        self.backend.is_logged_in()
+    }
+    pub fn toggle_pause(&mut self) {
+        self.audio.toggle_pause();
+    }
     pub fn adjust_volume(&mut self, delta: f32) {
         self.volume = (self.volume + delta).clamp(0.0, 1.0);
         self.audio.set_volume(self.volume);
     }
-    pub fn playback_status(&self) -> PlaybackStatus { self.audio.status() }
-    pub fn current_spectrum(&self) -> calyx_core::SpectrumFrame { self.audio.current_spectrum() }
+    pub fn playback_status(&self) -> PlaybackStatus {
+        self.audio.status()
+    }
+    pub fn current_spectrum(&self) -> calyx_core::SpectrumFrame {
+        self.audio.current_spectrum()
+    }
     pub fn playback_progress(&self) -> (std::time::Duration, std::time::Duration) {
         let (elap, pcm) = self.audio.progress();
-        let tot = self.current_track.as_ref().map(|t| std::time::Duration::from_millis(t.duration_ms)).filter(|&d| d > std::time::Duration::ZERO).unwrap_or(pcm);
+        let tot = self
+            .current_track
+            .as_ref()
+            .map(|t| std::time::Duration::from_millis(t.duration_ms))
+            .filter(|&d| d > std::time::Duration::ZERO)
+            .unwrap_or(pcm);
         (elap, tot)
     }
 }

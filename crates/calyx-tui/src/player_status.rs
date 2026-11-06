@@ -1,25 +1,37 @@
 //! Text lines of the player panel (title, status, up next), adapted to its width.
 
+use crate::app::TuiApp;
+use crate::hints::{KEY_STYLE, key_span};
+use crate::player_footer::footer;
+use crate::player_spectrum::{NARROW_BELOW, WIDE_FROM};
+use crate::ui::truncate;
 use calyx_core::{models::PlaybackStatus, queue::RepeatMode};
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
 };
-use crate::app::TuiApp;
-use crate::hints::{key_span, KEY_STYLE};
-use crate::player_footer::footer;
-use crate::player_spectrum::{NARROW_BELOW, WIDE_FROM};
-use crate::ui::truncate;
 
-const TIME: Style = Style::new().fg(Color::Rgb(220, 225, 230)).add_modifier(Modifier::BOLD);
+const TIME: Style = Style::new()
+    .fg(Color::Rgb(220, 225, 230))
+    .add_modifier(Modifier::BOLD);
 const OFF: Style = Style::new().fg(Color::DarkGray);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Density { Narrow, Medium, Wide }
+pub enum Density {
+    Narrow,
+    Medium,
+    Wide,
+}
 
 impl Density {
     pub fn for_width(inner: u16) -> Self {
-        if inner < NARROW_BELOW { Self::Narrow } else if inner >= WIDE_FROM { Self::Wide } else { Self::Medium }
+        if inner < NARROW_BELOW {
+            Self::Narrow
+        } else if inner >= WIDE_FROM {
+            Self::Wide
+        } else {
+            Self::Medium
+        }
     }
 }
 
@@ -27,8 +39,17 @@ impl Density {
 pub fn progress(app: &TuiApp) -> (u64, u64, f64) {
     let (elapsed, total) = app.playback_progress();
     let elap = elapsed.as_secs();
-    let tot = total.as_secs().max(app.current_track.as_ref().map(|t| t.duration_ms / 1000).unwrap_or(0));
-    let ratio = if tot > 0 { (elapsed.as_millis() as f64 / (tot as f64 * 1000.0)).clamp(0.0, 1.0) } else { 0.0 };
+    let tot = total.as_secs().max(
+        app.current_track
+            .as_ref()
+            .map(|t| t.duration_ms / 1000)
+            .unwrap_or(0),
+    );
+    let ratio = if tot > 0 {
+        (elapsed.as_millis() as f64 / (tot as f64 * 1000.0)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
     (elap, tot, ratio)
 }
 
@@ -50,14 +71,12 @@ pub fn header_line(app: &TuiApp, density: Density) -> Line<'static> {
 
     spans.push(Span::styled(
         format!("{} ", truncate(&t.title, 34)),
-        Style::new()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD)
+        Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
     ));
 
     spans.push(Span::styled(
         format!("— {} • {}", truncate(&t.artist, 22), truncate(&t.album, 22)),
-        Style::new().fg(Color::Cyan)
+        Style::new().fg(Color::Cyan),
     ));
 
     Line::from(spans)
@@ -76,12 +95,16 @@ fn time_span(app: &TuiApp) -> Span<'static> {
             remaining / 60,
             remaining % 60
         ),
-        TIME
+        TIME,
     )
 }
 fn switch_spans(app: &TuiApp, compact: bool) -> Vec<Span<'static>> {
     let l = app.language;
-    let shuffle_style = if app.queue.is_shuffle() { Style::new().fg(Color::Rgb(200, 235, 245)) } else { OFF };
+    let shuffle_style = if app.queue.is_shuffle() {
+        Style::new().fg(Color::Rgb(200, 235, 245))
+    } else {
+        OFF
+    };
     let (rep_label, rep_icon, rep_style) = match app.queue.repeat_mode() {
         RepeatMode::Off => (l.btn_repeat(), "🔁", OFF),
         RepeatMode::All => (l.btn_repeat_all(), "🔁", Style::new().fg(Color::Cyan)),
@@ -90,7 +113,10 @@ fn switch_spans(app: &TuiApp, compact: bool) -> Vec<Span<'static>> {
     let (shuf, rep) = if compact {
         ("🔀".to_string(), rep_icon.to_string())
     } else {
-        (format!("🔀 {}", l.btn_shuffle()), format!("{rep_icon} {rep_label}"))
+        (
+            format!("🔀 {}", l.btn_shuffle()),
+            format!("{rep_icon} {rep_label}"),
+        )
     };
     vec![
         key_span("s", KEY_STYLE),
@@ -112,13 +138,16 @@ pub fn status_lines(app: &TuiApp, density: Density) -> Vec<Line<'static>> {
             spans.extend(switch_spans(app, false));
             vec![Line::from(spans)]
         }
-        Density::Medium => vec![Line::from(time_span(app)), Line::from(switch_spans(app, false))],
+        Density::Medium => vec![
+            Line::from(time_span(app)),
+            Line::from(switch_spans(app, false)),
+        ],
         Density::Narrow => {
             let mut spans = vec![time_span(app), Span::raw("  ")];
             spans.extend(switch_spans(app, true));
             spans.push(Span::styled(
                 format!("  Vol {}%", (app.volume * 100.0).round() as u8),
-                OFF
+                OFF,
             ));
             vec![Line::from(spans)]
         }
@@ -128,13 +157,15 @@ pub fn status_lines(app: &TuiApp, density: Density) -> Vec<Line<'static>> {
 pub fn footer_line(app: &TuiApp, width: u16) -> Line<'static> {
     let l = app.language;
     let status = app.status_message.as_str();
-    let next = app.queue.peek_next().map(|n| format!(
-        "{}: {} — {} ({} {})",
-        l.lbl_up_next(),
-        truncate(&n.title, 34),
-        truncate(&n.artist, 20),
-        app.queue.len(),
-        l.lbl_in_queue()
-    ));
+    let next = app.queue.peek_next().map(|n| {
+        format!(
+            "{}: {} — {} ({} {})",
+            l.lbl_up_next(),
+            truncate(&n.title, 34),
+            truncate(&n.artist, 20),
+            app.queue.len(),
+            l.lbl_in_queue()
+        )
+    });
     footer(next, status, width as usize)
 }

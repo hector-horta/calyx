@@ -2,10 +2,10 @@
 //! against the streaming facade and reports back with a `BgEvent`, so the
 //! event loop never waits on the network.
 
-use calyx_core::{SectionType, StreamingBackend};
 use crate::app::{ActiveView, TuiApp};
 use crate::bg_events::BgEvent;
 use crate::messages::{ListKind, Msg};
+use calyx_core::{SectionType, StreamingBackend};
 
 impl TuiApp {
     fn spawn_event<F>(&self, fut: F)
@@ -27,7 +27,11 @@ impl TuiApp {
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend.search(&query, 25).await.map_err(|e| e.to_string());
-            BgEvent::TracksReady { view: ActiveView::Home, kind: ListKind::Search, res }
+            BgEvent::TracksReady {
+                view: ActiveView::Home,
+                kind: ListKind::Search,
+                res,
+            }
         });
     }
 
@@ -36,7 +40,10 @@ impl TuiApp {
         self.say(Msg::Loading(kind));
         let backend = self.backend.clone();
         self.spawn_event(async move {
-            let res = backend.fetch_section(section).await.map_err(|e| e.to_string());
+            let res = backend
+                .fetch_section(section)
+                .await
+                .map_err(|e| e.to_string());
             BgEvent::TracksReady { view, kind, res }
         });
     }
@@ -46,8 +53,15 @@ impl TuiApp {
         self.say(Msg::Loading(ListKind::Library));
         let backend = self.backend.clone();
         self.spawn_event(async move {
-            let res = backend.fetch_user_library().await.map_err(|e| e.to_string());
-            BgEvent::TracksReady { view: ActiveView::Library, kind: ListKind::Library, res }
+            let res = backend
+                .fetch_user_library()
+                .await
+                .map_err(|e| e.to_string());
+            BgEvent::TracksReady {
+                view: ActiveView::Library,
+                kind: ListKind::Library,
+                res,
+            }
         });
     }
 
@@ -56,18 +70,36 @@ impl TuiApp {
         self.say(Msg::SyncingPlaylists);
         let backend = self.backend.clone();
         self.spawn_event(async move {
-            BgEvent::PlaylistsReady(backend.fetch_user_playlists().await.map_err(|e| e.to_string()))
+            BgEvent::PlaylistsReady(
+                backend
+                    .fetch_user_playlists()
+                    .await
+                    .map_err(|e| e.to_string()),
+            )
         });
     }
 
     /// Loads the selected playlist; `play` queues it all instead of browsing it.
     pub fn load_selected_playlist(&mut self, play: bool) {
-        let Some(pl) = self.playlists.get(self.playlist_state.selected().unwrap_or(0)).cloned() else { return };
+        let Some(pl) = self
+            .playlists
+            .get(self.playlist_state.selected().unwrap_or(0))
+            .cloned()
+        else {
+            return;
+        };
         self.say(Msg::LoadingPlaylist(&pl.name));
         let backend = self.backend.clone();
         self.spawn_event(async move {
-            let res = backend.fetch_playlist_tracks(&pl.id).await.map_err(|e| e.to_string());
-            if play { BgEvent::PlaylistReady(pl.name, res) } else { BgEvent::PlaylistOpened(pl.name, res) }
+            let res = backend
+                .fetch_playlist_tracks(&pl.id)
+                .await
+                .map_err(|e| e.to_string());
+            if play {
+                BgEvent::PlaylistReady(pl.name, res)
+            } else {
+                BgEvent::PlaylistOpened(pl.name, res)
+            }
         });
     }
 
@@ -77,6 +109,8 @@ impl TuiApp {
         }
         self.login_in_progress = true;
         let backend = self.backend.clone();
-        self.spawn_event(async move { BgEvent::LoginDone(backend.login().await.map_err(|e| e.to_string())) });
+        self.spawn_event(async move {
+            BgEvent::LoginDone(backend.login().await.map_err(|e| e.to_string()))
+        });
     }
 }

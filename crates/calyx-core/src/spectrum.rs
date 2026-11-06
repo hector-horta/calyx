@@ -24,7 +24,9 @@ fn raw_energies(pcm: &[i16], channels: u16, sample_rate: u32) -> Vec<[u32; SPECT
     for chunk in pcm.chunks(win) {
         mono.clear();
         for frame in chunk.chunks(ch) {
-            if frame.is_empty() { continue; }
+            if frame.is_empty() {
+                continue;
+            }
             mono.push(frame.iter().map(|&s| s as i32).sum::<i32>() / frame.len() as i32);
         }
 
@@ -32,7 +34,10 @@ fn raw_energies(pcm: &[i16], channels: u16, sample_rate: u32) -> Vec<[u32; SPECT
         let sub_len = (mono.len() / SPECTRUM_BANDS).max(1);
 
         for (b, sub) in mono.chunks(sub_len).take(SPECTRUM_BANDS).enumerate() {
-            if sub.is_empty() { row[b] = 0; continue; }
+            if sub.is_empty() {
+                row[b] = 0;
+                continue;
+            }
 
             let b32 = (b * 32 / SPECTRUM_BANDS) as u64;
             let step = (32 - b32 as usize).clamp(1, 16);
@@ -62,7 +67,9 @@ fn band_references(raw: &[[u32; SPECTRUM_BANDS]]) -> [f32; SPECTRUM_BANDS] {
     for (b, slot) in refs.iter_mut().enumerate() {
         v.clear();
         v.extend(raw.iter().map(|r| r[b]));
-        if v.is_empty() { continue; }
+        if v.is_empty() {
+            continue;
+        }
 
         let k = (v.len() * 95 / 100).min(v.len() - 1);
         let (_, p, _) = v.select_nth_unstable(k);
@@ -72,7 +79,9 @@ fn band_references(raw: &[[u32; SPECTRUM_BANDS]]) -> [f32; SPECTRUM_BANDS] {
 }
 
 fn level_db(energy: u32, reference: f32) -> u8 {
-    if energy == 0 { return 1; }
+    if energy == 0 {
+        return 1;
+    }
 
     let db = 20.0 * (energy as f32 / reference).log10();
     let t = ((db + RANGE_DB) / RANGE_DB).clamp(0.0, 1.0);
@@ -81,19 +90,23 @@ fn level_db(energy: u32, reference: f32) -> u8 {
 
 pub fn compute_spectrum_frames(pcm: &[i16], channels: u16, sample_rate: u32) -> Vec<SpectrumFrame> {
     let raw = raw_energies(pcm, channels, sample_rate);
-    if raw.is_empty() { return Vec::new(); }
+    if raw.is_empty() {
+        return Vec::new();
+    }
 
     let refs = band_references(&raw);
 
     let mut prev: SpectrumFrame = [0u8; SPECTRUM_BANDS];
-    raw.iter().map(|r| {
-        let mut row: SpectrumFrame = [0u8; SPECTRUM_BANDS];
-        for b in 0..SPECTRUM_BANDS {
-            row[b] = level_db(r[b], refs[b]).max(prev[b].saturating_sub(FALL_PER_FRAME));
-        }
-        prev = row;
-        row
-    }).collect()
+    raw.iter()
+        .map(|r| {
+            let mut row: SpectrumFrame = [0u8; SPECTRUM_BANDS];
+            for b in 0..SPECTRUM_BANDS {
+                row[b] = level_db(r[b], refs[b]).max(prev[b].saturating_sub(FALL_PER_FRAME));
+            }
+            prev = row;
+            row
+        })
+        .collect()
 }
 #[cfg(test)]
 #[path = "spectrum_tests.rs"]

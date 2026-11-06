@@ -1,9 +1,9 @@
 mod app;
 mod artwork;
-mod hints;
-mod messages;
 mod audio_pipeline;
 mod bg_events;
+mod hints;
+mod messages;
 mod navigation;
 mod playback;
 mod player_footer;
@@ -12,21 +12,21 @@ mod player_status;
 mod tasks;
 mod ui;
 mod ui_dancer;
-mod ui_lists;
 mod ui_help;
+mod ui_lists;
 mod ui_lyrics;
 mod ui_player;
 
-use std::io;
-use std::time::Duration;
 use anyhow::{Context, Result};
+use calyx_core::SectionType;
 use crossterm::{
     event::{self, Event, KeyCode, KeyEventKind},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use calyx_core::SectionType;
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
+use std::io;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -48,8 +48,10 @@ async fn main() -> Result<()> {
     enable_raw_mode().context("Failed to enable raw mode")?;
     let res = match execute!(io::stdout(), EnterAlternateScreen)
         .context("Failed to enter alternate screen")
-        .and_then(|_| Terminal::new(CrosstermBackend::new(io::stdout())).context("Failed to create Ratatui terminal"))
-    {
+        .and_then(|_| {
+            Terminal::new(CrosstermBackend::new(io::stdout()))
+                .context("Failed to create Ratatui terminal")
+        }) {
         Ok(mut terminal) => run_event_loop(&mut terminal, &mut app),
         Err(e) => Err(e),
     };
@@ -90,7 +92,9 @@ fn run_event_loop(
         if !event::poll(Duration::from_millis(50))? {
             continue;
         }
-        let Event::Key(key_event) = event::read()? else { continue };
+        let Event::Key(key_event) = event::read()? else {
+            continue;
+        };
         if key_event.kind != KeyEventKind::Press {
             continue;
         }
@@ -102,7 +106,9 @@ fn run_event_loop(
                     app.start_search();
                 }
                 KeyCode::Esc => app.is_editing = false,
-                KeyCode::Backspace => { app.search_input.pop(); }
+                KeyCode::Backspace => {
+                    app.search_input.pop();
+                }
                 KeyCode::Char(c) => app.search_input.push(c),
                 _ => {}
             }
@@ -117,12 +123,24 @@ fn run_event_loop(
             KeyCode::Char('d') => app.remove_selected_from_queue(),
             KeyCode::Char('c') => app.clear_current_list(),
             KeyCode::Char('y') | KeyCode::Char('Y') => app.toggle_phonetic_mode(),
-            KeyCode::Char('s') => { app.toggle_shuffle(); }
-            KeyCode::Char('r') => { app.toggle_repeat(); }
+            KeyCode::Char('s') => {
+                app.toggle_shuffle();
+            }
+            KeyCode::Char('r') => {
+                app.toggle_repeat();
+            }
             KeyCode::Char('l') | KeyCode::Char('L') => app.toggle_language(),
             KeyCode::Char('1') => app.open_home(),
-            KeyCode::Char('2') => app.open_section(app::ActiveView::New, SectionType::NewReleases, messages::ListKind::NewReleases),
-            KeyCode::Char('3') => app.open_section(app::ActiveView::Radio, SectionType::Radio, messages::ListKind::Radio),
+            KeyCode::Char('2') => app.open_section(
+                app::ActiveView::New,
+                SectionType::NewReleases,
+                messages::ListKind::NewReleases,
+            ),
+            KeyCode::Char('3') => app.open_section(
+                app::ActiveView::Radio,
+                SectionType::Radio,
+                messages::ListKind::Radio,
+            ),
             KeyCode::Char('4') => app.sync_library(),
             KeyCode::Char('5') => app.sync_playlists(),
             KeyCode::Char('p') | KeyCode::Char('P') => app.play_all(),
@@ -135,7 +153,10 @@ fn run_event_loop(
             KeyCode::Tab => app.toggle_view(),
             KeyCode::Char('u') if !app.login_in_progress => {
                 let browser = calyx_core::browser_discovery::discover_browser();
-                app.status_message = if matches!(browser, Some(calyx_core::browser_discovery::BrowserType::WebKit(_))) {
+                app.status_message = if matches!(
+                    browser,
+                    Some(calyx_core::browser_discovery::BrowserType::WebKit(_))
+                ) {
                     app.language.msg_login_safari_alert().to_string()
                 } else {
                     app.language.msg_login_opening().to_string()

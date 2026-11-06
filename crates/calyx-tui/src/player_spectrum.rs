@@ -3,7 +3,7 @@
 //! Bars widen to fill the panel; below `NARROW_BELOW` columns the big play icon
 //! and the volume meter are dropped so the spectrum is never clipped.
 
-use calyx_core::{SpectrumFrame, SPECTRUM_BANDS};
+use calyx_core::{SPECTRUM_BANDS, SpectrumFrame};
 use ratatui::{
     style::{Color, Style},
     text::Span,
@@ -36,7 +36,11 @@ impl BarLayout {
         let side = if show_sides { SIDE_COLS } else { 0 };
         let gaps = gap * (SPECTRUM_BANDS as u16 - 1);
         let bar_w = (inner.saturating_sub(side + gaps) / SPECTRUM_BANDS as u16).clamp(1, MAX_BAR_W);
-        Self { bar_w, gap, show_sides }
+        Self {
+            bar_w,
+            gap,
+            show_sides,
+        }
     }
 
     /// Total columns used by the bars (including gaps).
@@ -55,18 +59,34 @@ pub fn lerp(c1: Color, c2: Color, t: f64) -> Color {
             let mix = |a: u8, b: u8| (a as f64 + (b as f64 - a as f64) * t).clamp(0.0, 255.0) as u8;
             Color::Rgb(mix(r1, r2), mix(g1, g2), mix(b1, b2))
         }
-        _ => if t > 0.5 { c2 } else { c1 },
+        _ => {
+            if t > 0.5 {
+                c2
+            } else {
+                c1
+            }
+        }
     }
 }
 
 /// One spectrum row (`r`: 0 = bottom, 2 = top). Played cells use `color`,
 /// pending cells a faint tint of it; `progress` is 0.0..=1.0.
-pub fn spectrum_row(spec: &SpectrumFrame, r: u8, color: Color, layout: BarLayout, progress: f64) -> Vec<Span<'static>> {
+pub fn spectrum_row(
+    spec: &SpectrumFrame,
+    r: u8,
+    color: Color,
+    layout: BarLayout,
+    progress: f64,
+) -> Vec<Span<'static>> {
     let pending = lerp(TRACK_BG, color, PENDING_MIX);
     let progress_cell = progress.clamp(0.0, 1.0) * layout.cells();
     let mut v = Vec::with_capacity(layout.bars_width() as usize);
     for (b, &val) in spec.iter().enumerate() {
-        let idx = if val == 0 && r == 0 { 1 } else { val.saturating_sub(r * 8).min(8) as usize };
+        let idx = if val == 0 && r == 0 {
+            1
+        } else {
+            val.saturating_sub(r * 8).min(8) as usize
+        };
         let glyph = BAR_GLYPHS[idx];
         for c in 0..layout.bar_w {
             let cell = (b as u16 * layout.bar_w + c) as f64;

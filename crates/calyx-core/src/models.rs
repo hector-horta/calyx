@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::error::{CalyxError, CalyxResult};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Track {
@@ -95,7 +95,10 @@ mod tests {
 
     #[test]
     fn same_song_ignores_suffixes() {
-        assert!(t("Digital Love (Remastered)", "Daft Punk").is_same_song(&t("Digital Love", "Daft Punk")));
+        assert!(
+            t("Digital Love (Remastered)", "Daft Punk")
+                .is_same_song(&t("Digital Love", "Daft Punk"))
+        );
     }
 
     #[test]
@@ -105,7 +108,10 @@ mod tests {
 
     #[test]
     fn featured_artist_still_matches() {
-        assert!(t("Get Lucky", "Daft Punk").is_same_song(&t("Get Lucky", "Daft Punk, Pharrell Williams")));
+        assert!(
+            t("Get Lucky", "Daft Punk")
+                .is_same_song(&t("Get Lucky", "Daft Punk, Pharrell Williams"))
+        );
     }
 
     #[test]

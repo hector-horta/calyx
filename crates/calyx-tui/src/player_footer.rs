@@ -1,11 +1,11 @@
 //! Footer line of the player: "up next" and the status message, which is
 //! only cut when it is wider than the whole panel.
 
+use crate::ui::truncate;
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
 };
-use crate::ui::truncate;
 
 const INFO: Style = Style::new().fg(Color::Rgb(120, 160, 160));
 const SEP: &str = "  │  ";
@@ -63,7 +63,9 @@ mod tests {
 
     #[test]
     fn without_status_shows_up_next() {
-        assert_eq!(text(&footer(Some("A continuación: X".to_string()), "", 80)), "A continuación: X");
+        assert_eq!(
+            text(&footer(Some("A continuación: X".to_string()), "", 80)),
+            "A continuación: X"
+        );
     }
-
 }

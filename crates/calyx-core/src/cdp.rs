@@ -1,20 +1,30 @@
 //! Minimal Chrome DevTools Protocol (CDP) WebSocket transport.
 
-use std::time::Duration;
 use serde::Deserialize;
+use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 /// A free loopback port for `--remote-debugging-port`, chosen per login so we
 /// never talk to (or close) a debugging browser that isn't ours.
 pub(crate) fn free_local_port() -> Option<u16> {
-    std::net::TcpListener::bind(("127.0.0.1", 0)).ok()?.local_addr().ok().map(|a| a.port())
+    std::net::TcpListener::bind(("127.0.0.1", 0))
+        .ok()?
+        .local_addr()
+        .ok()
+        .map(|a| a.port())
 }
 
 /// Port of a browser still running on *our* profile: Chromium writes it to
 /// `DevToolsActivePort` inside the user-data dir.
 pub(crate) fn profile_devtools_port(profile_dir: &std::path::Path) -> Option<u16> {
-    std::fs::read_to_string(profile_dir.join("DevToolsActivePort")).ok()?.lines().next()?.trim().parse().ok()
+    std::fs::read_to_string(profile_dir.join("DevToolsActivePort"))
+        .ok()?
+        .lines()
+        .next()?
+        .trim()
+        .parse()
+        .ok()
 }
 
 /// Splits `ws://127.0.0.1:<port><path>` into (port, path); loopback only.
@@ -118,8 +128,14 @@ mod tests {
 
     #[test]
     fn ws_url_must_be_loopback_with_port() {
-        assert_eq!(split_ws_url("ws://127.0.0.1:45123/devtools/page/AB"), Some((45123, "/devtools/page/AB")));
-        assert_eq!(split_ws_url("ws://evil.example:9222/devtools/page/AB"), None);
+        assert_eq!(
+            split_ws_url("ws://127.0.0.1:45123/devtools/page/AB"),
+            Some((45123, "/devtools/page/AB"))
+        );
+        assert_eq!(
+            split_ws_url("ws://evil.example:9222/devtools/page/AB"),
+            None
+        );
         assert_eq!(split_ws_url("ws://127.0.0.1:notaport/x"), None);
     }
 
@@ -134,7 +150,11 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         assert_eq!(profile_devtools_port(&dir), None);
-        std::fs::write(dir.join("DevToolsActivePort"), "51234\n/devtools/browser/x\n").unwrap();
+        std::fs::write(
+            dir.join("DevToolsActivePort"),
+            "51234\n/devtools/browser/x\n",
+        )
+        .unwrap();
         assert_eq!(profile_devtools_port(&dir), Some(51234));
         let _ = std::fs::remove_dir_all(&dir);
     }

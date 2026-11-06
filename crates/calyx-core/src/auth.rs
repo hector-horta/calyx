@@ -1,10 +1,10 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
-use tracing::info;
 use crate::drm::WidevineDeviceL3;
 use crate::error::{CalyxError, CalyxResult};
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+use tracing::info;
 
 /// Where versions before 0.1.7 kept the session (the current directory).
 const LEGACY_AUTH_FILE: &str = "calyx_auth.json";
@@ -72,12 +72,19 @@ impl SessionConfig {
     }
 
     pub fn is_logged_in(&self) -> bool {
-        self.media_user_token.as_ref().is_some_and(|t| !t.trim().is_empty())
+        self.media_user_token
+            .as_ref()
+            .is_some_and(|t| !t.trim().is_empty())
     }
 
     pub fn has_full_stream_credentials(&self) -> bool {
-        self.developer_token.as_ref().is_some_and(|t| !t.trim().is_empty())
-            && self.media_user_token.as_ref().is_some_and(|t| !t.trim().is_empty())
+        self.developer_token
+            .as_ref()
+            .is_some_and(|t| !t.trim().is_empty())
+            && self
+                .media_user_token
+                .as_ref()
+                .is_some_and(|t| !t.trim().is_empty())
     }
 
     pub fn resolve_wvd_path(&self) -> Option<PathBuf> {
@@ -93,9 +100,10 @@ impl SessionConfig {
     pub fn load_wvd_device(&self) -> CalyxResult<WidevineDeviceL3> {
         if let Some(path) = self.resolve_wvd_path()
             && let Ok(raw) = fs::read(&path)
-                && let Ok(dev) = WidevineDeviceL3::from_wvd_bytes(&raw) {
-                    return Ok(dev);
-                }
+            && let Ok(dev) = WidevineDeviceL3::from_wvd_bytes(&raw)
+        {
+            return Ok(dev);
+        }
         WidevineDeviceL3::builtin()
     }
 }
@@ -134,8 +142,9 @@ pub async fn fetch_apple_developer_token(http: &Client) -> CalyxResult<String> {
         .text()
         .await?;
 
-    let js_path = extract_js_bundle_path(&html)
-        .ok_or_else(|| CalyxError::Auth("Could not locate Apple Music JS bundle path in HTML".to_string()))?;
+    let js_path = extract_js_bundle_path(&html).ok_or_else(|| {
+        CalyxError::Auth("Could not locate Apple Music JS bundle path in HTML".to_string())
+    })?;
 
     let js_url = if js_path.starts_with("http") {
         js_path
@@ -144,8 +153,9 @@ pub async fn fetch_apple_developer_token(http: &Client) -> CalyxResult<String> {
     };
 
     let js_body = http.get(&js_url).send().await?.text().await?;
-    extract_jwt_from_bundle(&js_body)
-        .ok_or_else(|| CalyxError::Auth("Could not find ES256 Developer JWT in Apple Music bundle".to_string()))
+    extract_jwt_from_bundle(&js_body).ok_or_else(|| {
+        CalyxError::Auth("Could not find ES256 Developer JWT in Apple Music bundle".to_string())
+    })
 }
 
 pub fn extract_js_bundle_path(html: &str) -> Option<String> {
@@ -184,7 +194,8 @@ mod tests {
 
     #[test]
     fn test_extract_js_and_jwt() {
-        let sample_html = r#"<script type="module" crossorigin src="/assets/index-legacy-a1b2c3.js"></script>"#;
+        let sample_html =
+            r#"<script type="module" crossorigin src="/assets/index-legacy-a1b2c3.js"></script>"#;
         assert_eq!(
             extract_js_bundle_path(sample_html),
             Some("/assets/index-legacy-a1b2c3.js".to_string())

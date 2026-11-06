@@ -12,7 +12,9 @@ pub struct HlsStreamPlan {
 impl HlsStreamPlan {
     pub fn parse_m3u8(manifest_text: &str, base_url: &str) -> CalyxResult<Self> {
         if !manifest_text.contains("#EXTM3U") {
-            return Err(CalyxError::Validation("Invalid HLS manifest: missing #EXTM3U header".to_string()));
+            return Err(CalyxError::Validation(
+                "Invalid HLS manifest: missing #EXTM3U header".to_string(),
+            ));
         }
 
         let mut pssh: Option<PsshBox> = None;
@@ -88,7 +90,7 @@ fn resolve_relative_url(base_url: &str, target: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+    use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 
     #[test]
     fn test_parse_apple_hls_m3u8() {
@@ -108,8 +110,11 @@ mod tests {
             b64_pssh
         );
 
-        let plan = HlsStreamPlan::parse_m3u8(&m3u8, "https://aod-ssl.itunes.apple.com/streams/master.m3u8")
-            .expect("valid m3u8");
+        let plan = HlsStreamPlan::parse_m3u8(
+            &m3u8,
+            "https://aod-ssl.itunes.apple.com/streams/master.m3u8",
+        )
+        .expect("valid m3u8");
         assert!(plan.pssh.is_some());
         assert_eq!(
             plan.init_segment_url.as_deref(),
@@ -119,7 +124,11 @@ mod tests {
 
         let master = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=256000,CODECS=\"mp4a.40.2\"\naudio_256/prog_index.m3u8\n";
         assert_eq!(
-            HlsStreamPlan::extract_variant_url(master, "https://aod-ssl.itunes.apple.com/streams/master.m3u8").as_deref(),
+            HlsStreamPlan::extract_variant_url(
+                master,
+                "https://aod-ssl.itunes.apple.com/streams/master.m3u8"
+            )
+            .as_deref(),
             Some("https://aod-ssl.itunes.apple.com/streams/audio_256/prog_index.m3u8")
         );
     }

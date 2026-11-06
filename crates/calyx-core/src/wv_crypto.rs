@@ -1,8 +1,8 @@
 //! Pure-Rust Widevine L3 cryptographic primitives (RSA-2048 PSS/OAEP, SHA-1, AES-128-CMAC, Protobuf).
 
+use crate::error::{CalyxError, CalyxResult};
 use aes::Aes128;
 use aes::cipher::{BlockDecryptMut, BlockEncrypt, KeyInit, KeyIvInit, generic_array::GenericArray};
-use crate::error::{CalyxError, CalyxResult};
 
 type Aes128CbcDec = cbc::Decryptor<Aes128>;
 
@@ -10,7 +10,11 @@ pub fn parse_rsa2048_der(der: &[u8]) -> CalyxResult<([u8; 256], [u8; 256])> {
     if der.len() < 520 || der[0] != 0x30 {
         return Err(CalyxError::Drm("Invalid RSA DER header".to_string()));
     }
-    let pos = if der[1] & 0x80 != 0 { 2 + (der[1] & 0x7f) as usize } else { 2 };
+    let pos = if der[1] & 0x80 != 0 {
+        2 + (der[1] & 0x7f) as usize
+    } else {
+        2
+    };
     let (_ver, p1) = read_asn1_int(der, pos)?;
     let (n_slice, p2) = read_asn1_int(der, p1)?;
     let (_e, p3) = read_asn1_int(der, p2)?;
@@ -65,7 +69,12 @@ pub fn sha1(data: &[u8]) -> [u8; 20] {
     for chunk in padded.chunks_exact(64) {
         let mut w = [0u32; 80];
         for i in 0..16 {
-            w[i] = u32::from_be_bytes([chunk[i * 4], chunk[i * 4 + 1], chunk[i * 4 + 2], chunk[i * 4 + 3]]);
+            w[i] = u32::from_be_bytes([
+                chunk[i * 4],
+                chunk[i * 4 + 1],
+                chunk[i * 4 + 2],
+                chunk[i * 4 + 3],
+            ]);
         }
         for i in 16..80 {
             w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
@@ -78,7 +87,12 @@ pub fn sha1(data: &[u8]) -> [u8; 20] {
                 40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
                 _ => (b ^ c ^ d, 0xCA62C1D6),
             };
-            let temp = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(k).wrapping_add(wi);
+            let temp = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(wi);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -228,9 +242,10 @@ pub fn rsa_oaep_sha1_decrypt(ct: &[u8; 256], d: &[u8; 256], n: &[u8; 256]) -> Ca
     for (x, m) in db.iter_mut().zip(db_mask.iter()) {
         *x ^= *m;
     }
-    let sep = db[20..].iter().position(|&b| b == 0x01).ok_or_else(|| {
-        CalyxError::Drm("RSA-OAEP padding separator 0x01 not found".to_string())
-    })?;
+    let sep = db[20..]
+        .iter()
+        .position(|&b| b == 0x01)
+        .ok_or_else(|| CalyxError::Drm("RSA-OAEP padding separator 0x01 not found".to_string()))?;
     Ok(db[20 + sep + 1..].to_vec())
 }
 
@@ -240,7 +255,11 @@ pub fn aes128_cmac(key: &[u8; 16], data: &[u8]) -> [u8; 16] {
     cipher.encrypt_block(GenericArray::from_mut_slice(&mut l));
     let k1 = dbl_block(l);
     let k2 = dbl_block(k1);
-    let n_blocks = if data.is_empty() { 1 } else { data.len().div_ceil(16) };
+    let n_blocks = if data.is_empty() {
+        1
+    } else {
+        data.len().div_ceil(16)
+    };
     let complete = !data.is_empty() && data.len().is_multiple_of(16);
     let mut x = [0u8; 16];
     for i in 0..n_blocks {
@@ -285,9 +304,15 @@ fn dbl_block(b: [u8; 16]) -> [u8; 16] {
     out
 }
 
-pub fn decrypt_aes128_cbc_key(enc_key: &[u8; 16], iv: &[u8; 16], ct: &[u8]) -> CalyxResult<[u8; 16]> {
+pub fn decrypt_aes128_cbc_key(
+    enc_key: &[u8; 16],
+    iv: &[u8; 16],
+    ct: &[u8],
+) -> CalyxResult<[u8; 16]> {
     if ct.len() < 16 {
-        return Err(CalyxError::Drm("Encrypted content_key < 16 bytes".to_string()));
+        return Err(CalyxError::Drm(
+            "Encrypted content_key < 16 bytes".to_string(),
+        ));
     }
     let mut buf = [0u8; 16];
     buf.copy_from_slice(&ct[..16]);

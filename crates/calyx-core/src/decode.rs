@@ -1,17 +1,17 @@
 //! M4A/AAC/ALAC decoding to interleaved PCM, safe to run on a blocking thread.
 
+use crate::error::{CalyxError, CalyxResult};
+use crate::spectrum::{SpectrumFrame, compute_spectrum_frames};
 use std::io::Cursor;
 use symphonia::core::{
     audio::{SampleBuffer, SignalSpec},
-    codecs::{DecoderOptions, CODEC_TYPE_NULL},
+    codecs::{CODEC_TYPE_NULL, DecoderOptions},
     errors::Error as SymphoniaError,
     formats::FormatOptions,
     io::MediaSourceStream,
     meta::MetadataOptions,
     probe::Hint,
 };
-use crate::error::{CalyxError, CalyxResult};
-use crate::spectrum::{compute_spectrum_frames, SpectrumFrame};
 
 #[derive(Debug)]
 pub struct DecodedTrack {
@@ -24,7 +24,12 @@ pub struct DecodedTrack {
 pub fn decode_track(bytes: Vec<u8>) -> CalyxResult<DecodedTrack> {
     let (channels, sample_rate, pcm) = decode_m4a_to_pcm(bytes)?;
     let spectrum = compute_spectrum_frames(&pcm, channels, sample_rate);
-    Ok(DecodedTrack { channels, sample_rate, pcm, spectrum })
+    Ok(DecodedTrack {
+        channels,
+        sample_rate,
+        pcm,
+        spectrum,
+    })
 }
 
 thread_local! {
@@ -38,7 +43,9 @@ fn install_quiet_panic_hook() {
     ONCE.call_once(|| {
         let prev = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            if !SILENCE_PANICS.with(|s| s.get()) { prev(info); }
+            if !SILENCE_PANICS.with(|s| s.get()) {
+                prev(info);
+            }
         }));
     });
 }
@@ -53,16 +60,26 @@ fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
     hint.with_extension("m4a");
 
     let probed = symphonia::default::get_probe()
-        .format(&hint, mss, &FormatOptions::default(), &MetadataOptions::default())
+        .format(
+            &hint,
+            mss,
+            &FormatOptions::default(),
+            &MetadataOptions::default(),
+        )
         .map_err(|e| CalyxError::Audio(format!("MP4/M4A probe error: {e}")))?;
 
     let mut format = probed.format;
-    let track = format.tracks().iter()
+    let track = format
+        .tracks()
+        .iter()
         .find(|t| t.codec_params.codec != CODEC_TYPE_NULL)
-        .ok_or_else(|| CalyxError::Audio("No supported audio track in M4A container".to_string()))?;
+        .ok_or_else(|| {
+            CalyxError::Audio("No supported audio track in M4A container".to_string())
+        })?;
 
     let track_id = track.id;
-    let reserve = track.codec_params.n_frames.unwrap_or(0) as usize * track.codec_params.channels.map(|c| c.count()).unwrap_or(2);
+    let reserve = track.codec_params.n_frames.unwrap_or(0) as usize
+        * track.codec_params.channels.map(|c| c.count()).unwrap_or(2);
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &DecoderOptions::default())
         .map_err(|e| CalyxError::Audio(format!("AAC/ALAC codec init error: {e}")))?;
@@ -77,17 +94,32 @@ fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
     // RAII: restores the flag even if a panic escapes, since tokio reuses blocking threads.
     struct QuietGuard;
     impl Drop for QuietGuard {
-        fn drop(&mut self) { SILENCE_PANICS.with(|s| s.set(false)); }
+        fn drop(&mut self) {
+            SILENCE_PANICS.with(|s| s.set(false));
+        }
     }
     SILENCE_PANICS.with(|s| s.set(true));
     let quiet = QuietGuard;
 
     loop {
         let packet = match format.next_packet() {
-            Ok(p) => { consecutive_errs = 0; p }
+            Ok(p) => {
+                consecutive_errs = 0;
+                p
+            }
             Err(SymphoniaError::IoError(_)) => break,
-            Err(SymphoniaError::ResetRequired) => { decoder.reset(); continue; }
-            Err(_) => { consecutive_errs += 1; if consecutive_errs > 50 { break; } decoder.reset(); continue; }
+            Err(SymphoniaError::ResetRequired) => {
+                decoder.reset();
+                continue;
+            }
+            Err(_) => {
+                consecutive_errs += 1;
+                if consecutive_errs > 50 {
+                    break;
+                }
+                decoder.reset();
+                continue;
+            }
         };
 
         if packet.track_id() != track_id {
@@ -100,10 +132,15 @@ fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
                     let spec = *decoded.spec();
                     let cap = decoded.capacity() as u64;
                     let needs_new = match (&sample_buf, buf_spec) {
-                        (Some(sb), Some(s)) => s != spec || (sb.capacity() as u64) < cap * spec.channels.count() as u64,
+                        (Some(sb), Some(s)) => {
+                            s != spec || (sb.capacity() as u64) < cap * spec.channels.count() as u64
+                        }
                         _ => true,
                     };
-                    if needs_new { sample_buf = Some(SampleBuffer::<i16>::new(cap, spec)); buf_spec = Some(spec); }
+                    if needs_new {
+                        sample_buf = Some(SampleBuffer::<i16>::new(cap, spec));
+                        buf_spec = Some(spec);
+                    }
                     if let Some(sb) = sample_buf.as_mut() {
                         sb.copy_interleaved_ref(decoded);
                         pcm.extend_from_slice(sb.samples());
@@ -115,7 +152,10 @@ fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
         }));
 
         match res {
-            Ok(Some(spec)) => { channels = (spec.channels.count() as u16).max(1); sample_rate = spec.rate.max(8_000); }
+            Ok(Some(spec)) => {
+                channels = (spec.channels.count() as u16).max(1);
+                sample_rate = spec.rate.max(8_000);
+            }
             Ok(None) => {}
             Err(_) => decoder.reset(),
         }
@@ -124,7 +164,9 @@ fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
     drop(quiet);
 
     if pcm.is_empty() {
-        return Err(CalyxError::Audio("Decoded 0 PCM samples from stream".to_string()));
+        return Err(CalyxError::Audio(
+            "Decoded 0 PCM samples from stream".to_string(),
+        ));
     }
 
     Ok((channels, sample_rate, pcm))

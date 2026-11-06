@@ -12,7 +12,11 @@ impl LyricLine {
     pub fn new(time_ms: u64, text: impl Into<String>) -> Self {
         let text = text.into();
         let phonetic = crate::transliteration::transliterate(&text);
-        Self { time_ms, text, phonetic }
+        Self {
+            time_ms,
+            text,
+            phonetic,
+        }
     }
 }
 
@@ -20,21 +24,30 @@ pub fn parse_lrc(raw: &str) -> Vec<LyricLine> {
     let mut lines = Vec::new();
     for (idx, raw_line) in raw.lines().enumerate() {
         let s = raw_line.trim();
-        if s.is_empty() { continue; }
+        if s.is_empty() {
+            continue;
+        }
         if let Some(close) = s.find(']')
-            && s.starts_with('[') {
-                let tag = &s[1..close];
-                let text = s[close + 1..].trim();
-                if let Some((m_str, s_str)) = tag.split_once(':')
-                    && let (Ok(mins), Ok(secs)) = (m_str.parse::<u64>(), s_str.parse::<f64>()) {
-                        let time_ms = mins * 60_000 + (secs * 1000.0) as u64;
-                        let val = if text.is_empty() { "•••" } else { text };
-                        if val != "•••" || lines.last().map(|l: &LyricLine| l.text != "•••").unwrap_or(true) {
-                            lines.push(LyricLine::new(time_ms, val));
-                        }
-                        continue;
-                    }
+            && s.starts_with('[')
+        {
+            let tag = &s[1..close];
+            let text = s[close + 1..].trim();
+            if let Some((m_str, s_str)) = tag.split_once(':')
+                && let (Ok(mins), Ok(secs)) = (m_str.parse::<u64>(), s_str.parse::<f64>())
+            {
+                let time_ms = mins * 60_000 + (secs * 1000.0) as u64;
+                let val = if text.is_empty() { "•••" } else { text };
+                if val != "•••"
+                    || lines
+                        .last()
+                        .map(|l: &LyricLine| l.text != "•••")
+                        .unwrap_or(true)
+                {
+                    lines.push(LyricLine::new(time_ms, val));
+                }
+                continue;
             }
+        }
         lines.push(LyricLine::new(idx as u64 * 4000, s));
     }
     if lines.first().map(|l| l.time_ms >= 3000).unwrap_or(false) {
@@ -53,60 +66,103 @@ pub async fn fetch_track_lyrics(
 ) -> Vec<LyricLine> {
     // Apple Music fallback
     if let Some((dev_tok, usr_tok, stf, sid)) = apple_ctx
-        && let Some(lyrics) = crate::lyrics_ttml::fetch_apple_music_lyrics(http, dev_tok, usr_tok, stf, sid).await {
-            return lyrics;
-        }
+        && let Some(lyrics) =
+            crate::lyrics_ttml::fetch_apple_music_lyrics(http, dev_tok, usr_tok, stf, sid).await
+    {
+        return lyrics;
+    }
 
     // Clean title for search
-    let clean_title = title.split(['(', '[']).next().unwrap_or(title)
-        .split(" - ").next().unwrap_or(title).trim();
+    let clean_title = title
+        .split(['(', '['])
+        .next()
+        .unwrap_or(title)
+        .split(" - ")
+        .next()
+        .unwrap_or(title)
+        .trim();
 
     // Fallback to lrclib.net /api/get
-    if let Ok(resp) = http.get("https://lrclib.net/api/get")
+    if let Ok(resp) = http
+        .get("https://lrclib.net/api/get")
         .query(&[("artist_name", artist), ("track_name", clean_title)])
         .header("User-Agent", "Calyx/0.1.0")
         .timeout(std::time::Duration::from_secs(5))
-        .send().await
-        && let Ok(item) = resp.json::<Value>().await {
-            if let Some(synced) = item.get("syncedLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
-                let parsed = parse_lrc(synced);
-                if !parsed.is_empty() { return parsed; }
-            }
-            if let Some(plain) = item.get("plainLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
-                let parsed = parse_lrc(plain);
-                if !parsed.is_empty() { return parsed; }
+        .send()
+        .await
+        && let Ok(item) = resp.json::<Value>().await
+    {
+        if let Some(synced) = item
+            .get("syncedLyrics")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+        {
+            let parsed = parse_lrc(synced);
+            if !parsed.is_empty() {
+                return parsed;
             }
         }
+        if let Some(plain) = item
+            .get("plainLyrics")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+        {
+            let parsed = parse_lrc(plain);
+            if !parsed.is_empty() {
+                return parsed;
+            }
+        }
+    }
 
     // Fallback to lrclib.net /api/search
     let q = format!("{artist} {clean_title}");
-    if let Ok(resp) = http.get("https://lrclib.net/api/search")
+    if let Ok(resp) = http
+        .get("https://lrclib.net/api/search")
         .query(&[("q", &q)])
         .header("User-Agent", "Calyx/0.1.0")
         .timeout(std::time::Duration::from_secs(5))
-        .send().await
+        .send()
+        .await
         && let Ok(val) = resp.json::<Value>().await
-            && let Some(arr) = val.as_array() {
-                for item in arr {
-                    if let Some(synced) = item.get("syncedLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
-                        let parsed = parse_lrc(synced);
-                        if !parsed.is_empty() { return parsed; }
-                    }
-                }
-                for item in arr {
-                    if let Some(plain) = item.get("plainLyrics").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
-                        let parsed = parse_lrc(plain);
-                        if !parsed.is_empty() { return parsed; }
-                    }
+        && let Some(arr) = val.as_array()
+    {
+        for item in arr {
+            if let Some(synced) = item
+                .get("syncedLyrics")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+            {
+                let parsed = parse_lrc(synced);
+                if !parsed.is_empty() {
+                    return parsed;
                 }
             }
+        }
+        for item in arr {
+            if let Some(plain) = item
+                .get("plainLyrics")
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+            {
+                let parsed = parse_lrc(plain);
+                if !parsed.is_empty() {
+                    return parsed;
+                }
+            }
+        }
+    }
 
     // No lyrics anywhere: empty list; the UI shows its own "no lyrics" view.
     Vec::new()
 }
 
 impl LyricLine {
-    pub fn karaoke_parts(&self, cur_ms: u64, next_ms: u64, max_chars: usize) -> (String, String, String) {
+    pub fn karaoke_parts(
+        &self,
+        cur_ms: u64,
+        next_ms: u64,
+        max_chars: usize,
+    ) -> (String, String, String) {
         let gap = next_ms.saturating_sub(self.time_ms).max(1200);
         let elapsed = cur_ms.saturating_sub(self.time_ms);
         if self.text == "•••" {
@@ -151,7 +207,9 @@ impl LyricLine {
         }
 
         if ratio >= 1.0 && gap >= 4500 && cur_ms < next_ms {
-            let wait_total = next_ms.saturating_sub(self.time_ms + sing_dur as u64).max(1);
+            let wait_total = next_ms
+                .saturating_sub(self.time_ms + sing_dur as u64)
+                .max(1);
             let wait_elap = cur_ms.saturating_sub(self.time_ms + sing_dur as u64);
             let dots = match (wait_elap * 3) / wait_total {
                 0 => "  ● ○ ○",

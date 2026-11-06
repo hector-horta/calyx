@@ -43,25 +43,48 @@ pub trait StreamingBackend: Send + Sync + 'static {
     /// Whether a user session is available.
     fn is_logged_in(&self) -> bool;
     /// Catalog search.
-    fn search(&self, query: &str, limit: usize) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
+    fn search(
+        &self,
+        query: &str,
+        limit: usize,
+    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
     /// Curated section (home, new releases, radio).
-    fn fetch_section(&self, section: SectionType) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
+    fn fetch_section(
+        &self,
+        section: SectionType,
+    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
     /// Songs in the user's library.
-    fn fetch_user_library(&self) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
+    fn fetch_user_library(
+        &self,
+    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
     /// The user's playlists.
-    fn fetch_user_playlists(&self) -> impl std::future::Future<Output = CalyxResult<Vec<UserPlaylist>>> + Send;
+    fn fetch_user_playlists(
+        &self,
+    ) -> impl std::future::Future<Output = CalyxResult<Vec<UserPlaylist>>> + Send;
     /// Tracks of one playlist.
-    fn fetch_playlist_tracks(&self, playlist_id: &str) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
+    fn fetch_playlist_tracks(
+        &self,
+        playlist_id: &str,
+    ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
     /// Fills missing preview/artwork URLs from the catalog.
     fn complete_track(&self, track: Track) -> impl std::future::Future<Output = Track> + Send;
     /// Playable audio: cache, then full stream, then preview.
-    fn resolve_audio(&self, track: &Track) -> impl std::future::Future<Output = CalyxResult<ResolvedAudio>> + Send;
+    fn resolve_audio(
+        &self,
+        track: &Track,
+    ) -> impl std::future::Future<Output = CalyxResult<ResolvedAudio>> + Send;
     /// Caches the full stream ahead of time (best effort).
     fn prefetch_audio(&self, track: &Track) -> impl std::future::Future<Output = ()> + Send;
     /// Raw cover-art bytes.
-    fn fetch_artwork(&self, url: &str) -> impl std::future::Future<Output = CalyxResult<Vec<u8>>> + Send;
+    fn fetch_artwork(
+        &self,
+        url: &str,
+    ) -> impl std::future::Future<Output = CalyxResult<Vec<u8>>> + Send;
     /// Synced lyrics; empty when none exist.
-    fn fetch_lyrics(&self, track: &Track) -> impl std::future::Future<Output = Vec<LyricLine>> + Send;
+    fn fetch_lyrics(
+        &self,
+        track: &Track,
+    ) -> impl std::future::Future<Output = Vec<LyricLine>> + Send;
     /// Interactive login; persists the new session.
     fn login(&self) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
     /// Fetches the public developer token if the session has none.
@@ -80,16 +103,29 @@ pub struct AppleMusicBackend {
 impl AppleMusicBackend {
     pub fn new(session: SessionConfig, cache: AudioCache) -> CalyxResult<Self> {
         let mut client = AppleMusicClient::new(&session.storefront)?;
-        client.set_tokens(session.developer_token.clone(), session.media_user_token.clone());
-        Ok(Self { client: RwLock::new(client), session: RwLock::new(session), cache })
+        client.set_tokens(
+            session.developer_token.clone(),
+            session.media_user_token.clone(),
+        );
+        Ok(Self {
+            client: RwLock::new(client),
+            session: RwLock::new(session),
+            cache,
+        })
     }
 
     fn client(&self) -> AppleMusicClient {
-        self.client.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.client
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     fn session(&self) -> SessionConfig {
-        self.session.read().unwrap_or_else(|e| e.into_inner()).clone()
+        self.session
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Applies `f` to the session and persists it.
@@ -107,7 +143,11 @@ impl AppleMusicBackend {
     /// (developer token, user token, storefront) for the user-scoped endpoints.
     fn user_ctx(&self) -> (String, String, String) {
         let s = self.session();
-        (s.developer_token.unwrap_or_default(), s.media_user_token.unwrap_or_default(), s.storefront)
+        (
+            s.developer_token.unwrap_or_default(),
+            s.media_user_token.unwrap_or_default(),
+            s.storefront,
+        )
     }
 }
 
@@ -149,7 +189,14 @@ impl StreamingBackend for AppleMusicBackend {
 
     async fn fetch_user_library(&self) -> CalyxResult<Vec<Track>> {
         let (dev, usr, sf) = self.user_ctx();
-        crate::library::fetch_user_library_songs(self.client().http(), &dev, &usr, &sf, MAX_LIBRARY_SONGS).await
+        crate::library::fetch_user_library_songs(
+            self.client().http(),
+            &dev,
+            &usr,
+            &sf,
+            MAX_LIBRARY_SONGS,
+        )
+        .await
     }
 
     async fn fetch_user_playlists(&self) -> CalyxResult<Vec<UserPlaylist>> {
@@ -159,7 +206,15 @@ impl StreamingBackend for AppleMusicBackend {
 
     async fn fetch_playlist_tracks(&self, playlist_id: &str) -> CalyxResult<Vec<Track>> {
         let (dev, usr, sf) = self.user_ctx();
-        crate::library::fetch_playlist_tracks(self.client().http(), &dev, &usr, playlist_id, &sf, MAX_PLAYLIST_TRACKS).await
+        crate::library::fetch_playlist_tracks(
+            self.client().http(),
+            &dev,
+            &usr,
+            playlist_id,
+            &sf,
+            MAX_PLAYLIST_TRACKS,
+        )
+        .await
     }
 
     async fn complete_track(&self, track: Track) -> Track {
@@ -180,8 +235,19 @@ impl StreamingBackend for AppleMusicBackend {
 
     async fn fetch_lyrics(&self, track: &Track) -> Vec<LyricLine> {
         let (dev, usr, sf) = self.user_ctx();
-        let apple_ctx = (!dev.is_empty()).then_some((dev.as_str(), usr.as_str(), sf.as_str(), track.id.as_str()));
-        crate::lyrics::fetch_track_lyrics(self.client().http(), &track.title, &track.artist, apple_ctx).await
+        let apple_ctx = (!dev.is_empty()).then_some((
+            dev.as_str(),
+            usr.as_str(),
+            sf.as_str(),
+            track.id.as_str(),
+        ));
+        crate::lyrics::fetch_track_lyrics(
+            self.client().http(),
+            &track.title,
+            &track.artist,
+            apple_ctx,
+        )
+        .await
     }
 
     async fn login(&self) -> CalyxResult<()> {
@@ -200,7 +266,11 @@ impl StreamingBackend for AppleMusicBackend {
     }
 
     async fn ensure_developer_token(&self) -> CalyxResult<()> {
-        if self.session().developer_token.is_some_and(|t| !t.is_empty()) {
+        if self
+            .session()
+            .developer_token
+            .is_some_and(|t| !t.is_empty())
+        {
             return Ok(());
         }
         let mut client = self.client();
@@ -216,8 +286,15 @@ mod tests {
     use super::*;
 
     fn backend() -> AppleMusicBackend {
-        let session = SessionConfig { storefront: "us".to_string(), ..Default::default() };
-        AppleMusicBackend::new(session, AudioCache::with_dir(std::env::temp_dir().join("calyx_backend_test"), 1024)).unwrap()
+        let session = SessionConfig {
+            storefront: "us".to_string(),
+            ..Default::default()
+        };
+        AppleMusicBackend::new(
+            session,
+            AudioCache::with_dir(std::env::temp_dir().join("calyx_backend_test"), 1024),
+        )
+        .unwrap()
     }
 
     #[test]

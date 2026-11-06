@@ -1,7 +1,7 @@
-use aes::Aes128;
-use ctr::cipher::{KeyIvInit, StreamCipher};
 use crate::drm::CbcsDecryptor;
 use crate::error::{CalyxError, CalyxResult};
+use aes::Aes128;
+use ctr::cipher::{KeyIvInit, StreamCipher};
 
 type Aes128Ctr = ctr::Ctr128BE<Aes128>;
 
@@ -69,7 +69,10 @@ pub fn decrypt_apple_fmp4_stream(
     let mut decrypted_samples = 0usize;
     let mut idx = 0usize;
     while idx < boxes.len() {
-        if &boxes[idx].box_type == b"moof" && idx + 1 < boxes.len() && &boxes[idx + 1].box_type == b"mdat" {
+        if &boxes[idx].box_type == b"moof"
+            && idx + 1 < boxes.len()
+            && &boxes[idx + 1].box_type == b"mdat"
+        {
             let moof_slice = &stream[boxes[idx].offset..boxes[idx].offset + boxes[idx].size];
             let (_desc_index, sizes, ivs, all_subs) = parse_moof_cenc_meta(moof_slice);
             let key = track_key;
@@ -79,7 +82,9 @@ pub fn decrypt_apple_fmp4_stream(
                 let mdat = &mut stream[mdat_start..mdat_end];
                 let mut pos = 0usize;
                 for (s_idx, &sz) in sizes.iter().enumerate() {
-                    if sz == 0 || pos + sz > mdat.len() { break; }
+                    if sz == 0 || pos + sz > mdat.len() {
+                        break;
+                    }
                     let sample_start = pos;
                     let iv = ivs.get(s_idx).copied().unwrap_or([0u8; 16]);
                     let mut cipher = Aes128Ctr::new(key.into(), (&iv).into());
@@ -88,7 +93,10 @@ pub fn decrypt_apple_fmp4_stream(
                         for &(clear, prot) in subs {
                             sub_pos += clear as usize;
                             let p = prot as usize;
-                            if sub_pos + p <= mdat.len() { cipher.apply_keystream(&mut mdat[sub_pos..sub_pos + p]); sub_pos += p; }
+                            if sub_pos + p <= mdat.len() {
+                                cipher.apply_keystream(&mut mdat[sub_pos..sub_pos + p]);
+                                sub_pos += p;
+                            }
                         }
                     } else {
                         cipher.apply_keystream(&mut mdat[sample_start..sample_start + sz]);
@@ -124,32 +132,53 @@ fn parse_moof_cenc_meta(moof: &[u8]) -> CencMeta {
                 if &tb.box_type == b"tfhd" && payload.len() >= 8 {
                     let flags = u32::from_be_bytes([0, payload[1], payload[2], payload[3]]);
                     let mut off = 8usize;
-                    if flags & 0x01 != 0 { off += 8; }
+                    if flags & 0x01 != 0 {
+                        off += 8;
+                    }
                     if flags & 0x02 != 0 && off + 4 <= payload.len() {
-                        desc_index = u32::from_be_bytes(payload[off..off + 4].try_into().unwrap_or([0, 0, 0, 2]));
+                        desc_index = u32::from_be_bytes(
+                            payload[off..off + 4].try_into().unwrap_or([0, 0, 0, 2]),
+                        );
                         off += 4;
                     }
-                    if flags & 0x08 != 0 { off += 4; }
+                    if flags & 0x08 != 0 {
+                        off += 4;
+                    }
                     if flags & 0x10 != 0 && off + 4 <= payload.len() {
-                        default_size = u32::from_be_bytes(payload[off..off + 4].try_into().unwrap_or([0; 4])) as usize;
+                        default_size =
+                            u32::from_be_bytes(payload[off..off + 4].try_into().unwrap_or([0; 4]))
+                                as usize;
                     }
                 } else if &tb.box_type == b"trun" && payload.len() >= 8 {
                     let flags = u32::from_be_bytes([0, payload[1], payload[2], payload[3]]);
-                    let count = u32::from_be_bytes(payload[4..8].try_into().unwrap_or([0; 4])) as usize;
+                    let count =
+                        u32::from_be_bytes(payload[4..8].try_into().unwrap_or([0; 4])) as usize;
                     let mut off = 8usize;
-                    if flags & 0x01 != 0 { off += 4; }
-                    if flags & 0x04 != 0 { off += 4; }
+                    if flags & 0x01 != 0 {
+                        off += 4;
+                    }
+                    if flags & 0x04 != 0 {
+                        off += 4;
+                    }
                     for _ in 0..count.min(4096) {
-                        if flags & 0x100 != 0 { off += 4; }
+                        if flags & 0x100 != 0 {
+                            off += 4;
+                        }
                         let sz = if flags & 0x200 != 0 && off + 4 <= payload.len() {
-                            let v = u32::from_be_bytes(payload[off..off + 4].try_into().unwrap_or([0; 4])) as usize;
+                            let v = u32::from_be_bytes(
+                                payload[off..off + 4].try_into().unwrap_or([0; 4]),
+                            ) as usize;
                             off += 4;
                             v
                         } else {
                             default_size
                         };
-                        if flags & 0x400 != 0 { off += 4; }
-                        if flags & 0x800 != 0 { off += 4; }
+                        if flags & 0x400 != 0 {
+                            off += 4;
+                        }
+                        if flags & 0x800 != 0 {
+                            off += 4;
+                        }
                         sizes.push(sz);
                     }
                 } else if &tb.box_type == b"senc" {
@@ -161,30 +190,43 @@ fn parse_moof_cenc_meta(moof: &[u8]) -> CencMeta {
     let mut ivs = Vec::with_capacity(sizes.len());
     let mut all_subs = Vec::with_capacity(sizes.len());
     if let Some(senc) = raw_senc
-        && senc.len() >= 8 {
-            let flags = u32::from_be_bytes([0, senc[1], senc[2], senc[3]]);
-            let has_sub = (flags & 0x02) != 0;
-            let body = &senc[8..];
-            let mut off = 0usize;
-            for _ in 0..sizes.len() {
-                if off + 8 > body.len() { break; }
-                let mut iv = [0u8; 16];
-                iv[..8].copy_from_slice(&body[off..off + 8]);
-                ivs.push(iv);
-                off += 8;
-                let mut subs = Vec::new();
-                if has_sub && off + 2 <= body.len() {
-                    let sub_cnt = u16::from_be_bytes([body[off], body[off + 1]]) as usize;
-                    off += 2;
-                    for _ in 0..sub_cnt {
-                        if off + 6 > body.len() { break; }
-                        subs.push((u16::from_be_bytes([body[off], body[off + 1]]), u32::from_be_bytes([body[off + 2], body[off + 3], body[off + 4], body[off + 5]])));
-                        off += 6;
-                    }
-                }
-                all_subs.push(subs);
+        && senc.len() >= 8
+    {
+        let flags = u32::from_be_bytes([0, senc[1], senc[2], senc[3]]);
+        let has_sub = (flags & 0x02) != 0;
+        let body = &senc[8..];
+        let mut off = 0usize;
+        for _ in 0..sizes.len() {
+            if off + 8 > body.len() {
+                break;
             }
+            let mut iv = [0u8; 16];
+            iv[..8].copy_from_slice(&body[off..off + 8]);
+            ivs.push(iv);
+            off += 8;
+            let mut subs = Vec::new();
+            if has_sub && off + 2 <= body.len() {
+                let sub_cnt = u16::from_be_bytes([body[off], body[off + 1]]) as usize;
+                off += 2;
+                for _ in 0..sub_cnt {
+                    if off + 6 > body.len() {
+                        break;
+                    }
+                    subs.push((
+                        u16::from_be_bytes([body[off], body[off + 1]]),
+                        u32::from_be_bytes([
+                            body[off + 2],
+                            body[off + 3],
+                            body[off + 4],
+                            body[off + 5],
+                        ]),
+                    ));
+                    off += 6;
+                }
+            }
+            all_subs.push(subs);
         }
+    }
     (desc_index, sizes, ivs, all_subs)
 }
 
@@ -218,11 +260,19 @@ pub fn decrypt_fmp4_segment_in_place(
 }
 
 pub fn strip_enca_protection_atoms(buffer: &mut [u8]) {
-    let limit = buffer.windows(4).position(|w| w == b"mdat").unwrap_or(buffer.len());
-    if limit < 8 { return; }
+    let limit = buffer
+        .windows(4)
+        .position(|w| w == b"mdat")
+        .unwrap_or(buffer.len());
+    if limit < 8 {
+        return;
+    }
     for i in 0..limit.saturating_sub(4) {
-        if &buffer[i..i + 4] == b"enca" { buffer[i..i + 4].copy_from_slice(b"mp4a"); }
-        else if &buffer[i..i + 4] == b"sinf" || &buffer[i..i + 4] == b"senc" { buffer[i..i + 4].copy_from_slice(b"free"); }
+        if &buffer[i..i + 4] == b"enca" {
+            buffer[i..i + 4].copy_from_slice(b"mp4a");
+        } else if &buffer[i..i + 4] == b"sinf" || &buffer[i..i + 4] == b"senc" {
+            buffer[i..i + 4].copy_from_slice(b"free");
+        }
     }
 }
 
@@ -242,8 +292,8 @@ mod tests {
         fake_segment.extend_from_slice(&[0xAAu8; 16]);
 
         let decryptor = CbcsDecryptor::new([0x11; 16], [0x22; 16]);
-        let count = decrypt_fmp4_segment_in_place(&mut fake_segment, &decryptor)
-            .expect("decrypt segment");
+        let count =
+            decrypt_fmp4_segment_in_place(&mut fake_segment, &decryptor).expect("decrypt segment");
         assert_eq!(count, 1);
         assert_eq!(&fake_segment[12..16], b"mp4a");
         assert_ne!(&fake_segment[24..40], &[0xAAu8; 16]);
