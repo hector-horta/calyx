@@ -66,6 +66,11 @@ pub trait StreamingBackend: Send + Sync + 'static {
         &self,
         playlist_id: &str,
     ) -> impl std::future::Future<Output = CalyxResult<Vec<Track>>> + Send;
+    /// Name and songs of the album `track` belongs to.
+    fn fetch_album_of(
+        &self,
+        track: &Track,
+    ) -> impl std::future::Future<Output = CalyxResult<(String, Vec<Track>)>> + Send;
     /// Fills missing preview/artwork URLs from the catalog.
     fn complete_track(&self, track: Track) -> impl std::future::Future<Output = Track> + Send;
     /// Playable audio: cache, then full stream, then preview.
@@ -217,6 +222,10 @@ impl StreamingBackend for AppleMusicBackend {
         .await
     }
 
+    async fn fetch_album_of(&self, track: &Track) -> CalyxResult<(String, Vec<Track>)> {
+        crate::catalog_album::fetch_album_of(&self.client(), track).await
+    }
+
     async fn complete_track(&self, track: Track) -> Track {
         stream_resolver::complete_track(&self.client(), track).await
     }
@@ -282,38 +291,5 @@ impl StreamingBackend for AppleMusicBackend {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn backend() -> AppleMusicBackend {
-        let session = SessionConfig {
-            storefront: "us".to_string(),
-            ..Default::default()
-        };
-        AppleMusicBackend::new(
-            session,
-            AudioCache::with_dir(std::env::temp_dir().join("calyx_backend_test"), 1024),
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn test_apple_music_backend_metadata() {
-        let backend = backend();
-        assert_eq!(backend.service_name(), "Apple Music");
-        assert!(!backend.is_logged_in());
-    }
-
-    #[test]
-    fn new_releases_query_uses_a_plausible_year() {
-        let q = new_releases_query();
-        let year: u64 = q.trim_start_matches("top hits ").parse().unwrap();
-        assert!((2024..2100).contains(&year), "{q}");
-    }
-
-    #[test]
-    fn backend_is_shareable_across_tasks() {
-        fn assert_send_sync<T: Send + Sync + 'static>() {}
-        assert_send_sync::<AppleMusicBackend>();
-    }
-}
+#[path = "backend_tests.rs"]
+mod tests;

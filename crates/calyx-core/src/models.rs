@@ -13,6 +13,9 @@ pub struct Track {
     pub artwork_url: Option<String>,
     pub hls_manifest_url: Option<String>,
     pub is_lossless: bool,
+    /// Catalog album id, when known (opens the album the song belongs to).
+    #[serde(default)]
+    pub album_id: Option<String>,
 }
 
 impl Track {
@@ -90,6 +93,7 @@ mod tests {
             artwork_url: None,
             hls_manifest_url: None,
             is_lossless: false,
+            album_id: None,
         }
     }
 

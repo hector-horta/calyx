@@ -176,6 +176,7 @@ mod tests {
             artwork_url: None,
             hls_manifest_url: alt.map(str::to_string),
             is_lossless: false,
+            album_id: None,
         }
     }
 

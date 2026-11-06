@@ -27,6 +27,14 @@ impl ListKind {
     }
 }
 
+/// Bottom-bar label of the 'o' key.
+pub fn album_label(lang: Language) -> &'static str {
+    match lang {
+        Language::Es => "Álbum",
+        Language::En => "Album",
+    }
+}
+
 pub enum Msg<'a> {
     Enqueued { artist: &'a str, title: &'a str },
     EnqueuedNext { artist: &'a str, title: &'a str },
@@ -50,6 +58,11 @@ pub enum Msg<'a> {
     PlaylistError { name: &'a str, err: &'a str },
     PlayingPlaylist { name: &'a str, count: usize },
     PlaylistPlayFailed(&'a str),
+    LoadingAlbum(&'a str),
+    AlbumOpened { name: &'a str, count: usize },
+    AlbumError(&'a str),
+    AlbumEmpty(&'a str),
+    ListEnqueued(usize),
     LoginOk,
     LoginError(&'a str),
     HelpOpened,
@@ -157,6 +170,20 @@ impl Msg<'_> {
                 format!("No se pudo reproducir la playlist '{name}'.")
             }
             (Msg::PlaylistPlayFailed(name), En) => format!("Could not play playlist '{name}'."),
+            (Msg::LoadingAlbum(title), Es) => format!("⏳ Cargando el álbum de '{title}'..."),
+            (Msg::LoadingAlbum(title), En) => format!("⏳ Loading the album of '{title}'..."),
+            (Msg::AlbumOpened { name, count }, Es) => {
+                format!("Álbum '{name}' ({count} canciones): 'p' lo reproduce, 'A' lo encola.")
+            }
+            (Msg::AlbumOpened { name, count }, En) => {
+                format!("Album '{name}' ({count} songs): 'p' plays it, 'A' enqueues it.")
+            }
+            (Msg::AlbumError(err), Es) => format!("No se pudo abrir el álbum: {err}"),
+            (Msg::AlbumError(err), En) => format!("Could not open the album: {err}"),
+            (Msg::AlbumEmpty(name), Es) => format!("El álbum '{name}' no tiene canciones."),
+            (Msg::AlbumEmpty(name), En) => format!("Album '{name}' has no songs."),
+            (Msg::ListEnqueued(n), Es) => format!("{n} canciones encoladas al final."),
+            (Msg::ListEnqueued(n), En) => format!("{n} songs added to the end of the queue."),
             (Msg::LoginOk, Es) => "Sesión de Apple Music verificada.".to_string(),
             (Msg::LoginOk, En) => "Apple Music session verified.".to_string(),
             (Msg::LoginError(err), Es) => format!("Error de login en Apple: {err}"),
@@ -209,6 +236,23 @@ mod tests {
             msg.text(Language::En)
                 .starts_with("Playlist 'Mix' loaded (3 songs)")
         );
+    }
+
+    #[test]
+    fn album_messages_name_the_keys() {
+        let msg = Msg::AlbumOpened {
+            name: "Let's Dance",
+            count: 8,
+        };
+        assert!(
+            msg.text(Language::Es)
+                .contains("'p' lo reproduce, 'A' lo encola")
+        );
+        assert!(
+            msg.text(Language::En)
+                .contains("'p' plays it, 'A' enqueues it")
+        );
+        assert_eq!(album_label(Language::Es), "Álbum");
     }
 
     #[test]

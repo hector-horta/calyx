@@ -120,6 +120,8 @@ fn run_event_loop(
             KeyCode::Char('q') => app.should_quit = true,
             KeyCode::Char('/') => app.is_editing = true,
             KeyCode::Char('a') => app.enqueue_selected_back(),
+            KeyCode::Char('A') => app.enqueue_visible_list(),
+            KeyCode::Char('o') => app.open_selected_album(),
             KeyCode::Char('n') => app.enqueue_selected_next(),
             KeyCode::Char('d') => app.remove_selected_from_queue(),
             KeyCode::Char('c') => app.clear_current_list(),
