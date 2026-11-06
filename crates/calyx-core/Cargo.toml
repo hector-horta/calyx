@@ -22,3 +22,4 @@ sha2 = { workspace = true }
 rodio = { workspace = true }
 symphonia = { workspace = true }
 kakasi = "0.1.0"
+dirs = { workspace = true }

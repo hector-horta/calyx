@@ -14,7 +14,11 @@ impl CatalogStore {
         Ok(Self { conn })
     }
 
-    pub fn open_path(path: &str) -> CalyxResult<Self> {
+    pub fn open_path(path: impl AsRef<std::path::Path>) -> CalyxResult<Self> {
+        let path = path.as_ref();
+        if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+            let _ = std::fs::create_dir_all(dir);
+        }
         let conn = Connection::open(path)?;
         Self::configure_database(&conn)?;
         Ok(Self { conn })

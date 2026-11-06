@@ -12,8 +12,7 @@ pub struct AudioCache {
 
 impl AudioCache {
     pub fn default_dir() -> PathBuf {
-        let home = std::env::var("USERPROFILE").unwrap_or_else(|_| std::env::var("HOME").unwrap());
-        PathBuf::from(&format!("{}/.cache/calyx/audio", home))
+        crate::paths::audio_cache_dir()
     }
 
     pub fn new(max_bytes: u64) -> Self {

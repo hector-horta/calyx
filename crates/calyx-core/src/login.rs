@@ -3,7 +3,7 @@ use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use reqwest::Client;
 use tracing::info;
-use crate::cdp::{send_cdp_command, CdpTarget, CDP_PORT};
+use crate::cdp::{free_local_port, profile_devtools_port, send_cdp_command, CdpTarget};
 use crate::error::{CalyxError, CalyxResult};
 
 pub fn find_browser_executable() -> CalyxResult<PathBuf> {
@@ -17,8 +17,10 @@ pub fn find_browser_executable() -> CalyxResult<PathBuf> {
     }
 }
 
+/// Login browser profile (Apple ID cookies): in calyx's own data dir, not the
+/// shared temp folder.
 pub fn calyx_browser_profile_dir() -> PathBuf {
-    std::env::temp_dir().join("calyx_apple_auth_profile")
+    crate::paths::browser_profile_dir()
 }
 
 pub struct LoginBrowserGuard {
@@ -76,23 +78,34 @@ pub async fn interactive_apple_login(
     let profile_dir = calyx_browser_profile_dir();
     let _ = std::fs::create_dir_all(&profile_dir);
 
-    let targets_url = format!("http://127.0.0.1:{CDP_PORT}/json");
-    if let Ok(resp) = http.get(&targets_url).send().await {
-        if let Ok(targets) = resp.json::<Vec<CdpTarget>>().await {
-            for t in targets {
-                if let Some(ws) = t.ws_url.as_deref() {
-                    let _ = send_cdp_command(ws, r#"{"id":99,"method":"Browser.close"}"#).await;
+    // A window left over on *our* profile would keep the profile locked, so
+    // close it. Only that browser: its port comes from our own profile dir.
+    if let Some(old_port) = profile_devtools_port(&profile_dir) {
+        let old_targets = format!("http://127.0.0.1:{old_port}/json");
+        if let Ok(resp) = http.get(&old_targets).send().await {
+            if let Ok(targets) = resp.json::<Vec<CdpTarget>>().await {
+                // The port file may be stale (another program could own the
+                // port now): only close our own login window, on apple.com.
+                let ours = targets.iter().filter(|t| t.url.as_deref().is_some_and(|u| u.starts_with("https://music.apple.com")));
+                for t in ours {
+                    if let Some(ws) = t.ws_url.as_deref() {
+                        let _ = send_cdp_command(ws, r#"{"id":99,"method":"Browser.close"}"#).await;
+                    }
                 }
+                tokio::time::sleep(Duration::from_millis(600)).await;
             }
-            tokio::time::sleep(Duration::from_millis(600)).await;
         }
     }
+
+    let port = free_local_port()
+        .ok_or_else(|| CalyxError::Auth("No hay un puerto local libre para la ventana de login.".to_string()))?;
+    let targets_url = format!("http://127.0.0.1:{port}/json");
 
     let sf = if storefront.len() == 2 { storefront } else { "us" };
     let login_url = format!("https://music.apple.com/{sf}/browse");
     info!("Abriendo ventana de inicio de sesión Apple Music: {}", login_url);
 
-    let mut child = spawn_app_window(&browser_bin, &profile_dir, &login_url)?;
+    let mut child = spawn_app_window(&browser_bin, &profile_dir, &login_url, port)?;
     let mut cdp_was_online = false;
     let mut rejected: Option<String> = None;
 
@@ -155,12 +168,13 @@ pub async fn token_is_live(http: &Client, dev_token: &str, user_token: &str) -> 
         .unwrap_or(false)
 }
 
-fn spawn_app_window(bin: &PathBuf, profile_dir: &PathBuf, url: &str) -> CalyxResult<Child> {
+fn spawn_app_window(bin: &PathBuf, profile_dir: &PathBuf, url: &str, port: u16) -> CalyxResult<Child> {
     Command::new(bin)
         .arg(format!("--app={url}"))
         .arg(format!("--user-data-dir={}", profile_dir.display()))
-        .arg(format!("--remote-debugging-port={CDP_PORT}"))
-        .arg("--remote-allow-origins=*")
+        // Loopback-only, per-login port. No --remote-allow-origins: our CDP
+        // client sends no Origin header, so web pages cannot attach.
+        .arg(format!("--remote-debugging-port={port}"))
         .arg("--window-size=520,700")
         .arg("--no-first-run")
         .arg("--no-default-browser-check")

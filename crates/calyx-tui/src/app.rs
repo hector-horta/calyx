@@ -74,7 +74,14 @@ impl TuiApp {
     pub fn new(storefront: &str) -> CalyxResult<Self> {
         let session = SessionConfig::load_or_default(storefront);
         let language = session.language.unwrap_or_else(calyx_core::Language::detect_system);
-        let store = CatalogStore::open_path("calyx_cache.db")?;
+        let db_path = calyx_core::paths::catalog_db();
+        // Versions before 0.1.7 kept the history next to where calyx was launched.
+        // The WAL is only copied together with its own database file.
+        if calyx_core::paths::adopt_legacy_file(std::path::Path::new("calyx_cache.db"), &db_path) {
+            let wal = std::path::PathBuf::from(format!("{}-wal", db_path.display()));
+            calyx_core::paths::adopt_legacy_file(std::path::Path::new("calyx_cache.db-wal"), &wal);
+        }
+        let store = CatalogStore::open_path(&db_path)?;
         let cached = store.search_tracks("", 50).unwrap_or_default();
         let mut list_state = ListState::default();
         list_state.select(Some(0));

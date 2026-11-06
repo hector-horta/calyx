@@ -30,4 +30,5 @@ rodio = { version = "0.20", default-features = false, features = ["symphonia-all
 ratatui = "0.29"
 crossterm = "0.28"
 symphonia = { version = "0.5", features = ["all"] }
+dirs = "6"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
