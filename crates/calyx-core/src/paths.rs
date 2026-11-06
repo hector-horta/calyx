@@ -17,7 +17,9 @@ fn locate(override_root: Option<PathBuf>, platform: Option<PathBuf>, sub: &str) 
 }
 
 fn home_override() -> Option<PathBuf> {
-    std::env::var_os("CALYX_HOME").filter(|v| !v.is_empty()).map(PathBuf::from)
+    std::env::var_os("CALYX_HOME")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 /// Session and credentials: `%APPDATA%\calyx`, `~/Library/Application Support/calyx`, `~/.config/calyx`.
@@ -34,7 +36,11 @@ pub fn data_dir() -> PathBuf {
 pub fn audio_cache_dir() -> PathBuf {
     match home_override() {
         Some(root) => root.join("cache").join("audio"),
-        None => dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")).join(".cache").join(APP).join("audio"),
+        None => dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".cache")
+            .join(APP)
+            .join("audio"),
     }
 }
 
@@ -70,13 +76,20 @@ mod tests {
 
     #[test]
     fn override_wins_over_platform() {
-        let p = locate(Some(PathBuf::from("/portable")), Some(PathBuf::from("/xdg")), "config");
+        let p = locate(
+            Some(PathBuf::from("/portable")),
+            Some(PathBuf::from("/xdg")),
+            "config",
+        );
         assert_eq!(p, PathBuf::from("/portable").join("config"));
     }
 
     #[test]
     fn platform_dir_gets_app_subfolder() {
-        assert_eq!(locate(None, Some(PathBuf::from("/xdg")), "config"), PathBuf::from("/xdg").join("calyx"));
+        assert_eq!(
+            locate(None, Some(PathBuf::from("/xdg")), "config"),
+            PathBuf::from("/xdg").join("calyx")
+        );
         assert_eq!(locate(None, None, "config"), PathBuf::from("."));
     }
 

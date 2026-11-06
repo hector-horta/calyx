@@ -1,6 +1,6 @@
-use std::collections::VecDeque;
-use serde::{Deserialize, Serialize};
 use crate::models::Track;
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum RepeatMode {
@@ -16,14 +16,6 @@ impl RepeatMode {
             Self::Off => Self::All,
             Self::All => Self::One,
             Self::One => Self::Off,
-        }
-    }
-
-    pub fn badge(&self) -> &'static str {
-        match self {
-            Self::Off => "🔁  OFF",
-            Self::All => "🔁  ALL",
-            Self::One => "🔂  ONE",
         }
     }
 }
@@ -69,10 +61,11 @@ impl PlaybackQueue {
     }
 
     fn advance(&mut self, current: Option<Track>, honor_repeat_one: bool) -> Option<Track> {
-        if honor_repeat_one && self.repeat_mode == RepeatMode::One {
-            if let Some(c) = current {
-                return Some(c);
-            }
+        if honor_repeat_one
+            && self.repeat_mode == RepeatMode::One
+            && let Some(c) = current
+        {
+            return Some(c);
         }
 
         if let Some(c) = current {

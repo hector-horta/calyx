@@ -1,21 +1,25 @@
+use crate::app::TuiApp;
 use ratatui::{
+    Frame,
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
-use crate::app::TuiApp;
 
 pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
-    if text.is_empty() || max_width < 2 { return vec![text.to_string()] }
+    if text.is_empty() || max_width < 2 {
+        return vec![text.to_string()];
+    }
     let mut lines = Vec::new();
     let mut current_line = String::with_capacity(max_width);
     let mut words = text.split_whitespace();
 
     for word in words.by_ref() {
         if current_line.is_empty() || current_line.len() + 1 + word.len() <= max_width {
-            if !current_line.is_empty() { current_line.push(' '); }
+            if !current_line.is_empty() {
+                current_line.push(' ');
+            }
             current_line.push_str(word);
         } else {
             lines.push(current_line);
@@ -23,7 +27,9 @@ pub fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
         }
     }
 
-    if !current_line.is_empty() { lines.push(current_line) }
+    if !current_line.is_empty() {
+        lines.push(current_line)
+    }
     lines
 }
 
@@ -32,23 +38,24 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         Line::from(""),
         Line::from(Span::styled(
             app.language.no_lyrics(),
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(Color::DarkGray),
         )),
     ];
 
     if app.current_lyrics.is_empty() {
         // A track is loaded but has no lyrics: dance instead of an empty pane.
         let active = app.current_track.is_some()
-            && !matches!(app.playback_status(), calyx_core::models::PlaybackStatus::Stopped);
+            && !matches!(
+                app.playback_status(),
+                calyx_core::models::PlaybackStatus::Stopped
+            );
         if active && crate::ui_dancer::fits(area) {
             crate::ui_dancer::render_dancer(frame, area, app);
             return;
         }
         frame.render_widget(
-            Paragraph::new(empty_lines).block(Block::default()
-                .borders(Borders::LEFT)
-            ),
-            area
+            Paragraph::new(empty_lines).block(Block::default().borders(Borders::LEFT)),
+            area,
         );
         return;
     }
@@ -57,7 +64,9 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let cur_ms = elap.as_millis() as u64;
     let tot_ms = (tot.as_millis() as u64).max(cur_ms + 4000);
     let max_w = (area.width as usize).saturating_sub(6).max(10);
-    let active_idx = app.current_lyrics.iter()
+    let active_idx = app
+        .current_lyrics
+        .iter()
         .rposition(|l| l.time_ms <= cur_ms)
         .unwrap_or(0);
 
@@ -69,7 +78,13 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
                 let b = (b1 as f64 + (b2 as f64 - b1 as f64) * t).clamp(0.0, 255.0) as u8;
                 Color::Rgb(r, g, b)
             }
-            _ => if t > 0.5 { c2 } else { c1 },
+            _ => {
+                if t > 0.5 {
+                    c2
+                } else {
+                    c1
+                }
+            }
         }
     };
 
@@ -77,7 +92,11 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let mut active_visual_idx = 0;
     for (idx, line) in app.current_lyrics.iter().enumerate() {
         if idx == active_idx {
-            let next_ms = app.current_lyrics.get(idx + 1).map(|n| n.time_ms).unwrap_or(tot_ms);
+            let next_ms = app
+                .current_lyrics
+                .get(idx + 1)
+                .map(|n| n.time_ms)
+                .unwrap_or(tot_ms);
             let gap = next_ms.saturating_sub(line.time_ms).max(1200);
             let elapsed = cur_ms.saturating_sub(line.time_ms);
             let sing_dur = ((gap as f64) * 0.88).clamp(800.0, 6000.0);
@@ -93,9 +112,16 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
 
             let mut global_char_idx = 0usize;
             for (c_idx, chunk) in chunks.into_iter().enumerate() {
-                if c_idx == 0 { active_visual_idx = visual_lines.len(); }
+                if c_idx == 0 {
+                    active_visual_idx = visual_lines.len();
+                }
                 let mut spans = vec![if c_idx == 0 {
-                    Span::styled(" ♪ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD))
+                    Span::styled(
+                        " ♪ ",
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    )
                 } else {
                     Span::raw("   ")
                 }];
@@ -120,13 +146,13 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
                 global_char_idx += 1;
                 visual_lines.push(Line::from(spans));
             }
-            if app.phonetic_mode == crate::app::PhoneticMode::Dual {
-                if let Some(phonetic) = &line.phonetic {
-                    visual_lines.push(Line::from(vec![
-                        Span::raw("   "),
-                        Span::styled(format!("⤷ {phonetic}"), Style::default().fg(Color::Yellow)),
-                    ]));
-                }
+            if app.phonetic_mode == crate::app::PhoneticMode::Dual
+                && let Some(phonetic) = &line.phonetic
+            {
+                visual_lines.push(Line::from(vec![
+                    Span::raw("   "),
+                    Span::styled(format!("⤷ {phonetic}"), Style::default().fg(Color::Yellow)),
+                ]));
             }
         } else {
             let text = if app.phonetic_mode == crate::app::PhoneticMode::Phonetic {
@@ -148,10 +174,7 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let start = active_visual_idx.saturating_sub(height / 2);
     let visible: Vec<Line<'static>> = visual_lines.into_iter().skip(start).take(height).collect();
     frame.render_widget(
-        Paragraph::new(visible)
-            .block(Block::default()
-                .borders(Borders::LEFT)
-                ),
+        Paragraph::new(visible).block(Block::default().borders(Borders::LEFT)),
         area,
     );
 }

@@ -7,6 +7,6 @@ impl TuiApp {
         self.selected_index = 0;
         self.list_state.select(Some(0));
         self.active_view = ActiveView::Home;
-        self.status_message = "1 — Recientes: Historial de búsquedas ('/').".to_string();
+        self.say(crate::messages::Msg::RecentOpened);
     }
 }

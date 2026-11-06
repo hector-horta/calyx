@@ -1,20 +1,32 @@
 //! Playback control. How audio is obtained (cache, DRM stream, preview) lives
 //! behind the streaming facade; this module only schedules it.
 
-use calyx_core::{StreamingBackend, Track};
 use crate::app::{ActiveView, TuiApp};
 use crate::artwork::TerminalCoverArt;
 use crate::bg_events::BgEvent;
+use crate::messages::Msg;
+use calyx_core::{StreamingBackend, Track};
 
 impl TuiApp {
     pub fn play_track(&mut self, track: Track) {
-        if let Some(old) = self.play_task.take() { old.abort(); }
+        if let Some(old) = self.play_task.take() {
+            old.abort();
+        }
         self.audio.stop();
-        let seed = format!("{}:{}:{}:{}", track.id, track.artist, track.album, track.title);
+        let seed = format!(
+            "{}:{}:{}:{}",
+            track.id, track.artist, track.album, track.title
+        );
         self.current_artwork = Some(TerminalCoverArt::from_jpeg_or_seed(None, &seed));
-        self.current_lyrics = vec![calyx_core::LyricLine::new(0, "⏳ Sincronizando letra...")];
+        self.current_lyrics = vec![calyx_core::LyricLine::new(
+            0,
+            Msg::SyncingLyrics.text(self.language),
+        )];
         self.current_track = Some(track.clone());
-        self.status_message = format!("⏳ Cargando audio en 2do plano: {} — {}...", track.artist, track.title);
+        self.say(Msg::LoadingAudio {
+            artist: &track.artist,
+            title: &track.title,
+        });
 
         let (backend, tx) = (self.backend.clone(), self.bg_tx.clone());
         self.play_task = Some(tokio::spawn(async move {
@@ -23,12 +35,20 @@ impl TuiApp {
                 let (backend, tx, id) = (backend.clone(), tx.clone(), track.id.clone());
                 tokio::spawn(async move {
                     if let Ok(bytes) = backend.fetch_artwork(&url).await {
-                        let _ = tx.send(BgEvent::ArtworkReady(id, TerminalCoverArt::from_jpeg_or_seed(Some(&bytes), &seed)));
+                        let _ = tx.send(BgEvent::ArtworkReady(
+                            id,
+                            TerminalCoverArt::from_jpeg_or_seed(Some(&bytes), &seed),
+                        ));
                     }
                 });
             }
-            let (audio, lyrics) = tokio::join!(backend.resolve_audio(&track), backend.fetch_lyrics(&track));
-            let _ = tx.send(BgEvent::AudioReady(track, audio.map_err(|e| e.to_string()), lyrics));
+            let (audio, lyrics) =
+                tokio::join!(backend.resolve_audio(&track), backend.fetch_lyrics(&track));
+            let _ = tx.send(BgEvent::AudioReady(
+                track,
+                audio.map_err(|e| e.to_string()),
+                lyrics,
+            ));
         }));
     }
 
@@ -62,7 +82,9 @@ impl TuiApp {
     }
 
     pub fn check_auto_advance(&mut self) {
-        if self.audio.is_finished() { self.play_next(); }
+        if self.audio.is_finished() {
+            self.play_next();
+        }
     }
 
     /// 'p': play the selected playlist, or the visible list from the selection on.
@@ -76,15 +98,20 @@ impl TuiApp {
         }
         self.queue.clear();
         let start = self.selected_index.min(self.tracks.len() - 1);
-        for t in self.tracks[start..].iter().chain(self.tracks[..start].iter()) {
+        for t in self.tracks[start..]
+            .iter()
+            .chain(self.tracks[..start].iter())
+        {
             self.queue.enqueue_back(t.clone());
         }
-        self.status_message = "Reproduciendo la lista actual...".to_string();
+        self.say(Msg::PlayingList);
         self.play_next();
     }
 
     pub fn trigger_prefetch_next(&mut self) {
-        let Some(next) = self.queue.peek_next().cloned() else { return };
+        let Some(next) = self.queue.peek_next().cloned() else {
+            return;
+        };
         let backend = self.backend.clone();
         tokio::spawn(async move { backend.prefetch_audio(&next).await });
     }

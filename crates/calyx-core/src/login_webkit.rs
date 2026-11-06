@@ -1,6 +1,6 @@
+use crate::error::{CalyxError, CalyxResult};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use crate::error::{CalyxError, CalyxResult};
 
 pub fn parse_binary_cookies(data: &[u8]) -> Option<String> {
     if data.len() < 8 || &data[0..4] != b"cook" {
@@ -12,13 +12,17 @@ pub fn parse_binary_cookies(data: &[u8]) -> Option<String> {
     let mut pos = 8;
 
     for _ in 0..num_pages {
-        if pos + 4 > data.len() { return None; }
-        page_sizes.push(u32::from_be_bytes(data[pos..pos+4].try_into().ok()?) as usize);
+        if pos + 4 > data.len() {
+            return None;
+        }
+        page_sizes.push(u32::from_be_bytes(data[pos..pos + 4].try_into().ok()?) as usize);
         pos += 4;
     }
 
     for page_size in page_sizes {
-        if pos + page_size > data.len() { break; }
+        if pos + page_size > data.len() {
+            break;
+        }
         let page = &data[pos..pos + page_size];
         pos += page_size;
 
@@ -31,23 +35,34 @@ pub fn parse_binary_cookies(data: &[u8]) -> Option<String> {
         let mut cpos = 8;
 
         for _ in 0..num_cookies {
-            if cpos + 4 > page.len() { break; }
-            cookie_offsets.push(u32::from_le_bytes(page[cpos..cpos+4].try_into().ok()?) as usize);
+            if cpos + 4 > page.len() {
+                break;
+            }
+            cookie_offsets.push(u32::from_le_bytes(page[cpos..cpos + 4].try_into().ok()?) as usize);
             cpos += 4;
         }
 
         for offset in cookie_offsets {
-            if offset + 32 > page.len() { continue; }
+            if offset + 32 > page.len() {
+                continue;
+            }
             let cookie = &page[offset..];
             let size = u32::from_le_bytes(cookie[0..4].try_into().unwrap_or_default()) as usize;
-            if size > cookie.len() || size < 32 { continue; }
+            if size > cookie.len() || size < 32 {
+                continue;
+            }
 
-            let url_off = u32::from_le_bytes(cookie[16..20].try_into().unwrap_or_default()) as usize;
-            let name_off = u32::from_le_bytes(cookie[20..24].try_into().unwrap_or_default()) as usize;
-            let val_off = u32::from_le_bytes(cookie[28..32].try_into().unwrap_or_default()) as usize;
+            let url_off =
+                u32::from_le_bytes(cookie[16..20].try_into().unwrap_or_default()) as usize;
+            let name_off =
+                u32::from_le_bytes(cookie[20..24].try_into().unwrap_or_default()) as usize;
+            let val_off =
+                u32::from_le_bytes(cookie[28..32].try_into().unwrap_or_default()) as usize;
 
             let read_str = |start: usize| -> Option<&str> {
-                if start >= size { return None; }
+                if start >= size {
+                    return None;
+                }
                 let slice = &cookie[start..size];
                 let null_pos = slice.iter().position(|&b| b == 0).unwrap_or(slice.len());
                 std::str::from_utf8(&slice[..null_pos]).ok()
@@ -57,7 +72,10 @@ pub fn parse_binary_cookies(data: &[u8]) -> Option<String> {
             let domain = read_str(url_off).unwrap_or("");
             let value = read_str(val_off).unwrap_or("");
 
-            if name == "media-user-token" && (domain.contains("apple.com") || domain.contains("mzstatic.com")) && !value.trim().is_empty() {
+            if name == "media-user-token"
+                && (domain.contains("apple.com") || domain.contains("mzstatic.com"))
+                && !value.trim().is_empty()
+            {
                 return Some(value.to_string());
             }
         }
@@ -71,16 +89,23 @@ pub fn find_webkit_cookie_files() -> Vec<PathBuf> {
     #[cfg(target_os = "macos")]
     if let Ok(home) = std::env::var("HOME") {
         let h = PathBuf::from(home);
-        for sub in ["Library/Cookies/Cookies.binarycookies", "Library/Application Support/Orion/Defaults/Cookies/Cookies.binarycookies"] {
+        for sub in [
+            "Library/Cookies/Cookies.binarycookies",
+            "Library/Application Support/Orion/Defaults/Cookies/Cookies.binarycookies",
+        ] {
             let p = h.join(sub);
-            if p.is_file() { files.push(p); }
+            if p.is_file() {
+                files.push(p);
+            }
         }
     }
 
     #[cfg(target_os = "linux")]
     if let Ok(home) = std::env::var("HOME") {
         let ep = PathBuf::from(home).join(".local/share/epiphany/cookies.sqlite");
-        if ep.is_file() { files.push(ep); }
+        if ep.is_file() {
+            files.push(ep);
+        }
     }
     files
 }
@@ -88,15 +113,15 @@ pub fn find_webkit_cookie_files() -> Vec<PathBuf> {
 pub fn extract_token_from_webkit() -> Option<String> {
     for path in find_webkit_cookie_files() {
         if path.extension().and_then(|s| s.to_str()) == Some("binarycookies") {
-            if let Ok(bytes) = std::fs::read(&path) {
-                if let Some(token) = parse_binary_cookies(&bytes) {
-                    return Some(token);
-                }
-            }
-        } else if path.extension().and_then(|s| s.to_str()) == Some("sqlite") {
-            if let Some(token) = crate::login_firefox::extract_token_from_db_file(&path) {
+            if let Ok(bytes) = std::fs::read(&path)
+                && let Some(token) = parse_binary_cookies(&bytes)
+            {
                 return Some(token);
             }
+        } else if path.extension().and_then(|s| s.to_str()) == Some("sqlite")
+            && let Some(token) = crate::login_firefox::extract_token_from_db_file(&path)
+        {
+            return Some(token);
         }
     }
     None
@@ -113,7 +138,10 @@ pub async fn wait_for_webkit_login(timeout: Duration) -> CalyxResult<String> {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
 
-    Err(CalyxError::Auth("Timeout en Safari/WebKit. Si macOS bloqueó permisos, usa '?' para modo manual.".to_string()))
+    Err(CalyxError::Auth(
+        "Timeout en Safari/WebKit. Si macOS bloqueó permisos, usa '?' para modo manual."
+            .to_string(),
+    ))
 }
 
 #[cfg(test)]
@@ -131,9 +159,12 @@ mod tests {
 
         let mut cookie = vec![0u8; 32];
         let mut data = Vec::new();
-        let u_off = 32 + data.len(); data.extend_from_slice(b".music.apple.com\0");
-        let n_off = 32 + data.len(); data.extend_from_slice(b"media-user-token\0");
-        let v_off = 32 + data.len(); data.extend_from_slice(b"safari_test_123\0");
+        let u_off = 32 + data.len();
+        data.extend_from_slice(b".music.apple.com\0");
+        let n_off = 32 + data.len();
+        data.extend_from_slice(b"media-user-token\0");
+        let v_off = 32 + data.len();
+        data.extend_from_slice(b"safari_test_123\0");
         let total_size = 32 + data.len();
 
         cookie[0..4].copy_from_slice(&(total_size as u32).to_le_bytes());
@@ -146,6 +177,9 @@ mod tests {
         buf.extend_from_slice(&(page.len() as u32).to_be_bytes());
         buf.extend_from_slice(&page);
 
-        assert_eq!(parse_binary_cookies(&buf), Some("safari_test_123".to_string()));
+        assert_eq!(
+            parse_binary_cookies(&buf),
+            Some("safari_test_123".to_string())
+        );
     }
 }

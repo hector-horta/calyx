@@ -3,15 +3,15 @@
 //! Stateless: the pose comes from the playback clock plus the bass level of
 //! the precomputed spectrum, so bigger moves land on the louder bass hits.
 
+use crate::app::TuiApp;
 use calyx_core::models::PlaybackStatus;
 use ratatui::{
+    Frame,
     layout::{Alignment, Rect},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
-    Frame,
 };
-use crate::app::TuiApp;
 
 /// Columns of every pose line.
 pub const DANCER_WIDTH: u16 = 9;
@@ -30,12 +30,48 @@ const CAPTION: Style = Style::new().fg(Color::DarkGray);
 
 /// 0 idle, 1-2 sway, 3-4 arms up, 5 jump.
 const POSES: [[&str; 5]; 6] = [
-    [r"    O    ", r"   /|\   ", r"    |    ", r"   / \   ", r"  /   \  "],
-    [r"  \ O    ", r"   \|\   ", r"    |    ", r"   / >   ", r"  /      "],
-    [r"    O /  ", r"   /|/   ", r"    |    ", r"   < \   ", r"      \  "],
-    [r"  \ O /  ", r"   \|/   ", r"    |    ", r"   / \   ", r"  /   \  "],
-    [r"  \ O /  ", r"   \|/   ", r"    |    ", r"   / \_  ", r"  /      "],
-    [r"  \ O /  ", r"   \|/   ", r"   _|_   ", r"  |   |  ", r"         "],
+    [
+        r"    O    ",
+        r"   /|\   ",
+        r"    |    ",
+        r"   / \   ",
+        r"  /   \  ",
+    ],
+    [
+        r"  \ O    ",
+        r"   \|\   ",
+        r"    |    ",
+        r"   / >   ",
+        r"  /      ",
+    ],
+    [
+        r"    O /  ",
+        r"   /|/   ",
+        r"    |    ",
+        r"   < \   ",
+        r"      \  ",
+    ],
+    [
+        r"  \ O /  ",
+        r"   \|/   ",
+        r"    |    ",
+        r"   / \   ",
+        r"  /   \  ",
+    ],
+    [
+        r"  \ O /  ",
+        r"   \|/   ",
+        r"    |    ",
+        r"   / \_  ",
+        r"  /      ",
+    ],
+    [
+        r"  \ O /  ",
+        r"   \|/   ",
+        r"   _|_   ",
+        r"  |   |  ",
+        r"         ",
+    ],
 ];
 /// Picks the pose for this moment: idle when not playing; otherwise sway,
 /// raise the arms or jump depending on how strong the bass is.
@@ -62,12 +98,21 @@ fn notes(step: u64, playing: bool) -> &'static str {
 }
 
 /// The dancer block: floating notes, the figure and a caption underneath.
-pub fn dancer_lines(bass: u8, elapsed_ms: u64, playing: bool, caption: &'static str) -> Vec<Line<'static>> {
+pub fn dancer_lines(
+    bass: u8,
+    elapsed_ms: u64,
+    playing: bool,
+    caption: &'static str,
+) -> Vec<Line<'static>> {
     let step = elapsed_ms / STEP_MS;
     let pose = pose_index(bass, step, playing);
     let mut lines = Vec::with_capacity(DANCER_HEIGHT as usize);
     lines.push(Line::from(Span::styled(notes(step, playing), NOTES)));
-    lines.extend(POSES[pose].iter().map(|row| Line::from(Span::styled(*row, FIGURE))));
+    lines.extend(
+        POSES[pose]
+            .iter()
+            .map(|row| Line::from(Span::styled(*row, FIGURE))),
+    );
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(caption, CAPTION)));
     lines
@@ -86,8 +131,18 @@ pub fn render_dancer(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let block = Block::default().borders(Borders::LEFT);
     let top = block.inner(area).height.saturating_sub(DANCER_HEIGHT) / 2;
     let mut lines = vec![Line::from(""); top as usize];
-    lines.extend(dancer_lines(bass, elapsed_ms, playing, app.language.no_lyrics_track()));
-    frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center).block(block), area);
+    lines.extend(dancer_lines(
+        bass,
+        elapsed_ms,
+        playing,
+        app.language.no_lyrics_track(),
+    ));
+    frame.render_widget(
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .block(block),
+        area,
+    );
 }
 #[cfg(test)]
 mod tests {
@@ -97,7 +152,11 @@ mod tests {
     fn every_pose_line_has_the_same_width() {
         for pose in POSES.iter() {
             for row in pose.iter() {
-                assert_eq!(Span::raw(*row).width(), DANCER_WIDTH as usize, "bad row {row:?}");
+                assert_eq!(
+                    Span::raw(*row).width(),
+                    DANCER_WIDTH as usize,
+                    "bad row {row:?}"
+                );
             }
         }
         assert_eq!(Span::raw(notes(0, true)).width(), DANCER_WIDTH as usize);

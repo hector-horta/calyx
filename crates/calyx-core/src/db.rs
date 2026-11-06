@@ -1,6 +1,6 @@
-use rusqlite::{params, Connection, Row};
 use crate::error::CalyxResult;
 use crate::models::Track;
+use rusqlite::{Connection, Row, params};
 use tracing::debug;
 
 pub struct CatalogStore {
@@ -25,10 +25,19 @@ impl CatalogStore {
     }
 
     fn configure_database(conn: &Connection) -> CalyxResult<()> {
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             PRAGMA synchronous = NORMAL;
-             CREATE TABLE IF NOT EXISTS tracks (
+        conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")?;
+        Self::migrate(conn)
+    }
+
+    /// Schema migrations, tracked with `PRAGMA user_version`. Add a new
+    /// `if version < N` block for every schema change; never edit old ones.
+    fn migrate(conn: &Connection) -> CalyxResult<()> {
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version < 1 {
+            // v1: base schema. Databases from before versioning may lack
+            // artwork_url, so add it only when it is missing.
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS tracks (
                  id TEXT PRIMARY KEY,
                  title TEXT NOT NULL,
                  artist TEXT NOT NULL,
@@ -41,14 +50,30 @@ impl CatalogStore {
                  is_lossless INTEGER NOT NULL
              );
              CREATE INDEX IF NOT EXISTS idx_tracks_title ON tracks(title);
-             CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);"
-        )?;
-        let _ = conn.execute("ALTER TABLE tracks ADD COLUMN artwork_url TEXT", []);
+             CREATE INDEX IF NOT EXISTS idx_tracks_artist ON tracks(artist);",
+            )?;
+            if !Self::has_column(conn, "tracks", "artwork_url")? {
+                conn.execute_batch("ALTER TABLE tracks ADD COLUMN artwork_url TEXT;")?;
+            }
+            conn.execute_batch("PRAGMA user_version = 1;")?;
+        }
         Ok(())
     }
 
+    fn has_column(conn: &Connection, table: &str, column: &str) -> CalyxResult<bool> {
+        let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+        let names = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        for name in names {
+            if name? == column {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     pub fn delete_track(&self, id: &str) -> CalyxResult<()> {
-        self.conn.execute("DELETE FROM tracks WHERE id = ?1", params![id])?;
+        self.conn
+            .execute("DELETE FROM tracks WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -175,29 +200,62 @@ mod tests {
         let store = CatalogStore::open_in_memory().unwrap();
         store.upsert_track(&track("1", "Zeta")).unwrap();
         store.upsert_track(&track("2", "Alfa")).unwrap();
-        let ids = |s: &CatalogStore| s.search_tracks("", 10).unwrap().into_iter().map(|t| t.id).collect::<Vec<_>>();
+        let ids = |s: &CatalogStore| {
+            s.search_tracks("", 10)
+                .unwrap()
+                .into_iter()
+                .map(|t| t.id)
+                .collect::<Vec<_>>()
+        };
         assert_eq!(ids(&store), ["2", "1"]);
         store.upsert_track(&track("1", "Zeta")).unwrap();
         assert_eq!(ids(&store), ["1", "2"]);
     }
 
     #[test]
+    fn fresh_database_is_at_schema_v1() {
+        let store = CatalogStore::open_in_memory().unwrap();
+        let v: i64 = store
+            .conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, 1);
+        assert!(CatalogStore::has_column(&store.conn, "tracks", "artwork_url").unwrap());
+    }
+
+    #[test]
+    fn legacy_database_gains_artwork_column_and_keeps_rows() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE tracks (id TEXT PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL,
+             album TEXT NOT NULL, duration_ms INTEGER NOT NULL, storefront TEXT NOT NULL,
+             preview_url TEXT, hls_manifest_url TEXT, is_lossless INTEGER NOT NULL);
+             INSERT INTO tracks VALUES ('7', 'Old', 'A', 'B', 1000, 'us', NULL, NULL, 0);",
+        )
+        .unwrap();
+        CatalogStore::migrate(&conn).unwrap();
+        let store = CatalogStore { conn };
+        assert!(CatalogStore::has_column(&store.conn, "tracks", "artwork_url").unwrap());
+        assert_eq!(store.search_tracks("", 10).unwrap()[0].title, "Old");
+        // Running it again is a no-op.
+        CatalogStore::migrate(&store.conn).unwrap();
+    }
+
+    #[test]
     fn test_empty_query() {
         let store = CatalogStore::open_in_memory().expect("in-memory db");
-        let tracks = vec![
-            Track {
-                id: "1".to_string(),
-                title: "Song A".to_string(),
-                artist: "Artist 1".to_string(),
-                album: "Album 1".to_string(),
-                duration_ms: 90_000,
-                storefront: "storefront.com".to_string(),
-                preview_url: None,
-                artwork_url: None,
-                hls_manifest_url: None,
-                is_lossless: false,
-            },
-        ];
+        let tracks = vec![Track {
+            id: "1".to_string(),
+            title: "Song A".to_string(),
+            artist: "Artist 1".to_string(),
+            album: "Album 1".to_string(),
+            duration_ms: 90_000,
+            storefront: "storefront.com".to_string(),
+            preview_url: None,
+            artwork_url: None,
+            hls_manifest_url: None,
+            is_lossless: false,
+        }];
         for track in tracks {
             store.upsert_track(&track).unwrap();
         }

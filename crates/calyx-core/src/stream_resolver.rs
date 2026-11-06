@@ -15,7 +15,11 @@ use crate::models::Track;
 /// library/catalog id stored in `hls_manifest_url`.
 fn candidate_ids(track: &Track) -> Vec<String> {
     let mut ids = vec![track.id.clone()];
-    if let Some(alt) = track.hls_manifest_url.as_ref().filter(|a| !a.is_empty() && **a != track.id) {
+    if let Some(alt) = track
+        .hls_manifest_url
+        .as_ref()
+        .filter(|a| !a.is_empty() && **a != track.id)
+    {
         ids.push(alt.clone());
     }
     ids
@@ -23,7 +27,12 @@ fn candidate_ids(track: &Track) -> Vec<String> {
 
 /// Title without "(Remastered)" / "[Live]" style suffixes, for catalog search.
 fn search_query(track: &Track) -> String {
-    let title = track.title.split(['(', '[']).next().unwrap_or(&track.title).trim();
+    let title = track
+        .title
+        .split(['(', '['])
+        .next()
+        .unwrap_or(&track.title)
+        .trim();
     format!("{} {}", track.artist, title)
 }
 
@@ -39,7 +48,9 @@ pub(crate) async fn complete_track(client: &AppleMusicClient, mut track: Track) 
     if track.preview_url.is_some() && track.artwork_url.is_some() {
         return track;
     }
-    let Ok(found) = client.search_catalog(&search_query(&track), 3).await else { return track };
+    let Ok(found) = client.search_catalog(&search_query(&track), 3).await else {
+        return track;
+    };
     if let Some(hit) = found.into_iter().find(|c| track.is_same_song(c)) {
         track.preview_url = track.preview_url.or(hit.preview_url);
         track.artwork_url = track.artwork_url.or(hit.artwork_url);
@@ -58,7 +69,9 @@ async fn fetch_full(
     if !session.has_full_stream_credentials() {
         return Err(None);
     }
-    let wvd = session.load_wvd_device().map_err(|_| Some("Falta device.wvd L3".to_string()))?;
+    let wvd = session
+        .load_wvd_device()
+        .map_err(|_| Some("Falta device.wvd L3".to_string()))?;
     let mut note = None;
     for id in ids {
         let mut res = client.fetch_full_track_stream(id, &wvd).await;
@@ -77,7 +90,10 @@ async fn fetch_full(
     // Same-song catalog hits only: anything else could be cached under the
     // original id and play the wrong version forever.
     if let Ok(found) = client.search_catalog(&search_query(track), 4).await {
-        for cat in found.into_iter().filter(|c| track.is_same_song(c) && !ids.contains(&c.id)) {
+        for cat in found
+            .into_iter()
+            .filter(|c| track.is_same_song(c) && !ids.contains(&c.id))
+        {
             match client.fetch_full_track_stream(&cat.id, &wvd).await {
                 Ok(bytes) => {
                     store(cache, &[cat.id.as_str(), track.id.as_str()], &bytes);
@@ -99,23 +115,44 @@ pub(crate) async fn resolve_audio(
 ) -> CalyxResult<ResolvedAudio> {
     let ids = candidate_ids(track);
     if let Some(bytes) = ids.iter().find_map(|id| cache.get(id)) {
-        return Ok(ResolvedAudio { bytes, source: AudioSource::Cache, note: None });
+        return Ok(ResolvedAudio {
+            bytes,
+            source: AudioSource::Cache,
+            note: None,
+        });
     }
     let note = match fetch_full(client, session, cache, track, &ids).await {
-        Ok(bytes) => return Ok(ResolvedAudio { bytes, source: AudioSource::FullStream, note: None }),
+        Ok(bytes) => {
+            return Ok(ResolvedAudio {
+                bytes,
+                source: AudioSource::FullStream,
+                note: None,
+            });
+        }
         Err(note) => note,
     };
     match track.preview_url.as_deref() {
         Some(url) => {
             let bytes = client.fetch_stream_bytes(url).await?;
-            Ok(ResolvedAudio { bytes, source: AudioSource::Preview, note })
+            Ok(ResolvedAudio {
+                bytes,
+                source: AudioSource::Preview,
+                note,
+            })
         }
-        None => Err(CalyxError::Audio(note.unwrap_or_else(|| "Sin URL de stream".to_string()))),
+        None => Err(CalyxError::Audio(
+            note.unwrap_or_else(|| "Sin URL de stream".to_string()),
+        )),
     }
 }
 
 /// Caches the full stream ahead of time; no-op when already cached.
-pub(crate) async fn prefetch(client: &AppleMusicClient, session: &SessionConfig, cache: &AudioCache, track: &Track) {
+pub(crate) async fn prefetch(
+    client: &AppleMusicClient,
+    session: &SessionConfig,
+    cache: &AudioCache,
+    track: &Track,
+) {
     let ids = candidate_ids(track);
     if ids.iter().any(|id| cache.contains(id)) {
         return;
@@ -143,7 +180,8 @@ mod tests {
     }
 
     fn temp_cache(name: &str) -> AudioCache {
-        let dir = std::env::temp_dir().join(format!("calyx_resolver_{name}_{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("calyx_resolver_{name}_{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         AudioCache::with_dir(dir, 10_000)
     }
@@ -165,15 +203,31 @@ mod tests {
         let cache = temp_cache("hit");
         cache.put("i.9", b"m4a").unwrap();
         let client = AppleMusicClient::new("us").unwrap();
-        let got = resolve_audio(&client, &SessionConfig::default(), &cache, &track("1", Some("i.9"))).await.unwrap();
-        assert_eq!((got.source, got.bytes), (AudioSource::Cache, b"m4a".to_vec()));
+        let got = resolve_audio(
+            &client,
+            &SessionConfig::default(),
+            &cache,
+            &track("1", Some("i.9")),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            (got.source, got.bytes),
+            (AudioSource::Cache, b"m4a".to_vec())
+        );
     }
 
     #[tokio::test]
     async fn nothing_playable_is_an_error() {
         let cache = temp_cache("miss");
         let client = AppleMusicClient::new("us").unwrap();
-        let err = resolve_audio(&client, &SessionConfig::default(), &cache, &track("1", None)).await;
+        let err = resolve_audio(
+            &client,
+            &SessionConfig::default(),
+            &cache,
+            &track("1", None),
+        )
+        .await;
         assert!(err.is_err());
     }
 }

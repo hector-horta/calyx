@@ -1,11 +1,11 @@
-use std::sync::{Mutex, MutexGuard};
-use std::time::{Duration, Instant};
-use rodio::{buffer::SamplesBuffer, OutputStream, OutputStreamHandle, Sink};
-use tracing::info;
-use crate::decode::{decode_track, DecodedTrack};
+use crate::decode::{DecodedTrack, decode_track};
 use crate::error::{CalyxError, CalyxResult};
 use crate::models::PlaybackStatus;
-use crate::spectrum::{SpectrumFrame, FRAME_MS, SPECTRUM_BANDS};
+use crate::spectrum::{FRAME_MS, SPECTRUM_BANDS, SpectrumFrame};
+use rodio::{OutputStream, OutputStreamHandle, Sink, buffer::SamplesBuffer};
+use std::sync::{Mutex, MutexGuard};
+use std::time::{Duration, Instant};
+use tracing::info;
 
 /// Everything that changes during playback, behind one lock so readers never
 /// see a half-updated state and there is no lock ordering to get wrong.
@@ -37,7 +37,10 @@ impl NativeAudioEngine {
     pub fn new() -> CalyxResult<Self> {
         let (stream, handle) = match OutputStream::try_default() {
             Ok((s, h)) => (Some(s), Some(h)),
-            Err(e) => { info!("Audio output device unavailable ({e}), running in headless mode"); (None, None) }
+            Err(e) => {
+                info!("Audio output device unavailable ({e}), running in headless mode");
+                (None, None)
+            }
         };
         Ok(Self::with_output(stream, handle))
     }
@@ -67,8 +70,14 @@ impl NativeAudioEngine {
     }
 
     pub fn play_decoded(&self, track: DecodedTrack) -> CalyxResult<()> {
-        let DecodedTrack { channels, sample_rate, pcm, spectrum } = track;
-        let duration = Duration::from_secs(pcm.len() as u64 / (channels as u64 * sample_rate as u64).max(1));
+        let DecodedTrack {
+            channels,
+            sample_rate,
+            pcm,
+            spectrum,
+        } = track;
+        let duration =
+            Duration::from_secs(pcm.len() as u64 / (channels as u64 * sample_rate as u64).max(1));
         let volume = self.lock().volume;
         // Build the sink without holding the lock.
         let new_sink = match &self.handle {
@@ -83,7 +92,9 @@ impl NativeAudioEngine {
             None => None,
         };
         let mut st = self.lock();
-        if let Some(old) = st.sink.take() { old.stop(); }
+        if let Some(old) = st.sink.take() {
+            old.stop();
+        }
         st.sink = new_sink;
         st.duration = duration;
         st.spectrum = spectrum;
@@ -97,13 +108,17 @@ impl NativeAudioEngine {
         let mut st = self.lock();
         match st.status {
             PlaybackStatus::Playing => {
-                if let Some(sink) = st.sink.as_ref() { sink.pause(); }
+                if let Some(sink) = st.sink.as_ref() {
+                    sink.pause();
+                }
                 st.accumulated = st.elapsed();
                 st.started_at = None;
                 st.status = PlaybackStatus::Paused;
             }
             PlaybackStatus::Paused => {
-                if let Some(sink) = st.sink.as_ref() { sink.play(); }
+                if let Some(sink) = st.sink.as_ref() {
+                    sink.play();
+                }
                 st.started_at = Some(Instant::now());
                 st.status = PlaybackStatus::Playing;
             }
@@ -113,7 +128,9 @@ impl NativeAudioEngine {
 
     pub fn stop(&self) {
         let mut st = self.lock();
-        if let Some(sink) = st.sink.take() { sink.stop(); }
+        if let Some(sink) = st.sink.take() {
+            sink.stop();
+        }
         st.started_at = None;
         st.accumulated = Duration::ZERO;
         st.status = PlaybackStatus::Stopped;
@@ -122,7 +139,9 @@ impl NativeAudioEngine {
     pub fn set_volume(&self, volume: f32) {
         let mut st = self.lock();
         st.volume = volume.clamp(0.0, 1.0);
-        if let Some(sink) = st.sink.as_ref() { sink.set_volume(st.volume); }
+        if let Some(sink) = st.sink.as_ref() {
+            sink.set_volume(st.volume);
+        }
     }
 
     /// (elapsed, total) of the current track.
@@ -134,7 +153,8 @@ impl NativeAudioEngine {
     /// True once, when a playing track runs out; the engine then stops.
     pub fn is_finished(&self) -> bool {
         let mut st = self.lock();
-        let finished = st.status == PlaybackStatus::Playing && st.sink.as_ref().is_some_and(|s| s.empty());
+        let finished =
+            st.status == PlaybackStatus::Playing && st.sink.as_ref().is_some_and(|s| s.empty());
         if finished {
             st.started_at = None;
             st.status = PlaybackStatus::Stopped;
@@ -166,7 +186,12 @@ mod tests {
     }
 
     fn one_second_track() -> DecodedTrack {
-        DecodedTrack { channels: 1, sample_rate: 8_000, pcm: vec![0; 8_000], spectrum: vec![[7; SPECTRUM_BANDS]; 20] }
+        DecodedTrack {
+            channels: 1,
+            sample_rate: 8_000,
+            pcm: vec![0; 8_000],
+            spectrum: vec![[7; SPECTRUM_BANDS]; 20],
+        }
     }
 
     #[test]
