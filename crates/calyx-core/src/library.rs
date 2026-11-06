@@ -176,6 +176,13 @@ pub struct UserPlaylist {
     pub id: String,
     pub name: String,
     pub description: String,
+    /// The user may add songs to it (own playlists; not followed/shared ones).
+    #[serde(default = "default_can_edit")]
+    pub can_edit: bool,
+}
+
+fn default_can_edit() -> bool {
+    true
 }
 
 pub fn parse_user_playlists_json(raw_json: &str) -> CalyxResult<Vec<UserPlaylist>> {
@@ -200,6 +207,10 @@ pub fn parse_user_playlists_json(raw_json: &str) -> CalyxResult<Vec<UserPlaylist
                 id: id.to_string(),
                 name: name.to_string(),
                 description: desc.to_string(),
+                can_edit: item
+                    .pointer("/attributes/canEdit")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true),
             });
         }
     }
@@ -225,7 +236,7 @@ pub async fn fetch_user_playlists(
 
 /// Library playlist ids look like `p.AbC123`; anything else is rejected
 /// before it is put into a URL path.
-fn valid_playlist_id(id: &str) -> bool {
+pub(crate) fn valid_playlist_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id

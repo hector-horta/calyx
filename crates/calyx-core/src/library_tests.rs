@@ -44,6 +44,19 @@ fn test_parse_user_playlists_json() {
 }
 
 #[test]
+fn playlists_carry_can_edit() {
+    let body = r#"{"data": [
+        {"id": "p.Mine", "attributes": {"name": "Mine", "canEdit": true}},
+        {"id": "p.Shared", "attributes": {"name": "Shared", "canEdit": false}},
+        {"id": "p.Old", "attributes": {"name": "No flag"}}
+    ]}"#;
+    let pls = parse_user_playlists_json(body).unwrap();
+    let flags: Vec<bool> = pls.iter().map(|p| p.can_edit).collect();
+    // Without the attribute we let Apple decide (it answers 403 if not allowed).
+    assert_eq!(flags, [true, false, true]);
+}
+
+#[test]
 fn page_info_reads_count_and_next() {
     let body = r#"{"next": "/v1/me/library/songs?offset=100", "data": [{"id": "a"}, {"id": "b"}]}"#;
     assert_eq!(

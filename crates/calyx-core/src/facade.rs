@@ -45,6 +45,12 @@ pub trait StreamingBackend: Send + Sync + 'static {
         &self,
         track: &Track,
     ) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
+    /// Appends `track` to one of the user's library playlists (needs login).
+    fn add_to_playlist(
+        &self,
+        playlist_id: &str,
+        track: &Track,
+    ) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
     /// Fills missing preview/artwork URLs from the catalog.
     fn complete_track(&self, track: Track) -> impl std::future::Future<Output = Track> + Send;
     /// Playable audio: cache, then full stream, then preview.
