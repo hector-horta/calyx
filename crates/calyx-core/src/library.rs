@@ -70,34 +70,75 @@ pub fn parse_library_songs_json(raw_json: &str, storefront: &str) -> CalyxResult
     Ok(tracks)
 }
 
+const API_ROOT: &str = "https://amp-api.music.apple.com";
+const PAGE_SIZE: usize = 100;
+
+/// Items on one page and the path of the next one. Only relative `/v1/`
+/// paths are followed, so a response can never redirect us to another host.
+fn page_info(body: &str) -> CalyxResult<(usize, Option<String>)> {
+    let val: Value = serde_json::from_str(body)
+        .map_err(|e| CalyxError::Validation(format!("Invalid Apple Music page JSON: {e}")))?;
+    let count = val.get("data").and_then(|d| d.as_array()).map_or(0, |a| a.len());
+    let next = val.get("next").and_then(|n| n.as_str()).filter(|n| n.starts_with("/v1/")).map(str::to_string);
+    Ok((count, next))
+}
+
+/// GETs `first_path` and every following page until `max_items` or the end.
+async fn get_paged(
+    http: &Client,
+    dev_token: &str,
+    user_token: &str,
+    first_path: String,
+    max_items: usize,
+    what: &str,
+) -> CalyxResult<Vec<String>> {
+    let mut bodies = Vec::new();
+    let mut seen = 0;
+    let mut next = Some(first_path);
+    while let Some(path) = next.take() {
+        let resp = http
+            .get(format!("{API_ROOT}{path}"))
+            .header("Authorization", format!("Bearer {dev_token}"))
+            .header("Media-User-Token", user_token)
+            .header("Origin", "https://music.apple.com")
+            .header("Referer", "https://music.apple.com/")
+            .send()
+            .await?;
+        if !resp.status().is_success() {
+            return Err(CalyxError::Auth(format!("{what} HTTP status: {}", resp.status())));
+        }
+        let body = resp.text().await?;
+        let (count, next_path) = page_info(&body)?;
+        seen += count;
+        bodies.push(body);
+        next = next_path.filter(|_| count > 0 && seen < max_items);
+    }
+    Ok(bodies)
+}
+
+fn require_session(dev_token: &str, user_token: &str, what: &str) -> CalyxResult<()> {
+    if dev_token.is_empty() || user_token.is_empty() {
+        return Err(CalyxError::Auth(format!("Se requiere sesión activa ('u') para {what}")));
+    }
+    Ok(())
+}
+
+/// Songs in the user's library, following pagination up to `limit`.
 pub async fn fetch_user_library_songs(
     http: &Client,
     dev_token: &str,
     user_token: &str,
     storefront: &str,
-    limit: usize
+    limit: usize,
 ) -> CalyxResult<Vec<Track>> {
-    if dev_token.is_empty() || user_token.is_empty() {
-        return Err(CalyxError::Auth("Se requiere sesión activa ('u') para sincronizar tu biblioteca".into()));
+    require_session(dev_token, user_token, "sincronizar tu biblioteca")?;
+    let first = format!("/v1/me/library/songs?include=catalog&limit={PAGE_SIZE}");
+    let mut tracks = Vec::new();
+    for body in get_paged(http, dev_token, user_token, first, limit, "Library").await? {
+        tracks.extend(parse_library_songs_json(&body, storefront)?);
     }
-
-    let url = format!(
-        "https://amp-api.music.apple.com/v1/me/library/songs?include=catalog&limit={}",
-        limit.clamp(1, 100)
-    );
-
-    let resp = http
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", dev_token))
-        .header("Media-User-Token", user_token)
-        .header("Origin", "https://music.apple.com")
-        .header("Referer", "https://music.apple.com/")
-        .send()
-        .await?;
-    if !resp.status().is_success() {
-        return Err(CalyxError::Auth(format!("Library HTTP status: {}", resp.status())));
-    }
-    parse_library_songs_json(&resp.text().await?, storefront)
+    tracks.truncate(limit);
+    Ok(tracks)
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -123,46 +164,48 @@ pub fn parse_user_playlists_json(raw_json: &str) -> CalyxResult<Vec<UserPlaylist
     Ok(playlists)
 }
 
+/// The user's playlists, following pagination up to `limit`.
 pub async fn fetch_user_playlists(
     http: &Client,
     dev_token: &str,
     user_token: &str,
     limit: usize,
 ) -> CalyxResult<Vec<UserPlaylist>> {
-    if dev_token.is_empty() || user_token.is_empty() {
-        return Err(CalyxError::Auth("Se requiere sesión activa ('u') para ver tus Playlists".into()));
+    require_session(dev_token, user_token, "ver tus Playlists")?;
+    let first = format!("/v1/me/library/playlists?limit={PAGE_SIZE}");
+    let mut playlists = Vec::new();
+    for body in get_paged(http, dev_token, user_token, first, limit, "Playlists").await? {
+        playlists.extend(parse_user_playlists_json(&body)?);
     }
-    let url = format!("https://amp-api.music.apple.com/v1/me/library/playlists?limit={}", limit.clamp(1, 100));
-    let resp = http.get(&url)
-        .header("Authorization", format!("Bearer {dev_token}"))
-        .header("Media-User-Token", user_token)
-        .header("Origin", "https://music.apple.com")
-        .header("Referer", "https://music.apple.com/")
-        .send().await?;
-    if !resp.status().is_success() {
-        return Err(CalyxError::Auth(format!("Playlists HTTP status: {}", resp.status())));
-    }
-    parse_user_playlists_json(&resp.text().await?)
+    playlists.truncate(limit);
+    Ok(playlists)
 }
 
+/// Library playlist ids look like `p.AbC123`; anything else is rejected
+/// before it is put into a URL path.
+fn valid_playlist_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_')
+}
+
+/// Tracks of a library playlist, following pagination up to `limit`.
 pub async fn fetch_playlist_tracks(
     http: &Client,
     dev_token: &str,
     user_token: &str,
     playlist_id: &str,
     storefront: &str,
+    limit: usize,
 ) -> CalyxResult<Vec<Track>> {
-    let url = format!("https://amp-api.music.apple.com/v1/me/library/playlists/{playlist_id}/tracks?include=catalog");
-    let resp = http.get(&url)
-        .header("Authorization", format!("Bearer {dev_token}"))
-        .header("Media-User-Token", user_token)
-        .header("Origin", "https://music.apple.com")
-        .header("Referer", "https://music.apple.com/")
-        .send().await?;
-    if !resp.status().is_success() {
-        return Err(CalyxError::Auth(format!("Playlist tracks HTTP status: {}", resp.status())));
+    if !valid_playlist_id(playlist_id) {
+        return Err(CalyxError::Validation(format!("Invalid playlist id: {playlist_id:?}")));
     }
-    parse_library_songs_json(&resp.text().await?, storefront)
+    let first = format!("/v1/me/library/playlists/{playlist_id}/tracks?include=catalog&limit={PAGE_SIZE}");
+    let mut tracks = Vec::new();
+    for body in get_paged(http, dev_token, user_token, first, limit, "Playlist tracks").await? {
+        tracks.extend(parse_library_songs_json(&body, storefront)?);
+    }
+    tracks.truncate(limit);
+    Ok(tracks)
 }
 
 #[cfg(test)]
@@ -207,5 +250,26 @@ mod tests {
         assert_eq!(result[0].id, "p.V7VY2");
         assert_eq!(result[0].name, "Synthwave Mix");
         assert_eq!(result[0].description, "Mis favoritos");
+    }
+
+    #[test]
+    fn page_info_reads_count_and_next() {
+        let body = r#"{"next": "/v1/me/library/songs?offset=100", "data": [{"id": "a"}, {"id": "b"}]}"#;
+        assert_eq!(page_info(body).unwrap(), (2, Some("/v1/me/library/songs?offset=100".to_string())));
+        assert_eq!(page_info(r#"{"data": []}"#).unwrap(), (0, None));
+    }
+
+    #[test]
+    fn page_info_never_follows_other_hosts() {
+        let body = r#"{"next": "https://evil.example/v1/x", "data": [{"id": "a"}]}"#;
+        assert_eq!(page_info(body).unwrap(), (1, None));
+    }
+
+    #[test]
+    fn playlist_ids_are_validated() {
+        assert!(valid_playlist_id("p.V7VY2"));
+        assert!(!valid_playlist_id("p.x/../../me/storefront"));
+        assert!(!valid_playlist_id("p.x?limit=1"));
+        assert!(!valid_playlist_id(""));
     }
 }

@@ -111,6 +111,11 @@ impl AppleMusicBackend {
     }
 }
 
+/// Upper bounds for paginated user lists (100 items per request).
+const MAX_LIBRARY_SONGS: usize = 1000;
+const MAX_PLAYLISTS: usize = 300;
+const MAX_PLAYLIST_TRACKS: usize = 1000;
+
 /// "top hits <current year>" without pulling in a date crate.
 fn new_releases_query() -> String {
     let secs = std::time::SystemTime::now()
@@ -144,17 +149,17 @@ impl StreamingBackend for AppleMusicBackend {
 
     async fn fetch_user_library(&self) -> CalyxResult<Vec<Track>> {
         let (dev, usr, sf) = self.user_ctx();
-        crate::library::fetch_user_library_songs(self.client().http(), &dev, &usr, &sf, 50).await
+        crate::library::fetch_user_library_songs(self.client().http(), &dev, &usr, &sf, MAX_LIBRARY_SONGS).await
     }
 
     async fn fetch_user_playlists(&self) -> CalyxResult<Vec<UserPlaylist>> {
         let (dev, usr, _) = self.user_ctx();
-        crate::library::fetch_user_playlists(self.client().http(), &dev, &usr, 50).await
+        crate::library::fetch_user_playlists(self.client().http(), &dev, &usr, MAX_PLAYLISTS).await
     }
 
     async fn fetch_playlist_tracks(&self, playlist_id: &str) -> CalyxResult<Vec<Track>> {
         let (dev, usr, sf) = self.user_ctx();
-        crate::library::fetch_playlist_tracks(self.client().http(), &dev, &usr, playlist_id, &sf).await
+        crate::library::fetch_playlist_tracks(self.client().http(), &dev, &usr, playlist_id, &sf, MAX_PLAYLIST_TRACKS).await
     }
 
     async fn complete_track(&self, track: Track) -> Track {
