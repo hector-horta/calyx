@@ -5,6 +5,7 @@ use calyx_core::{StreamingBackend, Track};
 use crate::app::{ActiveView, TuiApp};
 use crate::artwork::TerminalCoverArt;
 use crate::bg_events::BgEvent;
+use crate::messages::Msg;
 
 impl TuiApp {
     pub fn play_track(&mut self, track: Track) {
@@ -12,9 +13,9 @@ impl TuiApp {
         self.audio.stop();
         let seed = format!("{}:{}:{}:{}", track.id, track.artist, track.album, track.title);
         self.current_artwork = Some(TerminalCoverArt::from_jpeg_or_seed(None, &seed));
-        self.current_lyrics = vec![calyx_core::LyricLine::new(0, "⏳ Sincronizando letra...")];
+        self.current_lyrics = vec![calyx_core::LyricLine::new(0, Msg::SyncingLyrics.text(self.language))];
         self.current_track = Some(track.clone());
-        self.status_message = format!("⏳ Cargando audio en 2do plano: {} — {}...", track.artist, track.title);
+        self.say(Msg::LoadingAudio { artist: &track.artist, title: &track.title });
 
         let (backend, tx) = (self.backend.clone(), self.bg_tx.clone());
         self.play_task = Some(tokio::spawn(async move {
@@ -79,7 +80,7 @@ impl TuiApp {
         for t in self.tracks[start..].iter().chain(self.tracks[..start].iter()) {
             self.queue.enqueue_back(t.clone());
         }
-        self.status_message = "Reproduciendo la lista actual...".to_string();
+        self.say(Msg::PlayingList);
         self.play_next();
     }
 

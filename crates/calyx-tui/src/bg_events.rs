@@ -4,13 +4,14 @@
 use calyx_core::{AudioSource, DecodedTrack, LyricLine, ResolvedAudio, Track, UserPlaylist};
 use crate::app::{ActiveView, TuiApp};
 use crate::artwork::TerminalCoverArt;
+use crate::messages::{ListKind, Msg};
 
 pub enum BgEvent {
     AudioReady(Track, Result<ResolvedAudio, String>, Vec<LyricLine>),
     AudioDecoded(Track, Result<DecodedTrack, String>, Vec<LyricLine>, String),
     ArtworkReady(String, TerminalCoverArt),
     /// Search, curated sections and the user library.
-    TracksReady { view: ActiveView, label: &'static str, res: Result<Vec<Track>, String> },
+    TracksReady { view: ActiveView, kind: ListKind, res: Result<Vec<Track>, String> },
     PlaylistsReady(Result<Vec<UserPlaylist>, String>),
     /// A playlist opened with Enter (browse its tracks).
     PlaylistOpened(String, Result<Vec<Track>, String>),
@@ -20,13 +21,13 @@ pub enum BgEvent {
 }
 
 /// Quality hint shown in the status line for a resolved buffer.
-fn audio_hint(audio: &ResolvedAudio) -> String {
-    match (audio.source, audio.note.as_deref()) {
-        (AudioSource::Cache, _) => "[AAC 256k | Caché]".to_string(),
-        (AudioSource::FullStream, _) => "[AAC 256k]".to_string(),
-        (AudioSource::Preview, Some(note)) => format!("[Preview 30s | {note}]"),
-        (AudioSource::Preview, None) => "[Preview 30s — Presiona 'u' para Login Apple]".to_string(),
+fn audio_hint(audio: &ResolvedAudio, lang: calyx_core::Language) -> String {
+    match audio.source {
+        AudioSource::Cache => Msg::HintCache,
+        AudioSource::FullStream => Msg::HintFull,
+        AudioSource::Preview => Msg::HintPreview(audio.note.as_deref()),
     }
+    .text(lang)
 }
 
 impl TuiApp {
@@ -51,7 +52,7 @@ impl TuiApp {
         match ev {
             BgEvent::AudioReady(track, res, lyrics) if self.is_current(&track.id) => match res {
                 Ok(audio) => {
-                    let hint = audio_hint(&audio);
+                    let hint = audio_hint(&audio, self.language);
                     self.spawn_decode(track, audio.bytes, lyrics, hint);
                 }
                 Err(e) => {
@@ -63,44 +64,44 @@ impl TuiApp {
             BgEvent::AudioDecoded(track, res, lyrics, hint) => self.on_audio_decoded(track, res, lyrics, hint),
             BgEvent::ArtworkReady(tid, art) if self.is_current(&tid) => self.current_artwork = Some(art),
             BgEvent::ArtworkReady(..) => {}
-            BgEvent::TracksReady { view, label, res: Ok(list) } => {
+            BgEvent::TracksReady { view, kind, res: Ok(list) } => {
                 // An empty library sync keeps whatever is on screen.
                 if view == ActiveView::Library && list.is_empty() {
-                    self.status_message = format!("{label}: sin canciones.");
+                    self.say(Msg::ListEmpty(kind));
                     return;
                 }
                 if view == ActiveView::Home {
                     for t in &list { let _ = self.store.upsert_track(t); }
                 }
-                self.status_message = format!("{label}: {} pistas.", list.len());
+                self.say(Msg::ListLoaded { kind, count: list.len() });
                 self.show_tracks(list, view);
             }
-            BgEvent::TracksReady { label, res: Err(e), .. } => self.status_message = format!("Error en {label}: {e}"),
+            BgEvent::TracksReady { kind, res: Err(e), .. } => self.say(Msg::ListError { kind, err: &e }),
             BgEvent::PlaylistsReady(Ok(playlists)) => {
-                self.status_message = format!("Playlists sincronizadas: {} listas encontradas (Enter para abrir).", playlists.len());
+                self.say(Msg::PlaylistsSynced(playlists.len()));
                 self.playlist_state.select(if playlists.is_empty() { None } else { Some(0) });
                 self.playlists = playlists;
             }
-            BgEvent::PlaylistsReady(Err(e)) => self.status_message = format!("Error sincronizando playlists: {e}"),
+            BgEvent::PlaylistsReady(Err(e)) => self.say(Msg::PlaylistsError(&e)),
             BgEvent::PlaylistOpened(name, Ok(list)) => {
-                self.status_message = format!("Playlist '{name}' cargada ({} canciones). Presiona 'p' para reproducir toda.", list.len());
+                self.say(Msg::PlaylistOpened { name: &name, count: list.len() });
                 self.show_tracks(list, ActiveView::Library);
             }
-            BgEvent::PlaylistOpened(name, Err(e)) => self.status_message = format!("Error cargando playlist '{name}': {e}"),
+            BgEvent::PlaylistOpened(name, Err(e)) => self.say(Msg::PlaylistError { name: &name, err: &e }),
             BgEvent::PlaylistReady(name, Ok(list)) if !list.is_empty() => {
                 self.queue.clear();
                 for t in &list { self.queue.enqueue_back(t.clone()); }
                 self.show_tracks(list, ActiveView::Library);
-                self.status_message = format!("Reproduciendo '{name}' ({} pistas)...", self.queue.len());
+                self.say(Msg::PlayingPlaylist { name: &name, count: self.queue.len() });
                 self.play_next();
             }
-            BgEvent::PlaylistReady(name, _) => self.status_message = format!("No se pudo reproducir playlist '{name}'."),
+            BgEvent::PlaylistReady(name, _) => self.say(Msg::PlaylistPlayFailed(&name)),
             BgEvent::LoginDone(res) => {
                 self.login_in_progress = false;
-                self.status_message = match res {
-                    Ok(()) => "Sesión Apple Music verificada.".to_string(),
-                    Err(e) => format!("Error login Apple: {e}"),
-                };
+                match res {
+                    Ok(()) => self.say(Msg::LoginOk),
+                    Err(e) => self.say(Msg::LoginError(&e)),
+                }
             }
         }
     }
@@ -116,9 +117,11 @@ mod tests {
 
     #[test]
     fn hint_reflects_where_audio_came_from() {
-        assert_eq!(audio_hint(&audio(AudioSource::Cache, None)), "[AAC 256k | Caché]");
-        assert_eq!(audio_hint(&audio(AudioSource::FullStream, None)), "[AAC 256k]");
-        assert_eq!(audio_hint(&audio(AudioSource::Preview, Some("HTTP 403"))), "[Preview 30s | HTTP 403]");
-        assert!(audio_hint(&audio(AudioSource::Preview, None)).contains("Login"));
+        use calyx_core::Language::{En, Es};
+        assert_eq!(audio_hint(&audio(AudioSource::Cache, None), Es), "[AAC 256k | Caché]");
+        assert_eq!(audio_hint(&audio(AudioSource::Cache, None), En), "[AAC 256k | Cached]");
+        assert_eq!(audio_hint(&audio(AudioSource::FullStream, None), Es), "[AAC 256k]");
+        assert_eq!(audio_hint(&audio(AudioSource::Preview, Some("HTTP 403")), Es), "[Preview 30s | HTTP 403]");
+        assert!(audio_hint(&audio(AudioSource::Preview, None), En).contains("log in"));
     }
 }

@@ -1,6 +1,7 @@
 mod app;
 mod artwork;
 mod hints;
+mod messages;
 mod audio_pipeline;
 mod bg_events;
 mod navigation;
@@ -115,14 +116,14 @@ fn run_event_loop(
             KeyCode::Char('r') => { app.toggle_repeat(); }
             KeyCode::Char('l') | KeyCode::Char('L') => app.toggle_language(),
             KeyCode::Char('1') => app.open_home(),
-            KeyCode::Char('2') => app.open_section(app::ActiveView::New, SectionType::NewReleases, "Novedades"),
-            KeyCode::Char('3') => app.open_section(app::ActiveView::Radio, SectionType::Radio, "Estaciones de Radio"),
+            KeyCode::Char('2') => app.open_section(app::ActiveView::New, SectionType::NewReleases, messages::ListKind::NewReleases),
+            KeyCode::Char('3') => app.open_section(app::ActiveView::Radio, SectionType::Radio, messages::ListKind::Radio),
             KeyCode::Char('4') => app.sync_library(),
             KeyCode::Char('5') => app.sync_playlists(),
             KeyCode::Char('p') | KeyCode::Char('P') => app.play_all(),
             KeyCode::Char('?') => {
                 app.active_view = app::ActiveView::Help;
-                app.status_message = "Ayuda de atajos de teclado (Presiona 1-5 o Tab para volver).".to_string();
+                app.say(messages::Msg::HelpOpened);
             }
             KeyCode::Char('>') | KeyCode::Char('.') => app.skip_next(),
             KeyCode::Char('<') | KeyCode::Char(',') => app.play_previous(),

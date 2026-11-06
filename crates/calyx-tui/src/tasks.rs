@@ -5,6 +5,7 @@
 use calyx_core::{SectionType, StreamingBackend};
 use crate::app::{ActiveView, TuiApp};
 use crate::bg_events::BgEvent;
+use crate::messages::{ListKind, Msg};
 
 impl TuiApp {
     fn spawn_event<F>(&self, fut: F)
@@ -22,37 +23,37 @@ impl TuiApp {
         if query.is_empty() {
             return;
         }
-        self.status_message = format!("Buscando '{query}'...");
+        self.say(Msg::Searching(&query));
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend.search(&query, 25).await.map_err(|e| e.to_string());
-            BgEvent::TracksReady { view: ActiveView::Home, label: "Búsqueda", res }
+            BgEvent::TracksReady { view: ActiveView::Home, kind: ListKind::Search, res }
         });
     }
 
-    pub fn open_section(&mut self, view: ActiveView, section: SectionType, label: &'static str) {
+    pub fn open_section(&mut self, view: ActiveView, section: SectionType, kind: ListKind) {
         self.active_view = view;
-        self.status_message = format!("Cargando {label}...");
+        self.say(Msg::Loading(kind));
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend.fetch_section(section).await.map_err(|e| e.to_string());
-            BgEvent::TracksReady { view, label, res }
+            BgEvent::TracksReady { view, kind, res }
         });
     }
 
     pub fn sync_library(&mut self) {
         self.active_view = ActiveView::Library;
-        self.status_message = "Sincronizando biblioteca personal de Apple Music...".to_string();
+        self.say(Msg::Loading(ListKind::Library));
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend.fetch_user_library().await.map_err(|e| e.to_string());
-            BgEvent::TracksReady { view: ActiveView::Library, label: "Biblioteca", res }
+            BgEvent::TracksReady { view: ActiveView::Library, kind: ListKind::Library, res }
         });
     }
 
     pub fn sync_playlists(&mut self) {
         self.active_view = ActiveView::Playlists;
-        self.status_message = "Sincronizando tus playlists de Apple Music...".to_string();
+        self.say(Msg::SyncingPlaylists);
         let backend = self.backend.clone();
         self.spawn_event(async move {
             BgEvent::PlaylistsReady(backend.fetch_user_playlists().await.map_err(|e| e.to_string()))
@@ -62,7 +63,7 @@ impl TuiApp {
     /// Loads the selected playlist; `play` queues it all instead of browsing it.
     pub fn load_selected_playlist(&mut self, play: bool) {
         let Some(pl) = self.playlists.get(self.playlist_state.selected().unwrap_or(0)).cloned() else { return };
-        self.status_message = format!("⏳ Cargando playlist '{}'...", pl.name);
+        self.say(Msg::LoadingPlaylist(&pl.name));
         let backend = self.backend.clone();
         self.spawn_event(async move {
             let res = backend.fetch_playlist_tracks(&pl.id).await.map_err(|e| e.to_string());

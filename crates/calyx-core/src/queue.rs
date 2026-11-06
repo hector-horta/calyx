@@ -18,14 +18,6 @@ impl RepeatMode {
             Self::One => Self::Off,
         }
     }
-
-    pub fn badge(&self) -> &'static str {
-        match self {
-            Self::Off => "🔁  OFF",
-            Self::All => "🔁  ALL",
-            Self::One => "🔂  ONE",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Default)]

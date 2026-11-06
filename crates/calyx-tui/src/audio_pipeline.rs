@@ -28,9 +28,9 @@ impl TuiApp {
                     self.current_track = Some(track);
                     self.trigger_prefetch_next();
                 }
-                Err(e) => self.status_message = format!("Error de audio: {e}"),
+                Err(e) => self.say(crate::messages::Msg::AudioError(&e.to_string())),
             },
-            Err(e) => self.status_message = format!("Error de audio: {e}"),
+            Err(e) => self.say(crate::messages::Msg::AudioError(&e.to_string())),
         }
     }
 }

@@ -6,6 +6,7 @@ use calyx_core::{
 };
 use ratatui::widgets::ListState;
 use crate::artwork::TerminalCoverArt;
+use crate::messages::Msg;
 
 /// The streaming service behind the facade; the only place to swap it.
 pub type Backend = calyx_core::AppleMusicBackend;
@@ -187,14 +188,14 @@ pub fn selected_track(&self) -> Option<Track> {
 
     pub fn enqueue_selected_back(&mut self) {
         if let Some(track) = self.tracks.get(self.selected_index).cloned() {
-            self.status_message = format!("Encolada al final: {} — {}", track.artist, track.title);
+            self.say(Msg::Enqueued { artist: &track.artist, title: &track.title });
             self.queue.enqueue_back(track);
         }
     }
 
     pub fn enqueue_selected_next(&mut self) {
         if let Some(track) = self.tracks.get(self.selected_index).cloned() {
-            self.status_message = format!("Encolada a continuación: {} — {}", track.artist, track.title);
+            self.say(Msg::EnqueuedNext { artist: &track.artist, title: &track.title });
             self.queue.enqueue_next(track);
         }
     }
@@ -203,7 +204,7 @@ pub fn selected_track(&self) -> Option<Track> {
         if self.active_view == ActiveView::Queue {
             if let Some(idx) = self.queue_state.selected() {
                 if let Some(removed) = self.queue.remove(idx) {
-                    self.status_message = format!("Eliminada de la cola: {}", removed.title);
+                    self.say(Msg::RemovedFromQueue(&removed.title));
                     if self.queue.is_empty() {
                         self.queue_state.select(None);
                     } else if idx >= self.queue.len() {
@@ -221,7 +222,7 @@ pub fn selected_track(&self) -> Option<Track> {
                 self.selected_index = self.tracks.len() - 1;
                 self.list_state.select(Some(self.selected_index));
             }
-            self.status_message = format!("Eliminada de Recientes: {}", removed.title);
+            self.say(Msg::RemovedFromRecent(&removed.title));
         }
     }
 
@@ -229,25 +230,25 @@ pub fn selected_track(&self) -> Option<Track> {
         if self.active_view == ActiveView::Queue {
             self.queue.clear();
             self.queue_state.select(None);
-            self.status_message = "Cola de reproducción vaciada ('c').".to_string();
+            self.say(Msg::QueueCleared);
         } else if self.active_view == ActiveView::Home {
             let _ = self.store.clear_all_tracks();
             self.tracks.clear();
             self.selected_index = 0;
             self.list_state.select(None);
-            self.status_message = "Historial de Recientes vaciado por completo ('c').".to_string();
+            self.say(Msg::RecentCleared);
         }
     }
 
     pub fn toggle_repeat(&mut self) -> RepeatMode {
         let mode = self.queue.toggle_repeat();
-        self.status_message = format!("Modo Repetición: {}", mode.badge());
+        self.say(Msg::Repeat(mode));
         mode
     }
 
     pub fn toggle_shuffle(&mut self) -> bool {
         let shuf = self.queue.toggle_shuffle();
-        self.status_message = format!("Modo Aleatorio (Shuffle): {}", if shuf { "ON 🔀" } else { "OFF" });
+        self.say(Msg::Shuffle(shuf));
         shuf
     }
 
@@ -266,10 +267,12 @@ pub fn selected_track(&self) -> Option<Track> {
     pub fn toggle_language(&mut self) {
         self.language = self.language.toggle();
         let _ = self.backend.set_language(self.language);
-        self.status_message = match self.language {
-            calyx_core::Language::Es => "Idioma: Español ('L' para cambiar)".to_string(),
-            calyx_core::Language::En => "Language: English ('L' to switch)".to_string(),
-        };
+        self.say(Msg::LanguageSet);
+    }
+
+    /// Shows `msg` in the status line, in the current language.
+    pub fn say(&mut self, msg: Msg<'_>) {
+        self.status_message = msg.text(self.language);
     }
 
     pub fn is_logged_in(&self) -> bool { self.backend.is_logged_in() }
