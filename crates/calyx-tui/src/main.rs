@@ -31,7 +31,12 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--check" || a == "--version") {
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("calyx {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    // Smoke test for packaging: the binary starts and exits cleanly.
+    if args.iter().any(|a| a == "--check") {
         return Ok(());
     }
 
