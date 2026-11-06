@@ -32,23 +32,39 @@ async fn main() -> Result<()> {
     }
 
     let storefront = args.get(1).map(|s| s.as_str()).unwrap_or("us");
-    enable_raw_mode().context("Failed to enable raw mode")?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen).context("Failed to enter alternate screen")?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend).context("Failed to create Ratatui terminal")?;
-
+    // Built before raw mode, so a startup error prints on a normal terminal.
     let mut app = app::TuiApp::new(storefront).context("Failed to initialize TuiApp")?;
-    let res = run_event_loop(&mut terminal, &mut app).await;
 
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    terminal.show_cursor()?;
+    install_panic_hook();
+    enable_raw_mode().context("Failed to enable raw mode")?;
+    let res = match execute!(io::stdout(), EnterAlternateScreen)
+        .context("Failed to enter alternate screen")
+        .and_then(|_| Terminal::new(CrosstermBackend::new(io::stdout())).context("Failed to create Ratatui terminal"))
+    {
+        Ok(mut terminal) => run_event_loop(&mut terminal, &mut app).await,
+        Err(e) => Err(e),
+    };
+    restore_terminal();
 
     if let Err(err) = res {
         eprintln!("Calyx encountered an error: {err:?}");
     }
     Ok(())
+}
+
+/// Leaves raw mode and the alternate screen; errors are ignored (best effort).
+fn restore_terminal() {
+    let _ = disable_raw_mode();
+    let _ = execute!(io::stdout(), LeaveAlternateScreen, crossterm::cursor::Show);
+}
+
+/// Restores the terminal before the default panic message is printed.
+fn install_panic_hook() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        restore_terminal();
+        previous(info);
+    }));
 }
 
 async fn run_event_loop(
@@ -121,7 +137,7 @@ KeyCode::Char('p') | KeyCode::Char('P') => {
                             app.active_view = app::ActiveView::Help;
                             app.status_message = "Ayuda de atajos de teclado (Presiona 1-5 o Tab para volver).".to_string();
                         }
-                        KeyCode::Char('>') | KeyCode::Char('.') => app.play_next().await,
+                        KeyCode::Char('>') | KeyCode::Char('.') => app.skip_next().await,
                         KeyCode::Char('<') | KeyCode::Char(',') => app.play_previous().await,
                         KeyCode::Tab => app.toggle_view(),
                         KeyCode::Char('u') => {

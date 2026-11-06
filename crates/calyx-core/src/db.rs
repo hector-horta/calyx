@@ -96,9 +96,11 @@ impl CatalogStore {
         let limit_i64 = limit as i64;
         if query.trim().is_empty() {
             debug!("Listing cached tracks (limit={})", limit);
+            // Most recent first: INSERT OR REPLACE re-inserts the row, so a higher
+            // rowid always means "searched more recently".
             let mut stmt = self.conn.prepare(
                 "SELECT id, title, artist, album, duration_ms, storefront, preview_url, artwork_url, hls_manifest_url, is_lossless
-                 FROM tracks ORDER BY title ASC LIMIT ?1"
+                 FROM tracks ORDER BY rowid DESC LIMIT ?1"
             )?;
             let rows = stmt.query_map(params![limit_i64], Self::row_to_track)?;
             let mut results = Vec::new();
@@ -147,6 +149,32 @@ mod tests {
         let found = store.search_tracks("daft", 10).expect("search");
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].title, "Digital Love");
+    }
+
+    fn track(id: &str, title: &str) -> Track {
+        Track {
+            id: id.to_string(),
+            title: title.to_string(),
+            artist: "Artist".to_string(),
+            album: "Album".to_string(),
+            duration_ms: 1_000,
+            storefront: "us".to_string(),
+            preview_url: None,
+            artwork_url: None,
+            hls_manifest_url: None,
+            is_lossless: false,
+        }
+    }
+
+    #[test]
+    fn recent_list_is_newest_first() {
+        let store = CatalogStore::open_in_memory().unwrap();
+        store.upsert_track(&track("1", "Zeta")).unwrap();
+        store.upsert_track(&track("2", "Alfa")).unwrap();
+        let ids = |s: &CatalogStore| s.search_tracks("", 10).unwrap().into_iter().map(|t| t.id).collect::<Vec<_>>();
+        assert_eq!(ids(&store), ["2", "1"]);
+        store.upsert_track(&track("1", "Zeta")).unwrap();
+        assert_eq!(ids(&store), ["1", "2"]);
     }
 
     #[test]

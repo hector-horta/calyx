@@ -202,6 +202,13 @@ pub async fn play_next(&mut self) {
     }
 }
 
+/// Manual skip ('>'): moves on even when repeating one track.
+pub async fn skip_next(&mut self) {
+    if let Some(next) = self.queue.skip_track(self.current_track.clone()) {
+        self.play_track(next).await;
+    }
+}
+
 pub async fn play_previous(&mut self) {
     if let Some(prev) = self.queue.previous_track(self.current_track.clone()) {
         self.play_track(prev).await;
@@ -267,7 +274,9 @@ pub async fn check_auto_advance(&mut self) {
             let clean_title = next_track.title.split(['(', '[']).next().unwrap_or(&next_track.title).trim();
             let q = format!("{} {}", next_track.artist, clean_title);
             if let Ok(found) = client.search_catalog(&q, 3).await {
-                for cat in found {
+                // Only a search hit that is the same song may be cached under the
+                // original id; otherwise a wrong version would play forever.
+                for cat in found.into_iter().filter(|c| next_track.is_same_song(c)) {
                     if let Ok(full_bytes) = client.fetch_full_track_stream(&cat.id, &wvd).await {
                         let _ = cache.put(&cat.id, &full_bytes);
                         let _ = cache.put(&next_track.id, &full_bytes);

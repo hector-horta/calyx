@@ -91,18 +91,17 @@ pub async fn search_catalog(&self, term: &str, limit: usize) -> CalyxResult<Vec<
     }
 
     // Fallback to itunes.apple.com/search
-    let encoded_term: String = clean_term.chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '+' })
-        .collect();
-
-    let url = format!(
-        "https://itunes.apple.com/search?media=music&entity=song&country={}&term={}&limit={}",
-        self.storefront,
-        encoded_term,
-        limit.clamp(1, 50)
-    );
-
-    let resp = self.http.get(&url).send().await?;
+    // reqwest percent-encodes each value, so accents and CJK titles survive.
+    let lim = limit.clamp(1, 50).to_string();
+    let resp = self.http.get("https://itunes.apple.com/search")
+        .query(&[
+            ("media", "music"),
+            ("entity", "song"),
+            ("country", self.storefront.as_str()),
+            ("term", clean_term),
+            ("limit", lim.as_str()),
+        ])
+        .send().await?;
     let payload: ItunesSearchPayload = resp.json().await?;
 
     let mut tracks = Vec::new();

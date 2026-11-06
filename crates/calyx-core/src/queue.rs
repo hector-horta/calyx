@@ -58,8 +58,18 @@ impl PlaybackQueue {
         self.history.clear();
     }
 
+    /// Automatic advance (track finished): honours Repeat One.
     pub fn next_track(&mut self, current: Option<Track>) -> Option<Track> {
-        if self.repeat_mode == RepeatMode::One {
+        self.advance(current, true)
+    }
+
+    /// Manual skip by the user: always moves on, even with Repeat One.
+    pub fn skip_track(&mut self, current: Option<Track>) -> Option<Track> {
+        self.advance(current, false)
+    }
+
+    fn advance(&mut self, current: Option<Track>, honor_repeat_one: bool) -> Option<Track> {
+        if honor_repeat_one && self.repeat_mode == RepeatMode::One {
             if let Some(c) = current {
                 return Some(c);
             }
@@ -90,6 +100,9 @@ impl PlaybackQueue {
     }
 
     pub fn previous_track(&mut self, current: Option<Track>) -> Option<Track> {
+        if self.history.is_empty() {
+            return None;
+        }
         if let Some(c) = current {
             self.upcoming.push_front(c);
         }
@@ -177,6 +190,34 @@ mod tests {
         let cur = dummy_track("current");
         let next = q.next_track(Some(cur.clone())).unwrap();
         assert_eq!(next.id, "current");
+    }
+
+    #[test]
+    fn previous_without_history_does_not_duplicate() {
+        let mut q = PlaybackQueue::new();
+        q.enqueue_back(dummy_track("1"));
+        assert!(q.previous_track(Some(dummy_track("cur"))).is_none());
+        assert_eq!(q.len(), 1);
+    }
+
+    #[test]
+    fn previous_returns_last_played() {
+        let mut q = PlaybackQueue::new();
+        q.enqueue_back(dummy_track("1"));
+        q.enqueue_back(dummy_track("2"));
+        let t1 = q.next_track(None).unwrap();
+        let t2 = q.next_track(Some(t1)).unwrap();
+        assert_eq!(q.previous_track(Some(t2)).unwrap().id, "1");
+        assert_eq!(q.peek_next().unwrap().id, "2");
+    }
+
+    #[test]
+    fn skip_ignores_repeat_one() {
+        let mut q = PlaybackQueue::new();
+        q.toggle_repeat();
+        q.toggle_repeat();
+        q.enqueue_back(dummy_track("2"));
+        assert_eq!(q.skip_track(Some(dummy_track("1"))).unwrap().id, "2");
     }
 
     #[test]
