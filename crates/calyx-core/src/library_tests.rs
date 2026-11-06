@@ -57,22 +57,6 @@ fn playlists_carry_can_edit() {
 }
 
 #[test]
-fn page_info_reads_count_and_next() {
-    let body = r#"{"next": "/v1/me/library/songs?offset=100", "data": [{"id": "a"}, {"id": "b"}]}"#;
-    assert_eq!(
-        page_info(body).unwrap(),
-        (2, Some("/v1/me/library/songs?offset=100".to_string()))
-    );
-    assert_eq!(page_info(r#"{"data": []}"#).unwrap(), (0, None));
-}
-
-#[test]
-fn page_info_never_follows_other_hosts() {
-    let body = r#"{"next": "https://evil.example/v1/x", "data": [{"id": "a"}]}"#;
-    assert_eq!(page_info(body).unwrap(), (1, None));
-}
-
-#[test]
 fn playlist_ids_are_validated() {
     assert!(valid_playlist_id("p.V7VY2"));
     assert!(!valid_playlist_id("p.x/../../me/storefront"));

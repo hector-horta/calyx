@@ -3,7 +3,9 @@
 //! The TUI talks only to [`StreamingBackend`]; tokens, HTTP clients, the
 //! audio cache and the stream-resolution strategy stay behind it.
 
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
+
+use crate::progress::LoadProgress;
 
 use crate::api::AppleMusicClient;
 use crate::audio_cache::AudioCache;
@@ -123,7 +125,7 @@ impl StreamingBackend for AppleMusicBackend {
             .await
     }
 
-    async fn fetch_user_library(&self) -> CalyxResult<Vec<Track>> {
+    async fn fetch_user_library(&self, progress: Arc<LoadProgress>) -> CalyxResult<Vec<Track>> {
         let (dev, usr, sf) = self.user_ctx();
         crate::library::fetch_user_library_songs(
             self.client().http(),
@@ -131,6 +133,7 @@ impl StreamingBackend for AppleMusicBackend {
             &usr,
             &sf,
             MAX_LIBRARY_SONGS,
+            Some(&progress),
         )
         .await
     }
@@ -140,7 +143,11 @@ impl StreamingBackend for AppleMusicBackend {
         crate::library::fetch_user_playlists(self.client().http(), &dev, &usr, MAX_PLAYLISTS).await
     }
 
-    async fn fetch_playlist_tracks(&self, playlist_id: &str) -> CalyxResult<Vec<Track>> {
+    async fn fetch_playlist_tracks(
+        &self,
+        playlist_id: &str,
+        progress: Arc<LoadProgress>,
+    ) -> CalyxResult<Vec<Track>> {
         let (dev, usr, sf) = self.user_ctx();
         crate::library::fetch_playlist_tracks(
             self.client().http(),
@@ -149,6 +156,7 @@ impl StreamingBackend for AppleMusicBackend {
             playlist_id,
             &sf,
             MAX_PLAYLIST_TRACKS,
+            Some(&progress),
         )
         .await
     }

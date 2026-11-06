@@ -1,3 +1,5 @@
+mod activity;
+mod album_view;
 mod app;
 mod artwork;
 mod audio_pipeline;
@@ -5,6 +7,7 @@ mod bg_events;
 mod hints;
 mod labels;
 mod list_actions;
+mod list_kind;
 mod messages;
 mod navigation;
 mod picker;
@@ -131,7 +134,7 @@ fn run_event_loop(
             KeyCode::Char('/') => app.is_editing = true,
             KeyCode::Char('a') => app.enqueue_selected_back(),
             KeyCode::Char('A') => app.enqueue_visible_list(),
-            KeyCode::Char('o') => app.open_selected_album(),
+            KeyCode::Char('o') => app.toggle_album(),
             KeyCode::Char('f') => app.add_selected_album_to_library(),
             KeyCode::Char('n') => app.enqueue_selected_next(),
             KeyCode::Char('d') => app.remove_selected_from_queue(),

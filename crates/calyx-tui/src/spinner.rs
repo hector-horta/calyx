@@ -14,6 +14,11 @@ fn frame_at(elapsed_ms: u128) -> &'static str {
     FRAMES[(elapsed_ms / FRAME_MS) as usize % FRAMES.len()]
 }
 
+/// Current frame of a spinner started at `since` (also used by the status line).
+pub fn frame_since(since: Instant) -> &'static str {
+    frame_at(since.elapsed().as_millis())
+}
+
 /// One-column cell: the spinner when `track_id` is being cached, blank otherwise.
 pub fn cache_cell(caching: &Caching, track_id: &str) -> &'static str {
     match caching {

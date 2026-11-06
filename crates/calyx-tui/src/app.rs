@@ -73,6 +73,10 @@ pub struct TuiApp {
     pub(crate) caching: crate::spinner::Caching,
     /// Open 'm' picker (add the selected song to a playlist).
     pub(crate) picker: Option<crate::picker::PlaylistPicker>,
+    /// Background work in progress (spinner and counter in the status line).
+    pub(crate) activity: crate::activity::Activity,
+    /// List replaced by an album opened with 'o' ('o' again goes back to it).
+    pub(crate) album_back: Option<crate::album_view::SavedList>,
 }
 
 impl TuiApp {
@@ -152,6 +156,8 @@ impl TuiApp {
             login_in_progress: false,
             caching: None,
             picker: None,
+            activity: Default::default(),
+            album_back: None,
         })
     }
 

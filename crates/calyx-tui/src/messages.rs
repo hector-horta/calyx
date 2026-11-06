@@ -1,35 +1,18 @@
 //! Every status-line message of the TUI, in both languages, in one place.
 //! Callers build a `Msg` with its data; `text(lang)` renders it.
 
+pub use crate::list_kind::ListKind;
 use calyx_core::{Language, RepeatMode};
 
-/// Which track list a background load filled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ListKind {
-    Search,
-    NewReleases,
-    Radio,
-    Library,
-}
-
-impl ListKind {
-    pub fn name(self, lang: Language) -> &'static str {
-        match (self, lang) {
-            (Self::Search, Language::Es) => "Búsqueda",
-            (Self::Search, Language::En) => "Search",
-            (Self::NewReleases, Language::Es) => "Novedades",
-            (Self::NewReleases, Language::En) => "New releases",
-            (Self::Radio, Language::Es) => "Estaciones de radio",
-            (Self::Radio, Language::En) => "Radio stations",
-            (Self::Library, Language::Es) => "Biblioteca",
-            (Self::Library, Language::En) => "Library",
-        }
-    }
-}
-
 pub enum Msg<'a> {
-    Enqueued { artist: &'a str, title: &'a str },
-    EnqueuedNext { artist: &'a str, title: &'a str },
+    Enqueued {
+        artist: &'a str,
+        title: &'a str,
+    },
+    EnqueuedNext {
+        artist: &'a str,
+        title: &'a str,
+    },
     RemovedFromQueue(&'a str),
     RemovedFromRecent(&'a str),
     QueueCleared,
@@ -39,33 +22,68 @@ pub enum Msg<'a> {
     LanguageSet,
     Searching(&'a str),
     Loading(ListKind),
-    ListLoaded { kind: ListKind, count: usize },
+    ListLoaded {
+        kind: ListKind,
+        count: usize,
+    },
     ListEmpty(ListKind),
-    ListError { kind: ListKind, err: &'a str },
+    ListError {
+        kind: ListKind,
+        err: &'a str,
+    },
     SyncingPlaylists,
     PlaylistsSynced(usize),
     PlaylistsError(&'a str),
     LoadingPlaylist(&'a str),
-    PlaylistOpened { name: &'a str, count: usize },
-    PlaylistError { name: &'a str, err: &'a str },
-    PlayingPlaylist { name: &'a str, count: usize },
+    PlaylistOpened {
+        name: &'a str,
+        count: usize,
+    },
+    PlaylistError {
+        name: &'a str,
+        err: &'a str,
+    },
+    PlayingPlaylist {
+        name: &'a str,
+        count: usize,
+    },
     PlaylistPlayFailed(&'a str),
     LoadingAlbum(&'a str),
-    AlbumOpened { name: &'a str, count: usize },
+    AlbumOpened {
+        name: &'a str,
+        count: usize,
+        back: &'a str,
+    },
+    BackToList(&'a str),
     AlbumError(&'a str),
     AlbumEmpty(&'a str),
     ListEnqueued(usize),
     AddingAlbumToLibrary(&'a str),
     AlbumAddedToLibrary(&'a str),
-    AlbumAddError { album: &'a str, err: &'a str },
+    AlbumAddError {
+        album: &'a str,
+        err: &'a str,
+    },
     PickPlaylist(&'a str),
-    AddingToPlaylist { title: &'a str, playlist: &'a str },
-    AddedToPlaylist { title: &'a str, playlist: &'a str },
-    AddToPlaylistError { playlist: &'a str, err: &'a str },
+    AddingToPlaylist {
+        title: &'a str,
+        playlist: &'a str,
+    },
+    AddedToPlaylist {
+        title: &'a str,
+        playlist: &'a str,
+    },
+    AddToPlaylistError {
+        playlist: &'a str,
+        err: &'a str,
+    },
     LoginOk,
     LoginError(&'a str),
     HelpOpened,
-    LoadingAudio { artist: &'a str, title: &'a str },
+    LoadingAudio {
+        artist: &'a str,
+        title: &'a str,
+    },
     PlayingList,
     RecentOpened,
     AudioError(&'a str),
@@ -145,8 +163,8 @@ impl Msg<'_> {
             (Msg::PlaylistsSynced(n), En) => format!("Playlists synced: {n} (Enter to open)."),
             (Msg::PlaylistsError(err), Es) => format!("Error sincronizando playlists: {err}"),
             (Msg::PlaylistsError(err), En) => format!("Could not sync playlists: {err}"),
-            (Msg::LoadingPlaylist(name), Es) => format!("⏳ Cargando playlist '{name}'..."),
-            (Msg::LoadingPlaylist(name), En) => format!("⏳ Loading playlist '{name}'..."),
+            (Msg::LoadingPlaylist(name), Es) => format!("Cargando playlist '{name}'..."),
+            (Msg::LoadingPlaylist(name), En) => format!("Loading playlist '{name}'..."),
             (Msg::PlaylistOpened { name, count }, Es) => format!(
                 "Playlist '{name}' cargada ({count} canciones). Presiona 'p' para reproducirla entera."
             ),
@@ -169,23 +187,25 @@ impl Msg<'_> {
                 format!("No se pudo reproducir la playlist '{name}'.")
             }
             (Msg::PlaylistPlayFailed(name), En) => format!("Could not play playlist '{name}'."),
-            (Msg::LoadingAlbum(title), Es) => format!("⏳ Cargando el álbum de '{title}'..."),
-            (Msg::LoadingAlbum(title), En) => format!("⏳ Loading the album of '{title}'..."),
-            (Msg::AlbumOpened { name, count }, Es) => {
-                format!("Álbum '{name}' ({count} canciones): 'p' lo reproduce, 'A' lo encola.")
-            }
-            (Msg::AlbumOpened { name, count }, En) => {
-                format!("Album '{name}' ({count} songs): 'p' plays it, 'A' enqueues it.")
-            }
+            (Msg::LoadingAlbum(title), Es) => format!("Cargando el álbum de '{title}'..."),
+            (Msg::LoadingAlbum(title), En) => format!("Loading the album of '{title}'..."),
+            (Msg::AlbumOpened { name, count, back }, Es) => format!(
+                "Álbum '{name}' ({count} canciones): 'p' lo reproduce, 'A' lo encola, 'o' vuelve a {back}."
+            ),
+            (Msg::AlbumOpened { name, count, back }, En) => format!(
+                "Album '{name}' ({count} songs): 'p' plays it, 'A' enqueues it, 'o' goes back to {back}."
+            ),
+            (Msg::BackToList(view), Es) => format!("De vuelta en {view}."),
+            (Msg::BackToList(view), En) => format!("Back to {view}."),
             (Msg::AlbumError(err), Es) => format!("No se pudo abrir el álbum: {err}"),
             (Msg::AlbumError(err), En) => format!("Could not open the album: {err}"),
             (Msg::AlbumEmpty(name), Es) => format!("El álbum '{name}' no tiene canciones."),
             (Msg::AlbumEmpty(name), En) => format!("Album '{name}' has no songs."),
             (Msg::AddingAlbumToLibrary(album), Es) => {
-                format!("⏳ Agregando '{album}' a tu biblioteca...")
+                format!("Agregando '{album}' a tu biblioteca...")
             }
             (Msg::AddingAlbumToLibrary(album), En) => {
-                format!("⏳ Adding '{album}' to your library...")
+                format!("Adding '{album}' to your library...")
             }
             (Msg::AlbumAddedToLibrary(album), Es) => {
                 format!("Álbum '{album}' agregado a tu biblioteca ('4' para verla).")
@@ -206,10 +226,10 @@ impl Msg<'_> {
                 format!("Choose a playlist for '{title}' (Enter adds, Esc cancels).")
             }
             (Msg::AddingToPlaylist { title, playlist }, Es) => {
-                format!("⏳ Agregando '{title}' a '{playlist}'...")
+                format!("Agregando '{title}' a '{playlist}'...")
             }
             (Msg::AddingToPlaylist { title, playlist }, En) => {
-                format!("⏳ Adding '{title}' to '{playlist}'...")
+                format!("Adding '{title}' to '{playlist}'...")
             }
             (Msg::AddedToPlaylist { title, playlist }, Es) => {
                 format!("'{title}' agregada a la playlist '{playlist}'.")
@@ -232,10 +252,10 @@ impl Msg<'_> {
             (Msg::HelpOpened, Es) => "Ayuda de atajos (1-5 o Tab para volver).".to_string(),
             (Msg::HelpOpened, En) => "Keyboard help (1-5 or Tab to go back).".to_string(),
             (Msg::LoadingAudio { artist, title }, Es) => {
-                format!("⏳ Cargando audio: {artist} — {title}...")
+                format!("Cargando audio: {artist} — {title}...")
             }
             (Msg::LoadingAudio { artist, title }, En) => {
-                format!("⏳ Loading audio: {artist} — {title}...")
+                format!("Loading audio: {artist} — {title}...")
             }
             (Msg::PlayingList, Es) => "Reproduciendo la lista actual...".to_string(),
             (Msg::PlayingList, En) => "Playing the current list...".to_string(),
