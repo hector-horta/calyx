@@ -66,7 +66,8 @@ pub fn sha1(data: &[u8]) -> [u8; 20] {
         padded.push(0);
     }
     padded.extend_from_slice(&bit_len.to_be_bytes());
-    for chunk in padded.chunks_exact(64) {
+    // Always whole blocks: the padding above makes the length a multiple of 64.
+    for chunk in padded.as_chunks::<64>().0 {
         let mut w = [0u32; 80];
         for i in 0..16 {
             w[i] = u32::from_be_bytes([
@@ -319,4 +320,52 @@ pub fn decrypt_aes128_cbc_key(
     let mut dec = Aes128CbcDec::new(enc_key.into(), iv.into());
     dec.decrypt_block_mut(GenericArray::from_mut_slice(&mut buf));
     Ok(buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    fn be256(value: u64) -> [u8; 256] {
+        let mut out = [0u8; 256];
+        out[248..].copy_from_slice(&value.to_be_bytes());
+        out
+    }
+
+    #[test]
+    fn sha1_matches_fips_180_vectors() {
+        assert_eq!(hex(&sha1(b"")), "da39a3ee5e6b4b0d3255bfef95601890afd80709");
+        assert_eq!(
+            hex(&sha1(b"abc")),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
+        // 56 bytes: the padding spills into a second 64-byte block.
+        assert_eq!(
+            hex(&sha1(
+                b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+            )),
+            "84983e441c3bd26ebaae4aa1f95129e5e54670f1"
+        );
+    }
+
+    #[test]
+    fn limbs_round_trip() {
+        let mut bytes = [0u8; 256];
+        for (i, b) in bytes.iter_mut().enumerate() {
+            *b = (i * 7 + 3) as u8;
+        }
+        assert_eq!(limbs_to_bytes(&bytes_to_limbs(&bytes)), bytes);
+    }
+
+    #[test]
+    fn modpow_small_numbers() {
+        assert_eq!(
+            rsa2048_modpow(&be256(2), &be256(10), &be256(1000)),
+            be256(24)
+        );
+    }
 }
