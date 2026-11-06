@@ -6,7 +6,8 @@ use tracing::info;
 use crate::drm::WidevineDeviceL3;
 use crate::error::{CalyxError, CalyxResult};
 
-const AUTH_FILE_PATH: &str = "calyx_auth.json";
+/// Where versions before 0.1.7 kept the session (the current directory).
+const LEGACY_AUTH_FILE: &str = "calyx_auth.json";
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionConfig {
@@ -19,8 +20,10 @@ pub struct SessionConfig {
 
 impl SessionConfig {
     pub fn load_or_default(default_storefront: &str) -> Self {
-        let mut cfg = if Path::new(AUTH_FILE_PATH).exists() {
-            fs::read_to_string(AUTH_FILE_PATH)
+        let auth_file = crate::paths::auth_file();
+        crate::paths::adopt_legacy_file(Path::new(LEGACY_AUTH_FILE), &auth_file);
+        let mut cfg = if auth_file.exists() {
+            fs::read_to_string(&auth_file)
                 .ok()
                 .and_then(|raw| serde_json::from_str::<SessionConfig>(&raw).ok())
                 .unwrap_or_default()
@@ -51,9 +54,21 @@ impl SessionConfig {
 
     pub fn save(&self) -> CalyxResult<()> {
         let serialized = serde_json::to_string_pretty(self)?;
-        fs::write(AUTH_FILE_PATH, serialized)
-            .map_err(|e| CalyxError::Auth(format!("Failed to write auth config: {}", e)))?;
-        Ok(())
+        let auth_file = crate::paths::auth_file();
+        let write = || -> std::io::Result<()> {
+            if let Some(dir) = auth_file.parent() {
+                fs::create_dir_all(dir)?;
+            }
+            fs::write(&auth_file, serialized)?;
+            // Tokens inside: readable by the owner only.
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&auth_file, fs::Permissions::from_mode(0o600))?;
+            }
+            Ok(())
+        };
+        write().map_err(|e| CalyxError::Auth(format!("Failed to write auth config: {e}")))
     }
 
     pub fn is_logged_in(&self) -> bool {
@@ -88,6 +103,14 @@ impl SessionConfig {
 }
 
 fn discover_local_wvd_path() -> Option<String> {
+    let config = crate::paths::config_dir();
+    for name in ["device.wvd", "calyx.wvd"] {
+        let candidate = config.join(name);
+        if candidate.is_file() {
+            return candidate.to_str().map(str::to_string);
+        }
+    }
+    // Legacy: next to where calyx is launched.
     for candidate in ["device.wvd", "calyx.wvd", "wvd/device.wvd"] {
         if Path::new(candidate).exists() {
             return Some(candidate.to_string());

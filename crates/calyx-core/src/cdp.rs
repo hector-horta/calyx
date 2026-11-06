@@ -5,7 +5,24 @@ use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub(crate) const CDP_PORT: u16 = 19222;
+/// A free loopback port for `--remote-debugging-port`, chosen per login so we
+/// never talk to (or close) a debugging browser that isn't ours.
+pub(crate) fn free_local_port() -> Option<u16> {
+    std::net::TcpListener::bind(("127.0.0.1", 0)).ok()?.local_addr().ok().map(|a| a.port())
+}
+
+/// Port of a browser still running on *our* profile: Chromium writes it to
+/// `DevToolsActivePort` inside the user-data dir.
+pub(crate) fn profile_devtools_port(profile_dir: &std::path::Path) -> Option<u16> {
+    std::fs::read_to_string(profile_dir.join("DevToolsActivePort")).ok()?.lines().next()?.trim().parse().ok()
+}
+
+/// Splits `ws://127.0.0.1:<port><path>` into (port, path); loopback only.
+fn split_ws_url(ws_url: &str) -> Option<(u16, &str)> {
+    let rest = ws_url.strip_prefix("ws://127.0.0.1:")?;
+    let slash = rest.find('/')?;
+    Some((rest[..slash].parse().ok()?, &rest[slash..]))
+}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct CdpTarget {
@@ -18,14 +35,14 @@ pub(crate) struct CdpTarget {
 
 pub(crate) async fn send_cdp_command(ws_url: &str, json_cmd: &str) -> Option<String> {
     tokio::time::timeout(Duration::from_secs(10), async {
-        let path = ws_url.strip_prefix(&format!("ws://127.0.0.1:{CDP_PORT}"))?;
+        let (port, path) = split_ws_url(ws_url)?;
         for _ in 0..6 {
-            let Ok(mut stream) = TcpStream::connect(("127.0.0.1", CDP_PORT)).await else {
+            let Ok(mut stream) = TcpStream::connect(("127.0.0.1", port)).await else {
                 tokio::time::sleep(Duration::from_millis(60)).await;
                 continue;
             };
             let handshake = format!(
-                "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{CDP_PORT}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+                "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
             );
             if stream.write_all(handshake.as_bytes()).await.is_err() {
                 continue;
@@ -93,4 +110,32 @@ async fn read_ws_text_frame(stream: &mut TcpStream) -> Option<String> {
     let mut data = vec![0u8; len];
     stream.read_exact(&mut data).await.ok()?;
     String::from_utf8(data).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ws_url_must_be_loopback_with_port() {
+        assert_eq!(split_ws_url("ws://127.0.0.1:45123/devtools/page/AB"), Some((45123, "/devtools/page/AB")));
+        assert_eq!(split_ws_url("ws://evil.example:9222/devtools/page/AB"), None);
+        assert_eq!(split_ws_url("ws://127.0.0.1:notaport/x"), None);
+    }
+
+    #[test]
+    fn free_port_is_nonzero() {
+        assert!(free_local_port().is_some_and(|p| p != 0));
+    }
+
+    #[test]
+    fn devtools_port_is_read_from_profile() {
+        let dir = std::env::temp_dir().join(format!("calyx_cdp_test_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(profile_devtools_port(&dir), None);
+        std::fs::write(dir.join("DevToolsActivePort"), "51234\n/devtools/browser/x\n").unwrap();
+        assert_eq!(profile_devtools_port(&dir), Some(51234));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

@@ -50,6 +50,8 @@ pub mod wvd_builtin;
 pub mod backend;
 /// Cache → full stream → preview strategy behind the facade.
 mod stream_resolver;
+/// Per-platform locations for session, history and caches.
+pub mod paths;
 /// Off-thread M4A decoding to PCM.
 pub mod decode;
 /// Precomputed visualizer frames.
