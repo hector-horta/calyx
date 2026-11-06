@@ -4,6 +4,7 @@ mod audio_pipeline;
 mod bg_events;
 mod hints;
 mod labels;
+mod list_actions;
 mod messages;
 mod navigation;
 mod playback;
