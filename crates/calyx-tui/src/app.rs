@@ -69,6 +69,8 @@ pub struct TuiApp {
     pub(crate) play_task: Option<tokio::task::JoinHandle<()>>,
     /// A login window is open; a second one would fight over the CDP port.
     pub(crate) login_in_progress: bool,
+    /// Next track being prefetched into the audio cache (spinner in the lists).
+    pub(crate) caching: crate::spinner::Caching,
 }
 
 impl TuiApp {
@@ -146,6 +148,7 @@ impl TuiApp {
             bg_rx,
             play_task: None,
             login_in_progress: false,
+            caching: None,
         })
     }
 

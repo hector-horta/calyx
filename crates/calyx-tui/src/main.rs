@@ -9,6 +9,7 @@ mod playback;
 mod player_footer;
 mod player_spectrum;
 mod player_status;
+mod spinner;
 mod tasks;
 mod ui;
 mod ui_dancer;
