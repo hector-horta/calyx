@@ -1,7 +1,7 @@
 //! Responsive spectrum bars for the player panel.
 //!
-//! Bars widen to fill the panel; below `NARROW_BELOW` columns the big play icon
-//! and the volume meter are dropped so the spectrum is never clipped.
+//! Bars widen to fill the box, centred with a small margin; below `NARROW_BELOW`
+//! columns the margin and the gaps are dropped so the spectrum is never clipped.
 
 use calyx_core::{SPECTRUM_BANDS, SpectrumFrame};
 use ratatui::{
@@ -10,12 +10,11 @@ use ratatui::{
 };
 
 const BAR_GLYPHS: [&str; 9] = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-/// Gap (2) + volume meter (6) on the right; the play icon lives in the song box.
-pub const SIDE_COLS: u16 = 8;
-/// Inner widths below this drop the volume meter.
+/// Margin kept free around the bars (2 columns each side, centred): the bars
+/// share their axis with the time and control lines below them.
+pub const SIDE_COLS: u16 = 4;
+/// Inner widths below this drop the margin and the gaps between bars.
 pub const NARROW_BELOW: u16 = 60;
-/// Inner widths from this up spread the status line to the panel edges.
-pub const WIDE_FROM: u16 = 90;
 const MAX_BAR_W: u16 = 8;
 /// Background the pending (not yet played) bars are mixed towards.
 const TRACK_BG: Color = Color::Rgb(40, 44, 52);
