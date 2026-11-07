@@ -1,8 +1,7 @@
-//! Time and shuffle/repeat line of the player, adapted to its width.
+//! Time and controls (shuffle, repeat, volume) lines of the player.
 
 use crate::app::TuiApp;
 use crate::hints::{KEY_STYLE, key_span};
-use crate::player_spectrum::{NARROW_BELOW, WIDE_FROM};
 use calyx_core::queue::RepeatMode;
 use ratatui::{
     style::{Color, Modifier, Style},
@@ -13,25 +12,9 @@ const TIME: Style = Style::new()
     .fg(Color::Rgb(220, 225, 230))
     .add_modifier(Modifier::BOLD);
 const OFF: Style = Style::new().fg(Color::DarkGray);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Density {
-    Narrow,
-    Medium,
-    Wide,
-}
-
-impl Density {
-    pub fn for_width(inner: u16) -> Self {
-        if inner < NARROW_BELOW {
-            Self::Narrow
-        } else if inner >= WIDE_FROM {
-            Self::Wide
-        } else {
-            Self::Medium
-        }
-    }
-}
+const SEP: &str = "  │  ";
+/// Volume meter steps (block elements, not emoji).
+const METER: [&str; 4] = ["▂", "▄", "▆", "█"];
 
 /// Elapsed seconds, total seconds and played ratio (0..=1).
 pub fn progress(app: &TuiApp) -> (u64, u64, f64) {
@@ -67,59 +50,44 @@ fn time_span(app: &TuiApp) -> Span<'static> {
         TIME,
     )
 }
-fn switch_spans(app: &TuiApp, compact: bool) -> Vec<Span<'static>> {
+/// "[s] Aleatorio │ [r] Repetir │ [- / +] Vol 85% ▂▄▆█": the playback controls
+/// on one line. ASCII labels; the state shows as colour (and "todo"/"una").
+/// `compact` (narrow boxes): shorter separators and no meter glyphs.
+fn control_spans(app: &TuiApp, compact: bool) -> Vec<Span<'static>> {
+    let sep = if compact { " │ " } else { SEP };
     let l = app.language;
-    let shuffle_style = if app.queue.is_shuffle() {
-        Style::new().fg(Color::Rgb(200, 235, 245))
-    } else {
-        OFF
+    let on = Style::new().fg(Color::Cyan);
+    let shuffle = if app.queue.is_shuffle() { on } else { OFF };
+    let (repeat, repeat_style) = match app.queue.repeat_mode() {
+        RepeatMode::Off => (l.btn_repeat(), OFF),
+        RepeatMode::All => (l.btn_repeat_all(), on),
+        RepeatMode::One => (l.btn_repeat_one(), on),
     };
-    let (rep_label, rep_icon, rep_style) = match app.queue.repeat_mode() {
-        RepeatMode::Off => (l.btn_repeat(), "🔁", OFF),
-        RepeatMode::All => (l.btn_repeat_all(), "🔁", Style::new().fg(Color::Cyan)),
-        RepeatMode::One => (l.btn_repeat_one(), "🔂", Style::new().fg(Color::Cyan)),
-    };
-    let (shuf, rep) = if compact {
-        ("🔀".to_string(), rep_icon.to_string())
-    } else {
-        (
-            format!("🔀 {}", l.btn_shuffle()),
-            format!("{rep_icon} {rep_label}"),
-        )
-    };
-    vec![
+    let vol = (app.volume * 100.0).round() as u8;
+    let lit = ((vol as f64 / 100.0) * 4.0).round() as usize;
+    let mut spans = vec![
         key_span("s", KEY_STYLE),
-        Span::raw(" "),
-        Span::styled(shuf, shuffle_style),
-        Span::styled("   │   ", OFF),
+        Span::styled(format!(" {}", l.btn_shuffle()), shuffle),
+        Span::styled(sep, OFF),
         key_span("r", KEY_STYLE),
-        Span::raw(" "),
-        Span::styled(rep, rep_style),
-    ]
+        Span::styled(format!(" {repeat}"), repeat_style),
+        Span::styled(sep, OFF),
+        key_span("- / +", KEY_STYLE),
+        Span::styled(format!(" Vol {vol}%"), TIME),
+    ];
+    if !compact {
+        spans.push(Span::raw(" "));
+        spans.extend((0..4).map(|i| Span::styled(METER[i], if i < lit { on } else { OFF })));
+    }
+    spans
 }
 
-pub fn status_lines(app: &TuiApp, density: Density) -> Vec<Line<'static>> {
-    match density {
-        // Time and switches as one centered group: balanced whether or not a
-        // track is playing. The status message always goes to the footer.
-        Density::Wide => {
-            let mut spans = vec![time_span(app), Span::raw("     ")];
-            spans.extend(switch_spans(app, false));
-            vec![Line::from(spans)]
-        }
-        Density::Medium => vec![
-            Line::from(time_span(app)),
-            Line::from(switch_spans(app, false)),
-        ],
-        // The meters box can be narrow: time on one line, compact switches and
-        // the volume (its meter is hidden here) on the next.
-        Density::Narrow => {
-            let mut spans = switch_spans(app, true);
-            spans.push(Span::styled(
-                format!("   Vol {}%", (app.volume * 100.0).round() as u8),
-                OFF,
-            ));
-            vec![Line::from(time_span(app)), Line::from(spans)]
-        }
+/// Time on one line, the controls (shuffle, repeat, volume) on the next; both
+/// centred on the same axis as the spectrum.
+pub fn status_lines(app: &TuiApp, width: usize) -> Vec<Line<'static>> {
+    let mut controls = Line::from(control_spans(app, false));
+    if controls.width() > width {
+        controls = Line::from(control_spans(app, true));
     }
+    vec![Line::from(time_span(app)), controls]
 }
