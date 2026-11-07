@@ -88,6 +88,15 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         }
     };
 
+    // While the lyrics are being fetched the placeholder shows the activity
+    // spinner instead of the note.
+    let syncing = app.current_lyrics.len() == 1
+        && app.current_lyrics[0].text == crate::messages::Msg::SyncingLyrics.text(app.language);
+    let marker = match app.activity.spinner().filter(|_| syncing) {
+        Some(frame) => format!(" {frame} "),
+        None => " ♪ ".to_string(),
+    };
+
     let mut visual_lines: Vec<Line<'static>> = Vec::new();
     let mut active_visual_idx = 0;
     for (idx, line) in app.current_lyrics.iter().enumerate() {
@@ -117,7 +126,7 @@ pub fn render_lyrics(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
                 }
                 let mut spans = vec![if c_idx == 0 {
                     Span::styled(
-                        " ♪ ",
+                        marker.clone(),
                         Style::default()
                             .fg(Color::Cyan)
                             .add_modifier(Modifier::BOLD),
