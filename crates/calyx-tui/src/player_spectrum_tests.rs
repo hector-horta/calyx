@@ -4,7 +4,6 @@ use super::*;
 use ratatui::style::Color;
 
 const GREEN: Color = Color::Rgb(0, 200, 100);
-const SIDE_COLS: u16 = 4;
 const SPECTRUM_BANDS: usize = 12;
 
 fn used_cols(l: BarLayout) -> u16 {
@@ -19,14 +18,14 @@ fn used_cols(l: BarLayout) -> u16 {
 fn wide_panel_widens_bars() {
     let l = BarLayout::for_width(120);
     assert!(l.show_sides);
-    assert_eq!(l.bar_w, 7);
+    assert_eq!(l.bar_w, 8);
 }
 
 #[test]
-fn medium_panel_keeps_icon_and_volume() {
+fn medium_panel_keeps_the_volume_meter() {
     let l = BarLayout::for_width(70);
     assert!(l.show_sides);
-    assert_eq!(l.bar_w, 3);
+    assert_eq!(l.bar_w, 4);
 }
 
 #[test]

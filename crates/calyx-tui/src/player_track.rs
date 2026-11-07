@@ -1,0 +1,98 @@
+//! Left box of the player: cover art, the song (artist, title, album) with the
+//! big play/pause icon, and what plays next at the bottom.
+
+use crate::app::TuiApp;
+use crate::artwork::{ART_WIDTH, TerminalCoverArt};
+use crate::ui::truncate;
+use calyx_core::models::PlaybackStatus;
+use ratatui::{
+    Frame,
+    layout::{Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph},
+};
+
+const OFF: Style = Style::new().fg(Color::DarkGray);
+/// Big play/pause icon: 6 columns x 3 rows.
+const ICON_W: u16 = 6;
+/// Below this inner width the cover is hidden so the text stays readable.
+const MIN_TEXT_W: u16 = 20;
+
+pub fn render_track_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
+    let block = Block::default().borders(Borders::ALL);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let art_w = ART_WIDTH as u16 + 1;
+    let show_art = inner.width >= art_w + MIN_TEXT_W + ICON_W;
+    let [art, info] = Layout::horizontal([
+        Constraint::Length(if show_art { art_w } else { 0 }),
+        Constraint::Min(0),
+    ])
+    .areas(inner);
+    if show_art {
+        let cover = match &app.current_artwork {
+            Some(a) => a.to_lines(),
+            None => TerminalCoverArt::from_jpeg_or_seed(None, "Calyx").to_lines(),
+        };
+        frame.render_widget(Paragraph::new(cover), art);
+    }
+    let [text, icon] =
+        Layout::horizontal([Constraint::Min(0), Constraint::Length(ICON_W)]).areas(info);
+    let lines = track_lines(app, text.width as usize, text.height as usize);
+    frame.render_widget(Paragraph::new(lines), text);
+    frame.render_widget(Paragraph::new(icon_lines(app)), icon);
+}
+
+/// The big play/pause icon, 3 rows of 6 columns.
+fn icon_lines(app: &TuiApp) -> Vec<Line<'static>> {
+    let icon = match app.playback_status() {
+        PlaybackStatus::Playing => &app.play_icon.rows,
+        PlaybackStatus::Paused | PlaybackStatus::Stopped => &app.pause_icon.rows,
+        PlaybackStatus::Buffering => {
+            let cyan = Style::new().fg(Color::Cyan);
+            return vec![Line::from(""), Line::from(Span::styled("  ↻", cyan))];
+        }
+    };
+    icon.iter().map(|row| Line::from(row.clone())).collect()
+}
+
+/// Returns the lines for the track box showing current song and next track.
+fn track_lines(app: &TuiApp, width: usize, height: usize) -> Vec<Line<'static>> {
+    let l = app.language;
+    let mut lines: Vec<Line<'static>> = Vec::new();
+
+    if let Some(t) = &app.current_track {
+        lines.push(Line::from(Span::styled(
+            truncate(&t.artist, width),
+            Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(
+            truncate(&t.title, width),
+            Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+        )));
+        lines.push(Line::from(Span::styled(truncate(&t.album, width), OFF)));
+    } else {
+        lines.push(Line::from(Span::styled(l.no_active_playback(), OFF)));
+    }
+
+    if let Some(next) = app.queue.peek_next() {
+        let label = format!(
+            "{} ({} {}):",
+            l.lbl_up_next(),
+            app.queue.len(),
+            l.lbl_in_queue()
+        );
+        let song = format!("{} - {}", next.title, next.artist);
+        while lines.len() + 2 < height {
+            lines.push(Line::from(""));
+        }
+        lines.push(Line::from(Span::styled(truncate(&label, width), OFF)));
+        lines.push(Line::from(Span::styled(
+            truncate(&song, width),
+            Style::new().fg(Color::Rgb(120, 160, 160)),
+        )));
+    }
+
+    lines
+}

@@ -72,10 +72,10 @@ impl PickerMsg<'_> {
                 format!("Could not add to '{playlist}': {err}")
             }
             (PickerMsg::ConfirmRemove { title, playlist }, Es) => {
-                format!("¿Quitar '{title}' de '{playlist}'? Presiona d otra vez para confirmar.")
+                format!("¿Quitar '{title}' de '{playlist}'? Presiona d otra vez")
             }
             (PickerMsg::ConfirmRemove { title, playlist }, En) => {
-                format!("Remove '{title}' from '{playlist}'? Press d again to confirm.")
+                format!("Remove '{title}' from '{playlist}'? Press d again")
             }
             (PickerMsg::Removing { title, playlist }, Es) => {
                 format!("Quitando '{title}' de '{playlist}'...")

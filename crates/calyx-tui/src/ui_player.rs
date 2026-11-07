@@ -1,13 +1,14 @@
-//! Player panel: cover art + responsive spectrum, status and up-next lines.
+//! Player panel in two boxes: the song (cover, title, up next; player_track.rs)
+//! and the meters (spectrum, time, notices and the audio status).
 
 use crate::app::TuiApp;
-use crate::hints::{LABEL_STYLE, hint_bar};
+use crate::hints::{LABEL_STYLE, hint_bar_fit};
 use crate::player_spectrum::{BarLayout, spectrum_row};
-use crate::player_status::{Density, footer_line, header_line, progress, status_lines};
-use calyx_core::models::PlaybackStatus;
+use crate::player_status::{Density, progress, status_lines};
+use crate::ui::truncate;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -20,84 +21,64 @@ const ROW_COLORS: [Color; 3] = [
     Color::Rgb(0, 200, 100),
 ];
 const OFF: Style = Style::new().fg(Color::DarkGray);
+const INFO: Style = Style::new().fg(Color::Rgb(120, 160, 160));
 
 pub fn render_player_panel(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
-    let cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Length(22), Constraint::Min(30)])
-        .split(area);
-    let art_lines = match &app.current_artwork {
-        Some(a) => a.to_lines(),
-        None => crate::artwork::TerminalCoverArt::from_jpeg_or_seed(None, "Calyx").to_lines(),
-    };
-    frame.render_widget(
-        Paragraph::new(art_lines).block(Block::default().borders(Borders::ALL)),
-        cols[0],
-    );
+    let song_w = (area.width * 45 / 100).clamp(30, 72);
+    let [song, meters] =
+        Layout::horizontal([Constraint::Length(song_w), Constraint::Min(30)]).areas(area);
+    crate::player_track::render_track_box(frame, song, app);
+    render_meters_box(frame, meters, app);
+}
 
+fn render_meters_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     let l = app.language;
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .title_bottom(hint_bar(&[
-            ("Enter", l.btn_play(), LABEL_STYLE),
-            (l.key_space(), l.btn_pause(), LABEL_STYLE),
-            ("< / >", l.btn_prev_next(), LABEL_STYLE),
-            ("- / +", l.btn_volume(), LABEL_STYLE),
-        ]));
-    let inner_w = block.inner(cols[1]).width;
+    let keys = [
+        ("Enter", l.btn_play(), LABEL_STYLE),
+        (l.key_space(), l.btn_pause(), LABEL_STYLE),
+        ("< / >", l.btn_prev_next(), LABEL_STYLE),
+        ("- / +", l.btn_volume(), LABEL_STYLE),
+    ];
+    let bar = hint_bar_fit(&keys, area.width.saturating_sub(2) as usize);
+    let block = Block::default().borders(Borders::ALL).title_bottom(bar);
+    let inner_w = block.inner(area).width;
     let layout = BarLayout::for_width(inner_w);
-    let density = Density::for_width(inner_w);
     let (_, _, ratio) = progress(app);
     let spec = app.current_spectrum();
 
-    let mut lines = vec![header_line(app, density), Line::from("")];
+    let mut lines = Vec::new();
     for (i, color) in ROW_COLORS.iter().enumerate() {
         let r = (2 - i) as u8;
-        let mut row = Vec::new();
-        if layout.show_sides {
-            row.extend(icon_row(app, r));
-            row.push(Span::raw("  "));
-        }
-        row.extend(spectrum_row(&spec, r, *color, layout, ratio));
+        let mut row = spectrum_row(&spec, r, *color, layout, ratio);
         if layout.show_sides {
             row.push(Span::raw("  "));
             row.extend(volume_cell(app, r));
         }
         lines.push(Line::from(row));
     }
-    lines.extend(status_lines(app, density));
+    lines.extend(status_lines(app, Density::for_width(inner_w)));
     lines.push(Line::from(""));
-    lines.push(footer_line(app, inner_w));
-    frame.render_widget(
-        Paragraph::new(lines)
-            .alignment(Alignment::Center)
-            .block(block),
-        cols[1],
-    );
+    lines.push(notice_line(app, inner_w as usize));
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(app.audio_hint.clone(), INFO)));
+    let body = Paragraph::new(lines)
+        .alignment(Alignment::Center)
+        .block(block);
+    frame.render_widget(body, area);
 }
 
-/// One row of the big play/pause icon (6 columns).
-fn icon_row(app: &TuiApp, r: u8) -> Vec<Span<'static>> {
-    let row_idx = (2 - r) as usize;
-    let blank = || vec![Span::raw("      ")];
-    match app.playback_status() {
-        PlaybackStatus::Playing => app
-            .play_icon
-            .rows
-            .get(row_idx)
-            .cloned()
-            .unwrap_or_else(blank),
-        PlaybackStatus::Paused | PlaybackStatus::Stopped => app
-            .pause_icon
-            .rows
-            .get(row_idx)
-            .cloned()
-            .unwrap_or_else(blank),
-        PlaybackStatus::Buffering => vec![Span::styled(
-            if r == 1 { "  ↻   " } else { "      " },
-            Style::new().fg(Color::Cyan),
-        )],
+/// A live action/error/result in reverse video; otherwise the routine
+/// progress message (with the activity spinner and counter), plain.
+fn notice_line(app: &TuiApp, width: usize) -> Line<'static> {
+    if let Some(notice) = app.notice.as_ref().filter(|n| n.is_live()) {
+        return notice.line(width);
     }
+    let progress = app.activity.decorate(&app.status_message);
+    let style = INFO.add_modifier(Modifier::ITALIC);
+    Line::from(Span::styled(
+        truncate(&progress, width.saturating_sub(1)),
+        style,
+    ))
 }
 
 /// Volume meter column (6 columns): label, percentage, then the step bar.

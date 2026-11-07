@@ -1,11 +1,9 @@
-//! Text lines of the player panel (title, status, up next), adapted to its width.
+//! Time and shuffle/repeat line of the player, adapted to its width.
 
 use crate::app::TuiApp;
 use crate::hints::{KEY_STYLE, key_span};
-use crate::player_footer::footer;
 use crate::player_spectrum::{NARROW_BELOW, WIDE_FROM};
-use crate::ui::truncate;
-use calyx_core::{models::PlaybackStatus, queue::RepeatMode};
+use calyx_core::queue::RepeatMode;
 use ratatui::{
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -51,35 +49,6 @@ pub fn progress(app: &TuiApp) -> (u64, u64, f64) {
         0.0
     };
     (elap, tot, ratio)
-}
-
-pub fn header_line(app: &TuiApp, density: Density) -> Line<'static> {
-    let Some(t) = &app.current_track else {
-        return Line::from(Span::styled(app.language.no_active_playback(), OFF));
-    };
-
-    let mut spans = Vec::with_capacity(3);
-
-    if density == Density::Narrow {
-        let glyph = match app.playback_status() {
-            PlaybackStatus::Playing => "▶ ",
-            PlaybackStatus::Buffering => "↻ ",
-            PlaybackStatus::Paused | PlaybackStatus::Stopped => "⏸ ",
-        };
-        spans.push(Span::styled(glyph, Style::new().fg(Color::Cyan)));
-    }
-
-    spans.push(Span::styled(
-        format!("{} ", truncate(&t.title, 34)),
-        Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
-    ));
-
-    spans.push(Span::styled(
-        format!("— {} • {}", truncate(&t.artist, 22), truncate(&t.album, 22)),
-        Style::new().fg(Color::Cyan),
-    ));
-
-    Line::from(spans)
 }
 
 fn time_span(app: &TuiApp) -> Span<'static> {
@@ -142,30 +111,15 @@ pub fn status_lines(app: &TuiApp, density: Density) -> Vec<Line<'static>> {
             Line::from(time_span(app)),
             Line::from(switch_spans(app, false)),
         ],
+        // The meters box can be narrow: time on one line, compact switches and
+        // the volume (its meter is hidden here) on the next.
         Density::Narrow => {
-            let mut spans = vec![time_span(app), Span::raw("  ")];
-            spans.extend(switch_spans(app, true));
+            let mut spans = switch_spans(app, true);
             spans.push(Span::styled(
-                format!("  Vol {}%", (app.volume * 100.0).round() as u8),
+                format!("   Vol {}%", (app.volume * 100.0).round() as u8),
                 OFF,
             ));
-            vec![Line::from(spans)]
+            vec![Line::from(time_span(app)), Line::from(spans)]
         }
     }
-}
-
-pub fn footer_line(app: &TuiApp, width: u16) -> Line<'static> {
-    let l = app.language;
-    let status = app.activity.decorate(&app.status_message);
-    let next = app.queue.peek_next().map(|n| {
-        format!(
-            "{}: {} — {} ({} {})",
-            l.lbl_up_next(),
-            truncate(&n.title, 34),
-            truncate(&n.artist, 20),
-            app.queue.len(),
-            l.lbl_in_queue()
-        )
-    });
-    footer(next, &status, width as usize)
 }

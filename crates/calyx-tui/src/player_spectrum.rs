@@ -10,9 +10,9 @@ use ratatui::{
 };
 
 const BAR_GLYPHS: [&str; 9] = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
-/// Play icon (6) + gap (2) on the left, gap (2) + volume meter (6) on the right.
-pub const SIDE_COLS: u16 = 16;
-/// Inner widths below this drop the big icon and the volume meter.
+/// Gap (2) + volume meter (6) on the right; the play icon lives in the song box.
+pub const SIDE_COLS: u16 = 8;
+/// Inner widths below this drop the volume meter.
 pub const NARROW_BELOW: u16 = 60;
 /// Inner widths from this up spread the status line to the panel edges.
 pub const WIDE_FROM: u16 = 90;
