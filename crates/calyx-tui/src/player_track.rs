@@ -7,20 +7,26 @@ use crate::ui::truncate;
 use calyx_core::models::PlaybackStatus;
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout, Rect},
+    layout::{Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Padding, Paragraph},
 };
 
 const OFF: Style = Style::new().fg(Color::DarkGray);
 /// Big play/pause icon: 6 columns x 3 rows.
 const ICON_W: u16 = 6;
 /// Below this inner width the cover is hidden so the text stays readable.
-const MIN_TEXT_W: u16 = 20;
+const MIN_TEXT_W: u16 = 18;
+/// Rows of the play/pause icon.
+const ICON_H: u16 = 3;
+/// Blank column between the content and the right border (both player boxes).
+pub const RIGHT_MARGIN: u16 = 1;
 
 pub fn render_track_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
-    let block = Block::default().borders(Borders::ALL);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .padding(Padding::right(RIGHT_MARGIN));
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let art_w = ART_WIDTH as u16 + 1;
@@ -41,6 +47,10 @@ pub fn render_track_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         Layout::horizontal([Constraint::Min(0), Constraint::Length(ICON_W)]).areas(info);
     let lines = track_lines(app, text.width as usize, text.height as usize);
     frame.render_widget(Paragraph::new(lines), text);
+    // The icon is 3 rows tall: centre it in the column instead of pinning it to the top.
+    let [icon] = Layout::vertical([Constraint::Length(ICON_H)])
+        .flex(Flex::Center)
+        .areas(icon);
     frame.render_widget(Paragraph::new(icon_lines(app)), icon);
 }
 

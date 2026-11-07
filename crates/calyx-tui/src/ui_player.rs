@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Padding, Paragraph},
 };
 
 /// Bar colours from the top row down.
@@ -40,7 +40,10 @@ fn render_meters_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         ("- / +", l.btn_volume(), LABEL_STYLE),
     ];
     let bar = hint_bar_fit(&keys, area.width.saturating_sub(2) as usize);
-    let block = Block::default().borders(Borders::ALL).title_bottom(bar);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .padding(Padding::right(crate::player_track::RIGHT_MARGIN))
+        .title_bottom(bar);
     let inner_w = block.inner(area).width;
     let layout = BarLayout::for_width(inner_w);
     let (_, _, ratio) = progress(app);
