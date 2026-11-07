@@ -28,9 +28,10 @@ impl crate::bg_events::BgEvent {
             E::TracksReady { .. } | E::PlaylistOpened(..) | E::PlaylistReady(..) => Some(Job::List),
             E::AlbumOpened(..) => Some(Job::List),
             E::PlaylistsReady(..) => Some(Job::Playlists),
-            E::AlbumAddedToLibrary(..) | E::AddedToPlaylist { .. } | E::PlaylistCreated { .. } => {
-                Some(Job::Write)
-            }
+            E::AlbumAddedToLibrary(..)
+            | E::AddedToPlaylist { .. }
+            | E::PlaylistCreated { .. }
+            | E::RemovedFromPlaylist { .. } => Some(Job::Write),
             _ => None,
         }
     }

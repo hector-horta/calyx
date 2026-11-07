@@ -101,8 +101,8 @@ fn render_central_with_lyrics(
             ("c", l.btn_clear_all(), LABEL_STYLE),
         ]),
         // Most used first: in narrow terminals the last hints are dropped.
-        _ => hint_bar_fit(
-            &[
+        _ => {
+            let mut items = vec![
                 ("a", l.btn_enqueue(), LABEL_STYLE),
                 ("n", l.btn_next_in_queue(), LABEL_STYLE),
                 ("p", l.btn_play_list(), LABEL_STYLE),
@@ -111,9 +111,15 @@ fn render_central_with_lyrics(
                 ("f", crate::labels::album_to_library(l), LABEL_STYLE),
                 ("y", phonetic, yellow),
                 ("c", l.btn_clear_all(), LABEL_STYLE),
-            ],
-            area.width.saturating_sub(2) as usize,
-        ),
+            ];
+            if app.can_remove_from_open_playlist() {
+                items.insert(
+                    5,
+                    ("d", crate::labels::remove_from_playlist(l), LABEL_STYLE),
+                );
+            }
+            hint_bar_fit(&items, area.width.saturating_sub(2) as usize)
+        }
     };
     let outer = Block::default()
         .borders(Borders::ALL)

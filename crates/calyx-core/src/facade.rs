@@ -56,6 +56,12 @@ pub trait StreamingBackend: Send + Sync + 'static {
         playlist_id: &str,
         track: &Track,
     ) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
+    /// Removes a library song (`i.…` id) from one of the user's playlists (needs login).
+    fn remove_from_playlist(
+        &self,
+        playlist_id: &str,
+        song_id: &str,
+    ) -> impl std::future::Future<Output = CalyxResult<()>> + Send;
     /// Creates a playlist named `name` with `track` already in it (needs login).
     fn create_playlist_with(
         &self,

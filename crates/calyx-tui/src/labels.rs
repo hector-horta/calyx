@@ -49,6 +49,14 @@ pub fn album_to_library(lang: Language) -> &'static str {
     }
 }
 
+/// Label of the 'd' key inside an opened, editable playlist.
+pub fn remove_from_playlist(lang: Language) -> &'static str {
+    match lang {
+        Language::Es => "Quitar",
+        Language::En => "Remove",
+    }
+}
+
 /// Label of the 'm' key (add the selected song to a playlist).
 pub fn to_playlist(lang: Language) -> &'static str {
     match lang {

@@ -19,7 +19,7 @@ pub enum BgEvent {
     },
     PlaylistsReady(Result<Vec<UserPlaylist>, String>),
     /// A playlist opened with Enter (browse its tracks).
-    PlaylistOpened(String, Result<Vec<Track>, String>),
+    PlaylistOpened(UserPlaylist, Result<Vec<Track>, String>),
     /// A playlist started with 'p' (queue all and play).
     PlaylistReady(String, Result<Vec<Track>, String>),
     LoginDone(Result<(), String>),
@@ -36,6 +36,14 @@ pub enum BgEvent {
         title: String,
         name: String,
         res: Result<UserPlaylist, String>,
+    },
+    /// Result of removing a song ('d' twice) from an opened playlist.
+    RemovedFromPlaylist {
+        playlist_id: String,
+        playlist: String,
+        song_id: String,
+        title: String,
+        res: Result<(), String>,
     },
     /// Result of 'f' (album name, outcome).
     AlbumAddedToLibrary(String, Result<(), String>),
@@ -70,6 +78,8 @@ impl TuiApp {
     /// Shows a newly loaded list; an album's saved list is no longer reachable.
     fn show_tracks(&mut self, tracks: Vec<Track>, view: ActiveView) {
         self.album_back = None;
+        self.open_playlist = None;
+        self.pending_remove = None;
         self.tracks = tracks;
         self.selected_index = 0;
         self.list_state.select(Some(0));
@@ -155,15 +165,16 @@ impl TuiApp {
                 playlist: &playlist,
                 err: &err,
             }),
-            BgEvent::PlaylistOpened(name, Ok(list)) => {
+            BgEvent::PlaylistOpened(playlist, Ok(list)) => {
                 self.say(Msg::PlaylistOpened {
-                    name: &name,
+                    name: &playlist.name,
                     count: list.len(),
                 });
                 self.show_tracks(list, ActiveView::Library);
+                self.open_playlist = Some(playlist);
             }
-            BgEvent::PlaylistOpened(name, Err(e)) => self.say(Msg::PlaylistError {
-                name: &name,
+            BgEvent::PlaylistOpened(playlist, Err(e)) => self.say(Msg::PlaylistError {
+                name: &playlist.name,
                 err: &e,
             }),
             BgEvent::PlaylistReady(name, Ok(list)) if !list.is_empty() => {
@@ -213,6 +224,13 @@ impl TuiApp {
                 album: &album,
                 err: &err,
             }),
+            BgEvent::RemovedFromPlaylist {
+                playlist_id,
+                playlist,
+                song_id,
+                title,
+                res,
+            } => self.on_removed_from_playlist(&playlist_id, &playlist, &song_id, &title, res),
             // A newer prefetch may already own the spinner; only clear our own.
             BgEvent::PrefetchDone(id) => {
                 if self.caching.as_ref().is_some_and(|(c, _)| *c == id) {

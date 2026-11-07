@@ -33,7 +33,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
             Line::from("  [p] Reproducir Lista   [a] Encolar   [n] A continuación"),
             Line::from("  [d] Quitar Pista       [c] Limpiar Todo      [y] Fonética (Dual/Romaji)"),
             Line::from("  [o] Álbum / Volver     [A] Encolar Lista Entera  [f] Álbum a Biblioteca"),
-            Line::from("  [m] Agregar a Playlist"),
+            Line::from("  [m] Agregar a Playlist   [d] Quitar de la Playlist abierta (2 veces)"),
             Line::from(""),
             Line::from(Span::styled(
                 "  🎵 Controles del Reproductor",
@@ -74,7 +74,9 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
                 "  [d] Remove Track       [c] Clear All         [y] Phonetics (Dual/Romaji)",
             ),
             Line::from("  [o] Album / Back       [A] Enqueue Whole List    [f] Album to Library"),
-            Line::from("  [m] Add to Playlist"),
+            Line::from(
+                "  [m] Add to Playlist      [d] Remove from the open Playlist (press twice)",
+            ),
             Line::from(""),
             Line::from(Span::styled(
                 "  🎵 Player Controls",

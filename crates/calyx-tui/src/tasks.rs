@@ -109,7 +109,7 @@ impl TuiApp {
             if play {
                 BgEvent::PlaylistReady(pl.name, res)
             } else {
-                BgEvent::PlaylistOpened(pl.name, res)
+                BgEvent::PlaylistOpened(pl, res)
             }
         });
     }
