@@ -99,7 +99,7 @@ impl TuiApp {
                 Err(e) => {
                     self.activity.finish(crate::activity::Job::Audio);
                     self.current_lyrics = lyrics;
-                    self.status_message = e;
+                    self.say(crate::messages::Msg::AudioError(&e));
                 }
             },
             BgEvent::AudioReady(..) => {}

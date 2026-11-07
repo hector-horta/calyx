@@ -78,7 +78,7 @@ fn removal_messages_ask_before_deleting() {
     };
     assert_eq!(
         ask.text(Language::Es),
-        "¿Quitar 'Modern Love' de 'Mix'? Presiona d otra vez para confirmar."
+        "¿Quitar 'Modern Love' de 'Mix'? Presiona d otra vez"
     );
     assert!(
         PickerMsg::NotEditable("Top 50")

@@ -81,6 +81,10 @@ pub struct TuiApp {
     pub(crate) open_playlist: Option<UserPlaylist>,
     /// First 'd' on a playlist song: (library song id, when). A second 'd' confirms.
     pub(crate) pending_remove: Option<(String, std::time::Instant)>,
+    /// Action/error/result shown in reverse video; progress never overwrites it.
+    pub(crate) notice: Option<crate::notice::Notice>,
+    /// Quality/source of the playing audio ("[AAC 256k | Cache]"), always visible.
+    pub(crate) audio_hint: String,
 }
 
 impl TuiApp {
@@ -164,6 +168,8 @@ impl TuiApp {
             album_back: None,
             open_playlist: None,
             pending_remove: None,
+            notice: None,
+            audio_hint: String::new(),
         })
     }
 
@@ -223,8 +229,15 @@ impl TuiApp {
     }
 
     /// Shows `msg` in the status line, in the current language.
+    /// Actions, errors and results become a notice (reverse video, own slot);
+    /// everything else is routine progress in `status_message`.
     pub fn say<'m>(&mut self, msg: impl Into<Msg<'m>>) {
-        self.status_message = msg.into().text(self.language);
+        let msg = msg.into();
+        let text = msg.text(self.language);
+        match msg.tone() {
+            Some(tone) => self.notice = Some(crate::notice::Notice::new(text, tone)),
+            None => self.status_message = text,
+        }
     }
 
     pub fn is_logged_in(&self) -> bool {
