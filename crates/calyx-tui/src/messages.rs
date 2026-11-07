@@ -2,6 +2,7 @@
 //! Callers build a `Msg` with its data; `text(lang)` renders it.
 
 pub use crate::list_kind::ListKind;
+use crate::messages_picker::PickerMsg;
 use calyx_core::{Language, RepeatMode};
 
 pub enum Msg<'a> {
@@ -64,19 +65,8 @@ pub enum Msg<'a> {
         album: &'a str,
         err: &'a str,
     },
-    PickPlaylist(&'a str),
-    AddingToPlaylist {
-        title: &'a str,
-        playlist: &'a str,
-    },
-    AddedToPlaylist {
-        title: &'a str,
-        playlist: &'a str,
-    },
-    AddToPlaylistError {
-        playlist: &'a str,
-        err: &'a str,
-    },
+    /// Messages of the 'm' playlist picker (messages_picker.rs).
+    Picker(PickerMsg<'a>),
     LoginOk,
     LoginError(&'a str),
     HelpOpened,
@@ -219,30 +209,7 @@ impl Msg<'_> {
             (Msg::AlbumAddError { album, err }, En) => {
                 format!("Could not add '{album}' to your library: {err}")
             }
-            (Msg::PickPlaylist(title), Es) => {
-                format!("Elige una playlist para '{title}' (Enter agrega, Esc cancela).")
-            }
-            (Msg::PickPlaylist(title), En) => {
-                format!("Choose a playlist for '{title}' (Enter adds, Esc cancels).")
-            }
-            (Msg::AddingToPlaylist { title, playlist }, Es) => {
-                format!("Agregando '{title}' a '{playlist}'...")
-            }
-            (Msg::AddingToPlaylist { title, playlist }, En) => {
-                format!("Adding '{title}' to '{playlist}'...")
-            }
-            (Msg::AddedToPlaylist { title, playlist }, Es) => {
-                format!("'{title}' agregada a la playlist '{playlist}'.")
-            }
-            (Msg::AddedToPlaylist { title, playlist }, En) => {
-                format!("'{title}' added to playlist '{playlist}'.")
-            }
-            (Msg::AddToPlaylistError { playlist, err }, Es) => {
-                format!("No se pudo agregar a '{playlist}': {err}")
-            }
-            (Msg::AddToPlaylistError { playlist, err }, En) => {
-                format!("Could not add to '{playlist}': {err}")
-            }
+            (Msg::Picker(msg), _) => msg.text(lang),
             (Msg::ListEnqueued(n), Es) => format!("{n} canciones encoladas al final."),
             (Msg::ListEnqueued(n), En) => format!("{n} songs added to the end of the queue."),
             (Msg::LoginOk, Es) => "Sesión de Apple Music verificada.".to_string(),

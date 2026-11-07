@@ -217,8 +217,8 @@ impl TuiApp {
     }
 
     /// Shows `msg` in the status line, in the current language.
-    pub fn say(&mut self, msg: Msg<'_>) {
-        self.status_message = msg.text(self.language);
+    pub fn say<'m>(&mut self, msg: impl Into<Msg<'m>>) {
+        self.status_message = msg.into().text(self.language);
     }
 
     pub fn is_logged_in(&self) -> bool {

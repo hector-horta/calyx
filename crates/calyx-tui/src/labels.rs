@@ -57,35 +57,6 @@ pub fn to_playlist(lang: Language) -> &'static str {
     }
 }
 
-/// Texts of the 'm' picker: (title for `song`, add, cancel, loading, none editable).
-pub fn picker(
-    lang: Language,
-    song: &str,
-) -> (
-    String,
-    &'static str,
-    &'static str,
-    &'static str,
-    &'static str,
-) {
-    match lang {
-        Language::Es => (
-            format!(" Agregar '{song}' a playlist "),
-            "Agregar",
-            "Cancelar",
-            "Cargando tus playlists...",
-            "No tienes playlists editables.",
-        ),
-        Language::En => (
-            format!(" Add '{song}' to playlist "),
-            "Add",
-            "Cancel",
-            "Loading your playlists...",
-            "You have no editable playlists.",
-        ),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

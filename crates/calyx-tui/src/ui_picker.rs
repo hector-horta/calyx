@@ -2,6 +2,7 @@
 
 use crate::app::TuiApp;
 use crate::hints::{LABEL_STYLE, hint_bar};
+use crate::picker_texts::{PickerTexts, picker_texts};
 use crate::ui::truncate;
 use ratatui::{
     Frame,
@@ -25,39 +26,66 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
     cell
 }
 
+/// Displays a text field for entering a new playlist name.
+fn naming_popup(frame: &mut Frame<'_>, texts: &PickerTexts, name: &str) {
+    let area = centered(frame.area(), 64, 3);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::new().fg(Color::Cyan))
+        .title_top(texts.new_title.clone())
+        .title_bottom(hint_bar(&[
+            ("Enter", texts.create, LABEL_STYLE),
+            ("Esc", texts.back, LABEL_STYLE),
+        ]));
+    let line = Line::from(vec![
+        Span::styled(texts.name_label, Style::new().fg(Color::DarkGray)),
+        Span::raw(name.to_string()),
+        Span::styled("█", Style::new().fg(Color::Yellow)),
+    ]);
+    frame.render_widget(Clear, area);
+    frame.render_widget(ratatui::widgets::Paragraph::new(line).block(block), area);
+}
+
 pub fn render_picker(frame: &mut Frame<'_>, app: &TuiApp) {
     let Some(picker) = &app.picker else {
         return;
     };
     let song = truncate(&picker.track.title, SONG_TITLE_CHARS);
-    let (title, add, cancel, loading, none) = crate::labels::picker(app.language, &song);
+    let texts = picker_texts(app.language, &song);
+    if let Some(name) = &picker.naming {
+        naming_popup(frame, &texts, name);
+        return;
+    }
     let playlists = app.editable_playlists();
-    let items: Vec<ListItem<'static>> = if playlists.is_empty() {
+    let mut items = vec![ListItem::new(Line::from(texts.new_row))];
+    if playlists.is_empty() {
         let text = if app.playlists.is_empty() {
-            loading
+            texts.loading
         } else {
-            none
+            texts.none
         };
-        vec![ListItem::new(Span::styled(
+        items.push(ListItem::new(Span::styled(
             text,
             Style::new().fg(Color::DarkGray),
-        ))]
+        )));
     } else {
-        playlists
-            .iter()
-            .map(|p| ListItem::new(Line::from(format!("📁 {}", p.name))))
-            .collect()
-    };
+        items.extend(
+            playlists
+                .iter()
+                .map(|p| ListItem::new(Line::from(format!("📁 {}", p.name)))),
+        );
+    }
 
     let rows = (items.len() as u16).clamp(1, MAX_ROWS);
     let area = centered(frame.area(), 64, rows + 2);
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::new().fg(Color::Cyan))
-        .title_top(title)
+        .title_top(texts.title)
         .title_bottom(hint_bar(&[
-            ("Enter", add, LABEL_STYLE),
-            ("Esc", cancel, LABEL_STYLE),
+            ("Enter", texts.add, LABEL_STYLE),
+            ("n", texts.new_key, LABEL_STYLE),
+            ("Esc", texts.cancel, LABEL_STYLE),
         ]));
     let list = List::new(items)
         .block(block)
@@ -69,9 +97,6 @@ pub fn render_picker(frame: &mut Frame<'_>, app: &TuiApp) {
                 .add_modifier(Modifier::BOLD),
         );
     let mut state = picker.state.clone();
-    if playlists.is_empty() {
-        state.select(None);
-    }
     frame.render_widget(Clear, area);
     frame.render_stateful_widget(list, area, &mut state);
 }

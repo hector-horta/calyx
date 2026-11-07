@@ -4,6 +4,7 @@
 use crate::app::{ActiveView, TuiApp};
 use crate::artwork::TerminalCoverArt;
 use crate::messages::{ListKind, Msg};
+use crate::messages_picker::PickerMsg;
 use calyx_core::{AudioSource, DecodedTrack, LyricLine, ResolvedAudio, Track, UserPlaylist};
 
 pub enum BgEvent {
@@ -29,6 +30,12 @@ pub enum BgEvent {
         title: String,
         playlist: String,
         res: Result<(), String>,
+    },
+    /// Result of creating a playlist (with the song in it) from the 'm' picker.
+    PlaylistCreated {
+        title: String,
+        name: String,
+        res: Result<UserPlaylist, String>,
     },
     /// Result of 'f' (album name, outcome).
     AlbumAddedToLibrary(String, Result<(), String>),
@@ -124,7 +131,8 @@ impl TuiApp {
                 self.playlists = playlists;
                 // Loaded for the 'm' picker: keep its instructions on screen.
                 if let Some(title) = self.picker.as_ref().map(|p| p.track.title.clone()) {
-                    self.say(Msg::PickPlaylist(&title));
+                    self.say(PickerMsg::PickPlaylist(&title));
+                    self.select_first_playlist_in_picker();
                 }
             }
             BgEvent::PlaylistsReady(Err(e)) => {
@@ -135,7 +143,7 @@ impl TuiApp {
                 title,
                 playlist,
                 res: Ok(()),
-            } => self.say(Msg::AddedToPlaylist {
+            } => self.say(PickerMsg::AddedToPlaylist {
                 title: &title,
                 playlist: &playlist,
             }),
@@ -143,7 +151,7 @@ impl TuiApp {
                 playlist,
                 res: Err(err),
                 ..
-            } => self.say(Msg::AddToPlaylistError {
+            } => self.say(PickerMsg::AddToPlaylistError {
                 playlist: &playlist,
                 err: &err,
             }),
@@ -184,6 +192,20 @@ impl TuiApp {
             }
             BgEvent::AlbumOpened(Ok((name, _))) => self.say(Msg::AlbumEmpty(&name)),
             BgEvent::AlbumOpened(Err(e)) => self.say(Msg::AlbumError(&e)),
+            // The new playlist goes first, so the next 'm' offers it without a resync.
+            BgEvent::PlaylistCreated { title, name, res } => match res {
+                Ok(playlist) => {
+                    self.say(PickerMsg::PlaylistCreated {
+                        name: &playlist.name,
+                        title: &title,
+                    });
+                    self.playlists.insert(0, playlist);
+                }
+                Err(err) => self.say(PickerMsg::PlaylistCreateError {
+                    name: &name,
+                    err: &err,
+                }),
+            },
             BgEvent::AlbumAddedToLibrary(album, Ok(())) => {
                 self.say(Msg::AlbumAddedToLibrary(&album))
             }
