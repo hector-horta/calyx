@@ -179,6 +179,12 @@ impl StreamingBackend for AppleMusicBackend {
         crate::library_write::add_track_to_playlist(&http, &dev, &usr, playlist_id, &track.id).await
     }
 
+    async fn create_playlist_with(&self, name: &str, track: &Track) -> CalyxResult<UserPlaylist> {
+        let (dev, usr, _) = self.user_ctx();
+        let http = self.client().http().clone();
+        crate::playlist_create::create_playlist_with_track(&http, &dev, &usr, name, &track.id).await
+    }
+
     async fn complete_track(&self, track: Track) -> Track {
         stream_resolver::complete_track(&self.client(), track).await
     }

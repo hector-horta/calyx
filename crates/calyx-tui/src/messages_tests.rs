@@ -1,4 +1,5 @@
 use super::*;
+use crate::messages_picker::PickerMsg;
 
 #[test]
 fn messages_follow_the_language() {
@@ -50,7 +51,7 @@ fn album_messages_name_the_keys() {
 
 #[test]
 fn playlist_picker_messages() {
-    let pick = Msg::PickPlaylist("Modern Love");
+    let pick = PickerMsg::PickPlaylist("Modern Love");
     assert!(
         pick.text(Language::Es)
             .contains("(Enter agrega, Esc cancela)")
@@ -59,7 +60,7 @@ fn playlist_picker_messages() {
         pick.text(Language::En)
             .contains("(Enter adds, Esc cancels)")
     );
-    let added = Msg::AddedToPlaylist {
+    let added = PickerMsg::AddedToPlaylist {
         title: "Modern Love",
         playlist: "Mix",
     };

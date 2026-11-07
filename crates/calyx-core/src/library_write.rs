@@ -4,7 +4,7 @@ use crate::album_id::is_catalog_album_id;
 use crate::error::{CalyxError, CalyxResult};
 use reqwest::{Client, StatusCode};
 
-const LIBRARY_URL: &str = "https://amp-api.music.apple.com/v1/me/library";
+pub(crate) const LIBRARY_URL: &str = "https://amp-api.music.apple.com/v1/me/library";
 
 /// Target of `POST /v1/me/library?ids[albums]=<id>`; the id is validated
 /// before it is put into the URL.
@@ -18,7 +18,7 @@ fn add_album_url(album_id: &str) -> CalyxResult<String> {
 }
 
 /// Apple answers 202 Accepted, also when the album was already there.
-fn check_status(status: StatusCode) -> CalyxResult<()> {
+pub(crate) fn check_status(status: StatusCode) -> CalyxResult<()> {
     if status.is_success() {
         return Ok(());
     }
@@ -32,6 +32,21 @@ fn check_status(status: StatusCode) -> CalyxResult<()> {
     )))
 }
 
+/// Resource type Apple expects for a song id: catalog ids are numeric ("songs"),
+/// library-only ids look like `i.AbC` ("library-songs"); anything else is rejected.
+pub(crate) fn song_resource(song_id: &str) -> CalyxResult<&'static str> {
+    let library_id = song_id
+        .strip_prefix("i.")
+        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_alphanumeric()));
+    match (is_catalog_album_id(song_id), library_id) {
+        (true, _) => Ok("songs"),
+        (_, true) => Ok("library-songs"),
+        _ => Err(CalyxError::Validation(format!(
+            "Invalid song id: {song_id:?}"
+        ))),
+    }
+}
+
 /// URL and body of `POST /v1/me/library/playlists/{id}/tracks` for one song.
 /// Catalog ids are numeric ("songs"); library-only ids look like `i.AbC` ("library-songs").
 fn add_to_playlist_request(
@@ -43,18 +58,7 @@ fn add_to_playlist_request(
             "Invalid playlist id: {playlist_id:?}"
         )));
     }
-    let library_id = song_id
-        .strip_prefix("i.")
-        .is_some_and(|rest| !rest.is_empty() && rest.chars().all(|c| c.is_ascii_alphanumeric()));
-    let kind = if is_catalog_album_id(song_id) {
-        "songs"
-    } else if library_id {
-        "library-songs"
-    } else {
-        return Err(CalyxError::Validation(format!(
-            "Invalid song id: {song_id:?}"
-        )));
-    };
+    let kind = song_resource(song_id)?;
     let url = format!("{LIBRARY_URL}/playlists/{playlist_id}/tracks");
     let body = serde_json::json!({ "data": [{ "id": song_id, "type": kind }] });
     Ok((url, body))
