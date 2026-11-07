@@ -56,6 +56,8 @@ mod paging;
 pub mod paths;
 /// Create a playlist with one song in it.
 mod playlist_create;
+/// Remove songs from, rename or delete a library playlist (web API).
+mod playlist_edit;
 /// Progress of paginated loads, shared with the UI.
 pub mod progress;
 /// Playback queue management with repeat and shuffle support.

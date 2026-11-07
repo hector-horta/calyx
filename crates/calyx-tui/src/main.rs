@@ -17,6 +17,7 @@ mod playback;
 mod player_footer;
 mod player_spectrum;
 mod player_status;
+mod playlist_remove;
 mod spinner;
 mod tasks;
 mod ui;

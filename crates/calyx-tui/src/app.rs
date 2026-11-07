@@ -77,6 +77,10 @@ pub struct TuiApp {
     pub(crate) activity: crate::activity::Activity,
     /// List replaced by an album opened with 'o' ('o' again goes back to it).
     pub(crate) album_back: Option<crate::album_view::SavedList>,
+    /// Playlist whose songs are the visible list (opened with Enter in view 5).
+    pub(crate) open_playlist: Option<UserPlaylist>,
+    /// First 'd' on a playlist song: (library song id, when). A second 'd' confirms.
+    pub(crate) pending_remove: Option<(String, std::time::Instant)>,
 }
 
 impl TuiApp {
@@ -158,6 +162,8 @@ impl TuiApp {
             picker: None,
             activity: Default::default(),
             album_back: None,
+            open_playlist: None,
+            pending_remove: None,
         })
     }
 

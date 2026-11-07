@@ -24,8 +24,12 @@ impl TuiApp {
         }
     }
 
+    /// 'd': remove the selected row from the queue, from Recent (Home) or, inside
+    /// an opened playlist, from that playlist on Apple Music (asks first).
     pub fn remove_selected_from_queue(&mut self) {
-        if self.active_view == ActiveView::Queue {
+        if self.active_view == ActiveView::Library && self.open_playlist.is_some() {
+            self.remove_selected_from_playlist();
+        } else if self.active_view == ActiveView::Queue {
             if let Some(idx) = self.queue_state.selected()
                 && let Some(removed) = self.queue.remove(idx)
             {

@@ -71,6 +71,23 @@ fn playlist_picker_messages() {
 }
 
 #[test]
+fn removal_messages_ask_before_deleting() {
+    let ask = PickerMsg::ConfirmRemove {
+        title: "Modern Love",
+        playlist: "Mix",
+    };
+    assert_eq!(
+        ask.text(Language::Es),
+        "¿Quitar 'Modern Love' de 'Mix'? Presiona d otra vez para confirmar."
+    );
+    assert!(
+        PickerMsg::NotEditable("Top 50")
+            .text(Language::En)
+            .contains("cannot be edited")
+    );
+}
+
+#[test]
 fn list_kind_is_localized_inside_messages() {
     let msg = Msg::ListLoaded {
         kind: ListKind::Library,

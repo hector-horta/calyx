@@ -1,4 +1,5 @@
-//! Status-line messages of the 'm' playlist picker (add to / create a playlist).
+//! Status-line messages about editing playlists: the 'm' picker (add to /
+//! create a playlist) and 'd' inside an opened playlist (remove a song).
 
 use calyx_core::Language;
 
@@ -10,6 +11,12 @@ pub enum PickerMsg<'a> {
     AddingToPlaylist { title: &'a str, playlist: &'a str },
     AddedToPlaylist { title: &'a str, playlist: &'a str },
     AddToPlaylistError { playlist: &'a str, err: &'a str },
+    ConfirmRemove { title: &'a str, playlist: &'a str },
+    Removing { title: &'a str, playlist: &'a str },
+    Removed { title: &'a str, playlist: &'a str },
+    RemoveError { playlist: &'a str, err: &'a str },
+    NotEditable(&'a str),
+    NoLibraryId(&'a str),
 }
 
 impl<'a> From<PickerMsg<'a>> for crate::messages::Msg<'a> {
@@ -63,6 +70,42 @@ impl PickerMsg<'_> {
             }
             (PickerMsg::AddToPlaylistError { playlist, err }, En) => {
                 format!("Could not add to '{playlist}': {err}")
+            }
+            (PickerMsg::ConfirmRemove { title, playlist }, Es) => {
+                format!("¿Quitar '{title}' de '{playlist}'? Presiona d otra vez para confirmar.")
+            }
+            (PickerMsg::ConfirmRemove { title, playlist }, En) => {
+                format!("Remove '{title}' from '{playlist}'? Press d again to confirm.")
+            }
+            (PickerMsg::Removing { title, playlist }, Es) => {
+                format!("Quitando '{title}' de '{playlist}'...")
+            }
+            (PickerMsg::Removing { title, playlist }, En) => {
+                format!("Removing '{title}' from '{playlist}'...")
+            }
+            (PickerMsg::Removed { title, playlist }, Es) => {
+                format!("'{title}' quitada de '{playlist}'.")
+            }
+            (PickerMsg::Removed { title, playlist }, En) => {
+                format!("'{title}' removed from '{playlist}'.")
+            }
+            (PickerMsg::RemoveError { playlist, err }, Es) => {
+                format!("No se pudo quitar de '{playlist}': {err}")
+            }
+            (PickerMsg::RemoveError { playlist, err }, En) => {
+                format!("Could not remove from '{playlist}': {err}")
+            }
+            (PickerMsg::NotEditable(p), Es) => {
+                format!("La playlist '{p}' no es tuya: no se puede editar.")
+            }
+            (PickerMsg::NotEditable(p), En) => {
+                format!("Playlist '{p}' is not yours: it cannot be edited.")
+            }
+            (PickerMsg::NoLibraryId(t), Es) => {
+                format!("'{t}' no tiene id de biblioteca: no se puede quitar.")
+            }
+            (PickerMsg::NoLibraryId(t), En) => {
+                format!("'{t}' has no library id: it cannot be removed.")
             }
         }
     }
