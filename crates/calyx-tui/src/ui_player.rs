@@ -8,7 +8,7 @@ use crate::player_status::{Density, progress, status_lines};
 use crate::ui::truncate;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Padding, Paragraph},
@@ -60,14 +60,15 @@ fn render_meters_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         lines.push(Line::from(row));
     }
     lines.extend(status_lines(app, Density::for_width(inner_w)));
-    lines.push(Line::from(""));
+    // No fixed blank rows: when there is no notice its slot is the only gap.
     lines.push(notice_line(app, inner_w as usize));
-    lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(app.audio_hint.clone(), INFO)));
-    let body = Paragraph::new(lines)
-        .alignment(Alignment::Center)
-        .block(block);
-    frame.render_widget(body, area);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let [body] = Layout::vertical([Constraint::Length(lines.len() as u16)])
+        .flex(Flex::Center)
+        .areas(inner);
+    frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), body);
 }
 
 /// A live action/error/result in reverse video; otherwise the routine
