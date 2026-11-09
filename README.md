@@ -1,6 +1,6 @@
 # Calyx - Apple Music Native Terminal UI (TUI)
 
-**Cliente de consola nativo en Rust para Apple Music con reproducción de audio de alta fidelidad, desencriptación Widevine L3 / CBCS en memoria, caché en disco gapless y visualizador analógico TrueColor.**
+**Cliente de consola nativo en Rust para Apple Music con reproducción de audio de alta fidelidad (AAC 256k), streaming continuo en memoria, caché en disco gapless y visualizador analógico TrueColor.**
 
 ---
 
@@ -11,7 +11,7 @@
 ```
 crates/
 ├── calyx-core          # Motor de audio nativo (Symphonia/Rodio), cliente API Apple Music,
-│                       # desencriptación CBCS/Widevine L3, SQLite WAL versionado,
+│                       # decodificación de streams en memoria, SQLite WAL versionado,
 │                       # parser TTML nativo y caché atómico en disco con política LRU.
 └── calyx-tui           # Interfaz de consola (Ratatui), reproductor de dos cajas balanceado,
                         # lookahead prefetching gapless, espectro analógico de 48 pasos,
@@ -76,13 +76,13 @@ cargo run -p calyx-tui -- --version
 
 ## 🔐 Soporte de Audio, Caché y Streaming
 
-- **Pipeline Nativo de Audio fMP4 & Widevine L3**: Soporte de decodificación continua AAC-LC 256kbps en memoria con `Symphonia` + `Rodio`, desencriptación local CBCS y metadatos de sincronización de audio.
+- **Pipeline Nativo de Audio fMP4 / AAC**: Soporte de decodificación continua AAC-LC a 256 kbps en memoria mediante `Symphonia` + `Rodio`, procesamiento de streams por bloques y metadatos de sincronización de audio.
 - **⚡ Caché Atómico en Disco (`~/.cache/calyx/audio/`)**:
-  - Almacena las pistas ya desencriptadas en disco con cuota máxima configurable de **2 GB**.
+  - Almacena las pistas reproducidas en disco local con cuota máxima configurable de **2 GB**.
   - **Escritura Atómica Anti-Corrupción**: Escribe primero en `.part` y solo se consolida en `.bin` al completar el stream al 100%. Los saltos (*Skip*) nunca corrompen el caché.
   - **Política de Desalojo LRU**: Cada reproducción renueva la fecha de acceso (`mtime`/`touch`). Si el tamaño excede la cuota, el recolector de basura en segundo plano elimina las pistas más antiguas hasta recuperar un 25% de espacio libre.
 - **🎧 Lookahead Prefetching de la Pista $n+1$ (Gapless Playback)**:
-  - Mientras la canción actual $n$ está sonando, Calyx descarga y desencripta automáticamente en segundo plano la siguiente pista de la cola ($n+1$).
+  - Mientras la canción actual $n$ está sonando, Calyx descarga y procesa automáticamente en segundo plano la siguiente pista de la cola ($n+1$).
   - Al cambiar de canción o terminar la pista, la siguiente arranca en **0.05 segundos** con el tag `[AAC 256k | Caché]`, eliminando por completo los baches de silencio entre pistas.
 - **🎤 Letras Sincronizadas TTML con Relleno por Carácter (Fade-In RGB)**:
   - Parser nativo TTML de Apple Music con timestamps de alta precisión, con fallback automático a LRCLIB.
@@ -121,7 +121,7 @@ Calyx permite sincronizar tu biblioteca personal y reproducir el catálogo compl
     - Linux: `~/.config/calyx/calyx_auth.json` (XDG)
     - macOS: `~/Library/Application Support/calyx/calyx_auth.json`
   * **Base de Datos SQLite (`calyx_cache.db`)**: En el directorio de datos local de cada SO.
-  * **Caché de Audio Descifrado**: `~/.cache/calyx/audio/`
+  * **Caché Local de Audio**: `~/.cache/calyx/audio/`
   * **Instalaciones Portables**: Define la variable de entorno `CALYX_HOME` para almacenar toda la configuración, base de datos y caché en un directorio unificado (ej: pendrive o carpeta del proyecto).
 
 ---
