@@ -1,102 +1,120 @@
 # Calyx 🎵
 
-> **Un reproductor de Apple Music elegante, rápido y sin distracciones para tu terminal.**
+<p align="center">
+  <b>English</b> · <a href="README.es.md">Español</a>
+</p>
 
-Calyx te permite escuchar toda tu música de Apple Music directamente desde la consola, con carátulas en arte ASCII, visualizador de audio en tiempo real, letras animadas sincronizadas y control total con el teclado.
+<p align="center">
+  <img src="https://img.shields.io/badge/version-v0.1.12-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/language-Rust-orange.svg" alt="Rust">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platforms">
+  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
+</p>
 
----
+> **A sleek, distraction-free Apple Music terminal player.**
 
-## ✨ Características
-
-- 🎧 **Audio de Alta Fidelidad**: Reproducción fluida en calidad AAC 256 kbps sin publicidad ni interrupciones.
-- ⚡ **Reproducción Continua (Gapless)**: Cambios de canción instantáneos sin silencios incómodos entre pistas.
-- 🎤 **Letras en Tiempo Real**: Las letras avanzan e iluminan cada sílaba al compás de la voz (estilo karaoke).
-- 🈳 **Pronunciación Fonética (`y`)**: Transliteración automática a alfabeto latino (Romaji) para canciones en japonés o coreano.
-- 🌈 **Visualizador de Espectro**: Animación de frecuencias retroiluminada de 48 pasos que responde a la música.
-- 📁 **Biblioteca y Playlists**: Accede a tus listas guardadas, añade canciones (`m`), guarda álbumes (`f`) o crea listas nuevas al instante.
-- 🌐 **Bilingüe (Español / English)**: Detecta el idioma de tu sistema y permite alternar en caliente con la tecla `L`.
-- 💻 **Multiplataforma**: Funciona de forma idéntica en Windows, macOS y Linux.
+Calyx lets you stream your entire Apple Music catalog and library directly from the command line, featuring ASCII cover art, a real-time analog spectrum visualizer, syllable-synced lyrics, and complete keyboard-driven controls.
 
 ---
 
-## 🚀 Instalación y Uso Rápido
+## ✨ Features
 
-### 1. Descargar y compilar
-Requiere tener [Rust instalado](https://rustup.rs/):
+- 🎧 **High-Fidelity Audio**: Pure 256 kbps AAC streaming with zero ads or interruptions.
+- ⚡ **Gapless Playback**: Instant track transitions with lookahead prefetching — no silence between songs.
+- 🎤 **Real-Time Synced Lyrics**: Syllable-by-syllable TrueColor illumination in sync with the vocals (karaoke style).
+- 🈳 **Phonetic Transliteration (`y`)**: Automatic Latin transliteration (Romaji) for Japanese (Kanji/Kana) and Korean (Hangul) tracks.
+- 🌈 **Analog Spectrum Visualizer**: Balanced two-box player with a 48-step illuminated frequency display responding to the music.
+- 📁 **Library & Playlist Management**: Browse saved songs, add tracks to playlists (<kbd>m</kbd>), save albums (<kbd>f</kbd>), or create new playlists on the fly.
+- 🌐 **Bilingual (English / Spanish)**: Auto-detects your system locale with hot-swapping via <kbd>L</kbd>.
+- 💻 **Cross-Platform**: Native performance on Windows, macOS, and Linux.
 
+---
+
+## 🚀 Quick Start
+
+### 1. Requirements
+Ensure you have [Rust and Cargo installed](https://rustup.rs/).
+
+### 2. Clone and Run
 ```sh
-# Clonar el proyecto
+# Clone repository
 git clone https://github.com/hector-horta/calyx.git
 cd calyx
 
-# Iniciar el reproductor
+# Run the player (defaults to the US storefront)
 cargo run -p calyx-tui
 ```
 
-> **Consejo regional**: Si quieres explorar las listas y novedades de un país específico, puedes pasar su código de 2 letras al arrancar (por ejemplo: `cargo run -p calyx-tui -- mx` para México, `es` para España o `ar` para Argentina).
+> 💡 **Regional Storefronts**: To browse recommendations and charts from a specific region, pass its two-letter country code (e.g., `cargo run -p calyx-tui -- uk`, `cargo run -p calyx-tui -- mx`, or `cargo run -p calyx-tui -- jp`).
 
 ---
 
-## 🔑 Iniciar Sesión (Apple Music)
+## 🔑 Sign In (Apple Music)
 
-Para escuchar tus canciones completas, tus playlists y tu biblioteca personal:
+To unlock full-length playback, your personal library, and your playlists:
 
-1. Abre Calyx y presiona la tecla **`u`**.
-2. Se abrirá automáticamente tu navegador habitual con la página oficial de Apple Music.
-3. Inicia sesión normalmente. Calyx detectará tu cuenta y volverá a la terminal listo para reproducir.
+1. Launch Calyx and press <kbd>u</kbd>.
+2. Your default web browser will open to the official Apple Music page.
+3. Sign in to your account. Calyx will automatically capture your session and return to the terminal ready to play.
 
-*(Si alguna vez necesitas consultar opciones manuales para servidores sin entorno gráfico, presiona `?` dentro de Calyx).*
-
----
-
-## ⌨️ Atajos de Teclado
-
-### 🧭 Navegación y Búsqueda
-| **Tecla** | **Acción** |
-|:---:|:---|
-| `/` | **Buscar** cualquier canción, artista o álbum en el catálogo |
-| `1` a `5` | **Secciones principales**: `1` Recientes, `2` Novedades, `3` Radio, `4` Tu Biblioteca, `5` Playlists |
-| `o` | **Ver Álbum**: Abre el álbum de la canción seleccionada (pulsar de nuevo para volver) |
-| `Tab` | **Alternar vista**: Cambia entre la lista que estás explorando y tu Cola activa |
-| `?` | **Pantalla de Ayuda** con guía de controles integrada |
-
-### 🎵 Reproducción y Sonido
-| **Tecla** | **Acción** |
-|:---:|:---|
-| `Enter` | **Reproducir** la canción seleccionada |
-| `Espacio` | **Pausar / Reanudar** |
-| `<` / `>` (o `,` / `.`) | **Pista Anterior / Siguiente** |
-| `+` / `-` | **Subir / Bajar volumen** (+5% / -5%) |
-| `s` | **Modo Aleatorio** (`🔀 Shuffle`) |
-| `r` | **Modo Repetir** (`🔁 Todo` ➔ `🔂 Una canción` ➔ `Off`) |
-| `p` | **Reproducir Todo**: Reproduce la lista o playlist completa |
-
-### 📋 Gestión de Canciones y Listas
-| **Tecla** | **Acción** |
-|:---:|:---|
-| `a` | **Encolar al final** de la reproducción |
-| `n` | **Encolar a continuación** (*Play Next*) |
-| `A` | **Encolar Toda la Lista** actual |
-| `f` | **Favorito / Guardar**: Añade el álbum completo a tu Biblioteca |
-| `m` | **Añadir a Playlist**: Abre el menú para guardarla en una lista existente o crear una nueva |
-| `d` | **Quitar**: Quita de la Cola; en una Playlist abierta, presionar dos veces para borrarla |
-| `c` | **Limpiar**: Vacía la cola activa o el historial |
-
-### ⚙️ Preferencias
-| **Tecla** | **Acción** |
-|:---:|:---|
-| `y` | **Pronunciación Fonética**: Alterna entre letra original, fonética o modo dual |
-| `L` | **Cambiar Idioma**: Alterna al instante entre Español e Inglés |
-| `u` | **Iniciar sesión** con tu cuenta de Apple Music |
-| `q` | **Salir** de Calyx |
+*(For headless servers or SSH environments without a browser, press <kbd>?</kbd> inside Calyx for manual token setup instructions).*
 
 ---
 
-## 💡 Preguntas Frecuentes
+## ⌨️ Keyboard Shortcuts
 
-- **¿Dónde se guarda mi sesión y configuración?**
-  Calyx almacena tu sesión en las carpetas estándar de usuario de tu sistema (`%APPDATA%\calyx` en Windows, `~/.config/calyx` en Linux, `~/Library/Application Support/calyx` en macOS).
-- **¿Calyx guarda música en mi disco?**
-  Para que la música suene fluida y sin cortes, Calyx mantiene una pequeña caché temporal de audio en tu carpeta personal (`~/.cache/calyx/audio/`), la cual se autolimpia de forma automática para no exceder los 2 GB.
-- **¿Puedo usarlo en modo portátil?**
-  Sí, si defines la variable de entorno `CALYX_HOME=/ruta/carpeta`, Calyx guardará todos sus datos en esa ubicación sin tocar el resto de tu equipo.
+### 🧭 Navigation & Search
+| **Key** | **Action** |
+|:---:|:---|
+| <kbd>/</kbd> | **Search** songs, artists, or albums across Apple Music |
+| <kbd>1</kbd> – <kbd>5</kbd> | **Sections**: `1` Recent, `2` New Releases, `3` Radio, `4` Library, `5` Playlists |
+| <kbd>o</kbd> | **View Album**: Open the album of the selected track (press again to return) |
+| <kbd>Tab</kbd> | **Toggle View**: Switch between active browser list and the Queue |
+| <kbd>?</kbd> | **Help Screen** with interactive controls and guides |
+
+### 🎵 Playback & Sound
+| **Key** | **Action** |
+|:---:|:---|
+| <kbd>Enter</kbd> | **Play** selected track |
+| <kbd>Space</kbd> | **Pause / Resume** playback |
+| <kbd>&lt;</kbd> / <kbd>&gt;</kbd> *(or <kbd>,</kbd> / <kbd>.</kbd>)* | **Previous / Next** track in queue |
+| <kbd>+</kbd> / <kbd>-</kbd> | **Volume Up / Down** (±5%) |
+| <kbd>s</kbd> | **Toggle Shuffle** (`🔀 ON` / `OFF`) |
+| <kbd>r</kbd> | **Toggle Repeat** (`🔁 All` ➔ `🔂 One` ➔ `Off`) |
+| <kbd>p</kbd> | **Play All**: Start playback of the entire current list or playlist |
+
+### 📋 Queue & Playlist Management
+| **Key** | **Action** |
+|:---:|:---|
+| <kbd>a</kbd> | **Enqueue** track at the end of the queue |
+| <kbd>n</kbd> | **Play Next**: Enqueue track immediately after the current song |
+| <kbd>A</kbd> | **Enqueue All**: Add every song in the current view to the queue |
+| <kbd>f</kbd> | **Favorite / Save**: Add the selected track's album to your Library |
+| <kbd>m</kbd> | **Add to Playlist**: Open picker to save to an existing list or create a new one |
+| <kbd>d</kbd> | **Remove**: Remove track from Queue; inside an open Playlist, press twice to delete it |
+| <kbd>c</kbd> | **Clear**: Empty the current queue or recent history |
+
+### ⚙️ System & Preferences
+| **Key** | **Action** |
+|:---:|:---|
+| <kbd>y</kbd> | **Phonetic Lyrics**: Cycle between Original, Romaji, or Dual mode |
+| <kbd>L</kbd> | **Toggle Language**: Instantly switch between English and Spanish |
+| <kbd>u</kbd> | **Sign In** with Apple Music |
+| <kbd>q</kbd> | **Quit** Calyx |
+
+---
+
+## 💡 Frequently Asked Questions
+
+- **Where are my credentials and session stored?**
+  Calyx stores your session locally in your platform's standard application directory (`%APPDATA%\calyx` on Windows, `~/.config/calyx` on Linux, `~/Library/Application Support/calyx` on macOS).
+- **Does Calyx save music files to my drive?**
+  To maintain smooth, gapless audio, Calyx keeps a temporary local audio cache (`~/.cache/calyx/audio/`). It uses an LRU eviction policy that automatically cleans up older tracks to never exceed 2 GB.
+- **Can I run Calyx portably (e.g., from a USB drive)?**
+  Yes. Set the environment variable `CALYX_HOME=/path/to/folder` to keep all configurations, databases, and caches in a single custom location without touching system folders.
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
