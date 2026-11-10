@@ -55,7 +55,7 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
 
     let top_block = Block::default()
         .borders(Borders::ALL)
-        .title_top(" Calyx ")
+        .title_top(crate::version_badge::title(app.language))
         .title_top(help_line);
 
     frame.render_widget(
