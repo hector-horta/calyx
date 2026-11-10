@@ -70,6 +70,8 @@ pub mod spectrum;
 mod stream_resolver;
 /// Phonetic transliteration engine (Romaji, Hangul RR).
 pub mod transliteration;
+/// Whether a newer calyx release exists on GitHub (checked once a day).
+pub mod update_check;
 /// Full-track playback (webPlayback, Widevine license, HLS download).
 mod webplay;
 /// Pure-Rust Widevine L3 cryptographic primitives.

@@ -4,6 +4,7 @@ mod app;
 mod artwork;
 mod audio_pipeline;
 mod bg_events;
+mod cli;
 mod hints;
 mod labels;
 mod list_actions;
@@ -30,6 +31,7 @@ mod ui_lists;
 mod ui_lyrics;
 mod ui_picker;
 mod ui_player;
+mod version_badge;
 
 use anyhow::{Context, Result};
 use calyx_core::SectionType;
@@ -44,19 +46,20 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args: Vec<String> = std::env::args().collect();
-    if args.iter().any(|a| a == "--version" || a == "-V") {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let cli = cli::Cli::parse(&args);
+    if cli.version {
         println!("calyx {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
-    // Smoke test for packaging: the binary starts and exits cleanly.
-    if args.iter().any(|a| a == "--check") {
+    if cli.check {
         return Ok(());
     }
-
-    let storefront = args.get(1).map(|s| s.as_str()).unwrap_or("us");
     // Built before raw mode, so a startup error prints on a normal terminal.
-    let mut app = app::TuiApp::new(storefront).context("Failed to initialize TuiApp")?;
+    let mut app = app::TuiApp::new(&cli.storefront).context("Failed to initialize TuiApp")?;
+    if cli.update_check {
+        version_badge::start_check();
+    }
 
     install_panic_hook();
     enable_raw_mode().context("Failed to enable raw mode")?;

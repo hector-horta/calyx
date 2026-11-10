@@ -112,6 +112,8 @@ Para escuchar tus canciones completas, tus playlists y tu biblioteca personal:
   Para que la música suene fluida y sin cortes, Calyx mantiene una pequeña caché temporal de audio en tu carpeta personal (`~/.cache/calyx/audio/`), la cual se autolimpia de forma automática mediante política LRU para no exceder los 2 GB.
 - **¿Puedo usarlo en modo portátil?**
   Sí, si defines la variable de entorno `CALYX_HOME=/ruta/carpeta`, Calyx guardará todos sus datos en esa ubicación sin tocar el resto de tu equipo.
+- **¿Cómo sé si hay una versión nueva?**
+  La barra superior muestra tu versión (`Calyx v0.1.13`). Una vez al día Calyx consulta en segundo plano la última versión publicada en GitHub; si hay una más nueva, agrega `→ v0.1.14 disponible`. Nunca se actualiza sola. Usa `--no-update-check` para que no se conecte nunca a GitHub.
 
 ---
 
