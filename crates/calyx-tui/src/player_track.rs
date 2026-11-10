@@ -54,11 +54,32 @@ pub fn render_track_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
         .areas(icon);
     frame.render_widget(Paragraph::new(icon_lines(app)), icon);
     // The song (and what plays next) as one block, centred like the icon.
-    let lines = track_lines(app, text.width as usize);
-    let [text] = Layout::vertical([Constraint::Length(lines.len() as u16)])
+    let mut lines = track_lines(app, text.width as usize);
+    let big = crate::player_big_title::big_title(app, text.width);
+    // The big title takes the place of the plain title line.
+    let big_h = if big.is_some() {
+        crate::player_big_title::BIG_H - 1
+    } else {
+        0
+    };
+    let [text] = Layout::vertical([Constraint::Length(lines.len() as u16 + big_h)])
         .flex(Flex::Center)
         .areas(text);
-    frame.render_widget(Paragraph::new(lines), text);
+    let Some(big) = big else {
+        frame.render_widget(Paragraph::new(lines), text);
+        return;
+    };
+    // Artist, then the title in big letters instead of its plain line.
+    let rest = lines.split_off(2);
+    let [artist, title, below] = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(crate::player_big_title::BIG_H),
+        Constraint::Min(0),
+    ])
+    .areas(text);
+    frame.render_widget(Paragraph::new(lines.swap_remove(0)), artist);
+    frame.render_widget(big, title);
+    frame.render_widget(Paragraph::new(rest), below);
 }
 
 /// The big play/pause icon, 3 rows of 6 columns.
