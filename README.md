@@ -100,6 +100,7 @@ To unlock full-length playback, your personal library, and your playlists:
 | <kbd>y</kbd> | **Phonetic Lyrics**: Cycle between Original, Romaji, or Dual mode |
 | <kbd>L</kbd> | **Toggle Language**: Instantly switch between English and Spanish |
 | <kbd>u</kbd> | **Sign In** with Apple Music |
+| <kbd>V</kbd> | **New Version**: Open the download page when the top bar shows `→ vX.Y.Z available` |
 | <kbd>q</kbd> | **Quit** Calyx |
 
 ---
@@ -113,7 +114,7 @@ To unlock full-length playback, your personal library, and your playlists:
 - **Can I run Calyx portably (e.g., from a USB drive)?**
   Yes. Set the environment variable `CALYX_HOME=/path/to/folder` to keep all configurations, databases, and caches in a single custom location without touching system folders.
 - **How do I know there is a new version?**
-  The top bar shows your version (`Calyx v0.1.13`). Once a day Calyx asks GitHub for the latest release in the background; when there is a newer one it adds `→ v0.1.14 available`. It never updates itself. Run with `--no-update-check` to never contact GitHub.
+  The top bar shows your version (`Calyx v0.1.13`). Once a day Calyx asks GitHub for the latest release in the background; when there is a newer one it adds `→ v0.1.14 available`. Press `V` to open its download page. It never updates itself. Run with `--no-update-check` to never contact GitHub.
 
 ---
 

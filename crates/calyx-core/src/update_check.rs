@@ -26,6 +26,15 @@ pub fn is_newer(latest: &str, current: &str) -> bool {
     }
 }
 
+/// GitHub page of release `tag`. Rebuilt from the parsed numbers, so a tag
+/// from the network can only ever produce this exact URL shape.
+pub fn release_url(tag: &str) -> Option<String> {
+    let (major, minor, patch) = parse_version(tag)?;
+    Some(format!(
+        "https://github.com/hector-horta/calyx/releases/tag/v{major}.{minor}.{patch}"
+    ))
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 struct Cache {
     /// Unix seconds of the last successful check.

@@ -139,6 +139,7 @@ fn run_event_loop(
 
         match key_event.code {
             KeyCode::Char('q') => app.should_quit = true,
+            KeyCode::Char('V') => version_badge::open_release(app),
             KeyCode::Char('m') => app.open_playlist_picker(),
             KeyCode::Char('/') => app.is_editing = true,
             KeyCode::Char('a') => app.enqueue_selected_back(),

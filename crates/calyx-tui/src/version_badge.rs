@@ -22,7 +22,7 @@ pub fn start_check() {
     });
 }
 
-/// " Calyx v0.1.13 " or " Calyx v0.1.13 → v0.1.14 disponible ".
+/// " Calyx v0.1.13 " or " Calyx v0.1.13 → v0.1.14 disponible [V] ".
 pub fn title(lang: Language) -> Line<'static> {
     title_with(lang, NEWER.get().map(String::as_str))
 }
@@ -40,8 +40,24 @@ fn title_with(lang: Language, newer: Option<&str>) -> Line<'static> {
         };
         let style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
         spans.push(Span::styled(format!("→ {tag} {available} "), style));
+        spans.push(crate::hints::key_span("V", crate::hints::KEY_STYLE));
+        spans.push(Span::raw(" "));
     }
     Line::from(spans)
+}
+
+/// 'V': opens the newer release's page in the browser (does nothing until
+/// the check has found one).
+pub fn open_release(app: &mut crate::app::TuiApp) {
+    let Some(url) = NEWER
+        .get()
+        .and_then(|tag| calyx_core::update_check::release_url(tag))
+    else {
+        return;
+    };
+    if let Err(e) = calyx_core::login_firefox::open_url_in_system_browser(&url) {
+        app.status_message = e.to_string();
+    }
 }
 
 #[cfg(test)]
@@ -57,8 +73,8 @@ mod tests {
         let plain = text(&title_with(Language::Es, None));
         assert_eq!(plain, format!(" Calyx v{VERSION} "));
         let es = text(&title_with(Language::Es, Some("v9.0.0")));
-        assert!(es.ends_with("→ v9.0.0 disponible "));
+        assert!(es.ends_with("→ v9.0.0 disponible [V] "));
         let en = text(&title_with(Language::En, Some("v9.0.0")));
-        assert!(en.ends_with("→ v9.0.0 available "));
+        assert!(en.ends_with("→ v9.0.0 available [V] "));
     }
 }
