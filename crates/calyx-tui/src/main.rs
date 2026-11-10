@@ -17,6 +17,7 @@ mod picker_texts;
 mod playback;
 mod player_big_title;
 mod player_spectrum;
+mod player_state;
 mod player_status;
 mod player_track;
 mod playlist_remove;
