@@ -63,7 +63,7 @@ pub fn render_track_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     ])
     .areas(text);
     frame.render_widget(Paragraph::new(lines), head);
-    frame.render_widget(big, title);
+    big.render(frame, title);
     frame.render_widget(Paragraph::new(rest), below);
 }
 
