@@ -16,6 +16,9 @@ use tui_big_text::{BigText, PixelSize};
 /// Rows and columns of one big (quadrant) letter.
 pub const BIG_H: u16 = 4;
 const BIG_COL: u16 = 4;
+/// Columns of the "..." drawn after a cut title (three dots, one apart).
+const ELLIPSIS_W: u16 = 5;
+const STYLE: Style = Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
 /// Song time shown still before the scroll starts.
 const HOLD_MS: u64 = 2000;
 /// Song time per scrolled column.
@@ -29,20 +32,46 @@ pub struct BigTitle {
     width: u16,
     /// First column shown.
     offset: u16,
+    /// Which letters are spaces (an ellipsis never follows one).
+    spaces: Vec<bool>,
 }
 
 impl BigTitle {
     /// Draws the visible window of the title: the whole title is drawn into
     /// its own buffer and the columns from `offset` copied into `area`.
     pub fn render(self, frame: &mut Frame<'_>, area: Rect) {
+        // At rest a title too wide for the box ends in "..." after a whole letter.
+        let cut = self.offset == 0 && self.width > area.width;
+        let shown = if cut {
+            self.letters_before_ellipsis(area.width) * BIG_COL
+        } else {
+            area.width
+        };
         let mut own = Buffer::empty(Rect::new(0, 0, self.width, BIG_H));
         self.text.render(own.area, &mut own);
         let buf = frame.buffer_mut();
         for y in 0..area.height.min(BIG_H) {
-            for x in 0..area.width.min(self.width - self.offset) {
+            for x in 0..shown.min(self.width - self.offset) {
                 buf[(area.x + x, area.y + y)] = own[(self.offset + x, y)].clone();
             }
         }
+        if cut && area.height >= BIG_H {
+            // Three one-column dots on the baseline, like the big '.'.
+            for dot in 0..3 {
+                let x = area.x + shown + dot * 2;
+                buf[(x, area.y + 2)].set_symbol("▄").set_style(STYLE);
+                buf[(x, area.y + 3)].set_symbol("▀").set_style(STYLE);
+            }
+        }
+    }
+
+    /// Whole letters that fit before the ellipsis, without trailing spaces.
+    fn letters_before_ellipsis(&self, width: u16) -> u16 {
+        let mut n = (width.saturating_sub(ELLIPSIS_W) / BIG_COL) as usize;
+        while n > 0 && self.spaces.get(n - 1).copied().unwrap_or(false) {
+            n -= 1;
+        }
+        n as u16
     }
 }
 
@@ -76,17 +105,18 @@ pub fn big_title(app: &TuiApp, width: u16) -> Option<BigTitle> {
         return None;
     }
     let title_w = cols(&title);
+    let spaces = title.chars().map(|c| c == ' ').collect();
     let elapsed = app.playback_progress().0.as_millis() as u64;
     let offset = scroll_offset(elapsed, title_w.saturating_sub(width));
-    let style = Style::new().fg(Color::White).add_modifier(Modifier::BOLD);
     Some(BigTitle {
         text: BigText::builder()
             .pixel_size(PixelSize::Quadrant)
-            .style(style)
+            .style(STYLE)
             .lines(vec![Line::from(title)])
             .build(),
         width: title_w,
         offset,
+        spaces,
     })
 }
 
@@ -113,21 +143,5 @@ fn plain(c: char) -> char {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::scroll_offset;
-
-    #[test]
-    fn a_title_that_fits_never_moves() {
-        for ms in [0, 2500, 10_000, 200_000] {
-            assert_eq!(scroll_offset(ms, 0), 0);
-        }
-    }
-
-    #[test]
-    fn a_long_title_scrolls_once_then_rests_on_its_start() {
-        assert_eq!(scroll_offset(1000, 20), 0); // still at first
-        assert_eq!(scroll_offset(2000 + 900, 20), 10); // half way
-        assert_eq!(scroll_offset(2000 + 1800 + 500, 20), 20); // end hold
-        assert_eq!(scroll_offset(60_000, 20), 0); // back to the start
-    }
-}
+#[path = "player_big_title_tests.rs"]
+mod tests;
