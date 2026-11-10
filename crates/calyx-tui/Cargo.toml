@@ -18,3 +18,4 @@ tracing-subscriber = { workspace = true }
 ratatui = { workspace = true }
 crossterm = { workspace = true }
 image = { workspace = true }
+tui-big-text = "0.7.1"
