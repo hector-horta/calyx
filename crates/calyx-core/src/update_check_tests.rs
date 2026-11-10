@@ -29,3 +29,12 @@ fn the_cache_is_used_for_one_day() {
     assert_eq!(fresh(&cache, 1_000 + DAY_SECS - 1), Some("v0.1.14".into()));
     assert_eq!(fresh(&cache, 1_000 + DAY_SECS), None);
 }
+
+#[test]
+fn the_release_url_only_comes_from_a_valid_tag() {
+    assert_eq!(
+        release_url("v0.1.14").as_deref(),
+        Some("https://github.com/hector-horta/calyx/releases/tag/v0.1.14")
+    );
+    assert_eq!(release_url("v0.1.14&calc"), None);
+}
