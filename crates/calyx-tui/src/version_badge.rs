@@ -28,7 +28,7 @@ pub fn newer() -> Option<&'static str> {
 }
 
 /// " Calyx v0.1.13 ", " Calyx v0.1.13 → v0.1.14 disponible [V] ", or once
-/// `installed`, " Calyx v0.1.13 → v0.1.14 instalada, reiniciá ".
+/// `installed`, " Calyx v0.1.13 → v0.1.14 instalada, reinicia ".
 pub fn title(lang: Language, installed: bool) -> Line<'static> {
     title_with(lang, newer(), installed)
 }
@@ -43,7 +43,7 @@ fn title_with(lang: Language, newer: Option<&str>, installed: bool) -> Line<'sta
         let state = match (lang, installed) {
             (Language::Es, false) => "disponible",
             (Language::En, false) => "available",
-            (Language::Es, true) => "instalada, reiniciá",
+            (Language::Es, true) => "instalada, reinicia",
             (Language::En, true) => "installed, restart",
         };
         let style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
@@ -88,6 +88,6 @@ mod tests {
         let en = text(&title_with(Language::En, Some("v9.0.0"), false));
         assert!(en.ends_with("→ v9.0.0 available [V] "));
         let done = text(&title_with(Language::Es, Some("v9.0.0"), true));
-        assert!(done.ends_with("→ v9.0.0 instalada, reiniciá "));
+        assert!(done.ends_with("→ v9.0.0 instalada, reinicia "));
     }
 }
