@@ -5,7 +5,7 @@
 
 use crate::app::TuiApp;
 use crate::bg_events::BgEvent;
-use crate::notice::{Notice, Tone};
+use crate::notice::{Hold, Notice, Tone};
 use calyx_core::Language;
 use std::time::{Duration, Instant};
 
@@ -47,9 +47,9 @@ fn text(lang: Language, step: Step, tag: &str) -> String {
 }
 
 impl TuiApp {
-    fn update_notice(&mut self, tone: Tone, step: Step, tag: &str) {
+    fn update_notice(&mut self, tone: Tone, hold: Hold, step: Step, tag: &str) {
         let text = text(self.language, step, tag);
-        self.notice = Some(Notice::new(text, tone));
+        self.notice = Some(Notice::held(text, tone, hold));
     }
 
     /// Handles the 'V' key for updating Calyx to a newer version.
@@ -64,11 +64,13 @@ impl TuiApp {
 
         match self.update {
             UpdateState::Installing => {}
-            UpdateState::Installed => self.update_notice(Tone::Result, Step::Installed, tag),
+            UpdateState::Installed => {
+                self.update_notice(Tone::Result, Hold::UntilKey, Step::Installed, tag)
+            }
             UpdateState::Asked(at) if at.elapsed() < CONFIRM_WINDOW => self.start_install(tag),
             _ => {
                 self.update = UpdateState::Asked(Instant::now());
-                self.update_notice(Tone::Action, Step::Ask, tag);
+                self.update_notice(Tone::Action, Hold::Timed, Step::Ask, tag);
             }
         };
     }
@@ -76,7 +78,7 @@ impl TuiApp {
     /// Starts the installation process for the given version tag.
     fn start_install(&mut self, tag: &'static str) {
         self.update = UpdateState::Installing;
-        self.status_message = text(self.language, Step::Installing, tag);
+        self.update_notice(Tone::Action, Hold::Pinned, Step::Installing, tag);
         self.spawn_event(async move {
             let res = calyx_core::self_update::install(tag)
                 .await
@@ -87,15 +89,14 @@ impl TuiApp {
 
     /// The install finished: ask for a restart, or fall back to the page.
     pub(crate) fn on_update_installed(&mut self, tag: &str, res: Result<(), String>) {
-        self.status_message.clear();
         match res {
             Ok(()) => {
                 self.update = UpdateState::Installed;
-                self.update_notice(Tone::Result, Step::Installed, tag);
+                self.update_notice(Tone::Result, Hold::UntilKey, Step::Installed, tag);
             }
             Err(err) => {
                 self.update = UpdateState::Idle;
-                self.update_notice(Tone::Error, Step::Failed(&err), tag);
+                self.update_notice(Tone::Error, Hold::Timed, Step::Failed(&err), tag);
                 crate::version_badge::open_release(self);
             }
         }

@@ -13,6 +13,7 @@ mod messages;
 mod messages_picker;
 mod navigation;
 mod notice;
+mod notice_tone;
 mod picker;
 mod picker_texts;
 mod playback;
@@ -118,6 +119,7 @@ fn run_event_loop(
         if key_event.kind != KeyEventKind::Press {
             continue;
         }
+        app.dismiss_key_notice();
 
         if app.is_editing {
             match key_event.code {
