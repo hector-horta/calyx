@@ -38,20 +38,49 @@ Calyx te permite escuchar todo el catálogo y tu biblioteca personal de Apple Mu
 
 ## 🚀 Instalación y Uso Rápido
 
-### 1. Requisitos
-Asegúrate de tener [Rust y Cargo instalados](https://rustup.rs/).
+### 1. Descarga
 
-### 2. Clonar y Ejecutar
+Baja el archivo de tu sistema desde la **[última versión publicada](https://github.com/hector-horta/calyx/releases/latest)**:
+
+| Sistema | Archivo |
+| :--- | :--- |
+| Windows (x64) | `calyx-windows-x86_64.zip` |
+| macOS (Apple Silicon) | `calyx-macos-arm64.tar.gz` |
+| macOS (Intel) | `calyx-macos-x86_64.tar.gz` |
+| Linux (x64) | `calyx-linux-x86_64.tar.gz` |
+
+Cada archivo tiene al lado un `.sha256` por si quieres verificar la descarga.
+
+### 2. Ejecuta
+
+Descomprímelo y abre `calyx` desde una terminal:
+
 ```sh
-# Clonar el proyecto
-git clone https://github.com/hector-horta/calyx.git
-cd calyx
+# Windows (PowerShell)
+Expand-Archive calyx-windows-x86_64.zip -DestinationPath calyx
+.\calyx\calyx.exe
 
-# Iniciar el reproductor (catálogo por defecto: Estados Unidos)
-cargo run -p calyx-tui
+# macOS / Linux
+mkdir calyx && tar -xzf calyx-*.tar.gz -C calyx
+./calyx/calyx
 ```
 
-> 💡 **Consejo regional**: Si quieres explorar recomendaciones y novedades de un país específico, puedes pasar su código de 2 letras al arrancar (por ejemplo: `cargo run -p calyx-tui -- mx` para México, `es` para España o `ar` para Argentina).
+- **macOS:** el binario no está notarizado, así que la primera vez macOS puede bloquearlo. Quita la marca de descarga una vez con `xattr -d com.apple.quarantine ./calyx/calyx`.
+- **Linux:** el audio usa ALSA; instala `libasound2` (Debian/Ubuntu) o `alsa-lib` (Fedora/Arch) si no lo tienes.
+
+Después Calyx se actualiza solo: cuando la barra superior anuncie una versión nueva, presiona <kbd>V</kbd> dos veces.
+
+> 💡 **Consejo regional**: Si quieres explorar recomendaciones y novedades de un país específico, pasa su código de 2 letras al arrancar (por ejemplo: `calyx mx` para México, `calyx es` para España o `calyx ar` para Argentina).
+
+### Compilar desde el código
+
+Con [Rust y Cargo](https://rustup.rs/) instalados:
+
+```sh
+git clone https://github.com/hector-horta/calyx.git
+cd calyx
+cargo run --release -p calyx-tui      # agrega un país con: -- mx
+```
 
 ---
 
