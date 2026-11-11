@@ -38,20 +38,49 @@ Calyx lets you stream your entire Apple Music catalog and library directly from 
 
 ## 🚀 Quick Start
 
-### 1. Requirements
-Ensure you have [Rust and Cargo installed](https://rustup.rs/).
+### 1. Download
 
-### 2. Clone and Run
+Grab the file for your system from the **[latest release](https://github.com/hector-horta/calyx/releases/latest)**:
+
+| System | File |
+| :--- | :--- |
+| Windows (x64) | `calyx-windows-x86_64.zip` |
+| macOS (Apple Silicon) | `calyx-macos-arm64.tar.gz` |
+| macOS (Intel) | `calyx-macos-x86_64.tar.gz` |
+| Linux (x64) | `calyx-linux-x86_64.tar.gz` |
+
+Each file has a `.sha256` next to it if you want to check the download.
+
+### 2. Run
+
+Unpack it and start `calyx` from a terminal:
+
 ```sh
-# Clone repository
-git clone https://github.com/hector-horta/calyx.git
-cd calyx
+# Windows (PowerShell)
+Expand-Archive calyx-windows-x86_64.zip -DestinationPath calyx
+.\calyx\calyx.exe
 
-# Run the player (defaults to the US storefront)
-cargo run -p calyx-tui
+# macOS / Linux
+mkdir calyx && tar -xzf calyx-*.tar.gz -C calyx
+./calyx/calyx
 ```
 
-> 💡 **Regional Storefronts**: To browse recommendations and charts from a specific region, pass its two-letter country code (e.g., `cargo run -p calyx-tui -- uk`, `cargo run -p calyx-tui -- mx`, or `cargo run -p calyx-tui -- jp`).
+- **macOS:** the binary is not notarized, so the first run may be blocked. Clear the download flag once with `xattr -d com.apple.quarantine ./calyx/calyx`.
+- **Linux:** audio goes through ALSA; install `libasound2` (Debian/Ubuntu) or `alsa-lib` (Fedora/Arch) if it is missing.
+
+Calyx updates itself afterwards: when the top bar announces a new version, press <kbd>V</kbd> twice.
+
+> 💡 **Regional Storefronts**: To browse recommendations and charts from a specific region, pass its two-letter country code (e.g., `calyx uk`, `calyx mx`, or `calyx jp`).
+
+### Build from source
+
+With [Rust and Cargo](https://rustup.rs/) installed:
+
+```sh
+git clone https://github.com/hector-horta/calyx.git
+cd calyx
+cargo run --release -p calyx-tui      # add a storefront with: -- mx
+```
 
 ---
 
