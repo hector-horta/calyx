@@ -79,6 +79,8 @@ pub struct TuiApp {
     pub(crate) open_playlist: Option<UserPlaylist>,
     /// First 'd' on a playlist song: (library song id, when). A second 'd' confirms.
     pub(crate) pending_remove: Option<(String, std::time::Instant)>,
+    /// Self-update driven by 'V' (ask, installing, installed).
+    pub(crate) update: crate::update_install::UpdateState,
     /// Action/error/result shown in reverse video; progress never overwrites it.
     pub(crate) notice: Option<crate::notice::Notice>,
     /// Quality/source of the playing audio ("[AAC 256k | Cache]"), always visible.
@@ -149,6 +151,7 @@ impl TuiApp {
             album_back: None,
             open_playlist: None,
             pending_remove: None,
+            update: Default::default(),
             notice: None,
             audio_hint: String::new(),
         })

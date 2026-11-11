@@ -22,32 +22,43 @@ pub fn start_check() {
     });
 }
 
-/// " Calyx v0.1.13 " or " Calyx v0.1.13 → v0.1.14 disponible [V] ".
-pub fn title(lang: Language) -> Line<'static> {
-    title_with(lang, NEWER.get().map(String::as_str))
+/// Tag of the newer release, once the background check has found one.
+pub fn newer() -> Option<&'static str> {
+    NEWER.get().map(String::as_str)
 }
 
-fn title_with(lang: Language, newer: Option<&str>) -> Line<'static> {
+/// " Calyx v0.1.13 ", " Calyx v0.1.13 → v0.1.14 disponible [V] ", or once
+/// `installed`, " Calyx v0.1.13 → v0.1.14 instalada, reiniciá ".
+pub fn title(lang: Language, installed: bool) -> Line<'static> {
+    title_with(lang, newer(), installed)
+}
+
+fn title_with(lang: Language, newer: Option<&str>, installed: bool) -> Line<'static> {
     let dim = Style::new().fg(Color::DarkGray);
     let mut spans = vec![
         Span::raw(" Calyx "),
         Span::styled(format!("v{VERSION} "), dim),
     ];
     if let Some(tag) = newer {
-        let available = match lang {
-            Language::Es => "disponible",
-            Language::En => "available",
+        let state = match (lang, installed) {
+            (Language::Es, false) => "disponible",
+            (Language::En, false) => "available",
+            (Language::Es, true) => "instalada, reiniciá",
+            (Language::En, true) => "installed, restart",
         };
         let style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
-        spans.push(Span::styled(format!("→ {tag} {available} "), style));
-        spans.push(crate::hints::key_span("V", crate::hints::KEY_STYLE));
-        spans.push(Span::raw(" "));
+        spans.push(Span::styled(format!("→ {tag} {state} "), style));
+        if !installed {
+            spans.push(crate::hints::key_span("V", crate::hints::KEY_STYLE));
+            spans.push(Span::raw(" "));
+        }
     }
     Line::from(spans)
 }
 
-/// 'V': opens the newer release's page in the browser (does nothing until
-/// the check has found one).
+/// Opens the newer release's page in the browser (does nothing until the
+/// check has found one): 'V' where calyx cannot update itself, or after a
+/// failed install.
 pub fn open_release(app: &mut crate::app::TuiApp) {
     let Some(url) = NEWER
         .get()
@@ -70,11 +81,13 @@ mod tests {
 
     #[test]
     fn shows_the_version_and_a_newer_release_when_known() {
-        let plain = text(&title_with(Language::Es, None));
+        let plain = text(&title_with(Language::Es, None, false));
         assert_eq!(plain, format!(" Calyx v{VERSION} "));
-        let es = text(&title_with(Language::Es, Some("v9.0.0")));
+        let es = text(&title_with(Language::Es, Some("v9.0.0"), false));
         assert!(es.ends_with("→ v9.0.0 disponible [V] "));
-        let en = text(&title_with(Language::En, Some("v9.0.0")));
+        let en = text(&title_with(Language::En, Some("v9.0.0"), false));
         assert!(en.ends_with("→ v9.0.0 available [V] "));
+        let done = text(&title_with(Language::Es, Some("v9.0.0"), true));
+        assert!(done.ends_with("→ v9.0.0 instalada, reiniciá "));
     }
 }

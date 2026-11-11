@@ -64,6 +64,8 @@ pub mod progress;
 pub mod queue;
 /// Catalog searches behind the curated sections.
 mod sections;
+/// Installs a newer release over the running binary.
+pub mod self_update;
 /// Precomputed visualizer frames.
 pub mod spectrum;
 /// Cache → full stream → preview strategy behind the facade.

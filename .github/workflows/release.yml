@@ -63,6 +63,8 @@ jobs:
           Copy-Item "LICENSE" stage/
           if (Test-Path "assets") { Copy-Item -Recurse "assets" stage/ }
           Compress-Archive -Path "stage/*" -DestinationPath "${{ matrix.asset_name }}"
+          $hash = (Get-FileHash "${{ matrix.asset_name }}" -Algorithm SHA256).Hash.ToLower()
+          "$hash  ${{ matrix.asset_name }}" | Out-File -FilePath "${{ matrix.asset_name }}.sha256" -Encoding ascii -NoNewline
 
       - name: Package asset (Unix)
         if: runner.os != 'Windows'
@@ -73,6 +75,7 @@ jobs:
           cp LICENSE stage/
           if [ -d "assets" ]; then cp -r assets stage/; fi
           tar -czvf "${{ matrix.asset_name }}" -C stage .
+          shasum -a 256 "${{ matrix.asset_name }}" > "${{ matrix.asset_name }}.sha256"
 
       - name: Determine Release Tag
         id: release_tag
@@ -95,7 +98,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
-          files: ${{ matrix.asset_name }}
+          files: |
+            ${{ matrix.asset_name }}
+            ${{ matrix.asset_name }}.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

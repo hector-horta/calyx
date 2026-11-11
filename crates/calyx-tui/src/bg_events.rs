@@ -49,6 +49,8 @@ pub enum BgEvent {
     AlbumAddedToLibrary(String, Result<(), String>),
     /// The prefetch of this track id finished (cached, or failed).
     PrefetchDone(String),
+    /// Result of installing release `tag` over the binary ('V' twice).
+    UpdateInstalled(&'static str, Result<(), String>),
 }
 
 /// Quality hint shown in the status line for a resolved buffer.
@@ -231,6 +233,7 @@ impl TuiApp {
                 title,
                 res,
             } => self.on_removed_from_playlist(&playlist_id, &playlist, &song_id, &title, res),
+            BgEvent::UpdateInstalled(tag, res) => self.on_update_installed(tag, res),
             // A newer prefetch may already own the spinner; only clear our own.
             BgEvent::PrefetchDone(id) => {
                 if self.caching.as_ref().is_some_and(|(c, _)| *c == id) {
