@@ -33,11 +33,11 @@ enum Step<'a> {
 /// Text of each step for release `tag`, in `lang`.
 fn text(lang: Language, step: Step, tag: &str) -> String {
     match (lang, step) {
-        (Language::Es, Step::Ask) => format!("Presioná V otra vez para instalar {tag}"),
+        (Language::Es, Step::Ask) => format!("Presiona V otra vez para instalar {tag}"),
         (Language::En, Step::Ask) => format!("Press V again to install {tag}"),
         (Language::Es, Step::Installing) => format!("Descargando {tag}…"),
         (Language::En, Step::Installing) => format!("Downloading {tag}…"),
-        (Language::Es, Step::Installed) => format!("{tag} instalada: reiniciá calyx para usarla"),
+        (Language::Es, Step::Installed) => format!("{tag} instalada: reinicia calyx para usarla"),
         (Language::En, Step::Installed) => format!("{tag} installed: restart calyx to use it"),
         (Language::Es, Step::Failed(err)) => {
             format!("No se pudo actualizar ({err}); abriendo la página")
