@@ -67,7 +67,7 @@ pub fn open_url_in_system_browser(url: &str) -> CalyxResult<()> {
 }
 
 pub async fn wait_for_firefox_login(timeout: Duration) -> CalyxResult<String> {
-    open_url_in_system_browser("https://music.apple.com")?;
+    crate::browser_choice::open_login_page("https://music.apple.com")?;
 
     let start = Instant::now();
     while start.elapsed() < timeout {

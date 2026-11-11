@@ -8,7 +8,7 @@ pub enum BrowserType {
     WebKit(PathBuf),
 }
 
-fn find_in_path(name: &str) -> Option<PathBuf> {
+pub(crate) fn find_in_path(name: &str) -> Option<PathBuf> {
     let filename = if cfg!(windows) && !name.ends_with(".exe") {
         format!("{}.exe", name)
     } else {
@@ -32,6 +32,9 @@ fn find_candidate(names: &[&str]) -> Option<PathBuf> {
 }
 
 pub fn discover_browser() -> Option<BrowserType> {
+    if let Some(chosen) = crate::browser_choice::preferred() {
+        return Some(chosen.clone());
+    }
     if let Ok(val) = env::var("CALYX_BROWSER_BIN").or_else(|_| env::var("BROWSER")) {
         let low = val.to_lowercase();
         if low.contains("safari")
