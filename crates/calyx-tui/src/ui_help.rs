@@ -51,7 +51,9 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from("  [L] Cambiar Idioma     [u] Login Apple   [q] Salir"),
-            Line::from("  [V] Descargar la nueva versión (cuando la barra superior la anuncia)"),
+            Line::from(
+                "  [V] Instalar la nueva versión (dos veces; cuando la barra superior la anuncia)",
+            ),
         ]
     } else {
         vec![
@@ -95,7 +97,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from("  [L] Toggle Language    [u] Apple Login   [q] Quit"),
-            Line::from("  [V] Download the new version (when the top bar announces it)"),
+            Line::from("  [V] Install the new version (twice; when the top bar announces it)"),
         ]
     };
 

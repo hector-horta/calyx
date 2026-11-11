@@ -22,4 +22,9 @@ sha2 = { workspace = true }
 rodio = { workspace = true }
 symphonia = { workspace = true }
 kakasi = "0.1.0"
+# Self-update: release archives are .zip (Windows) and .tar.gz (Linux/macOS).
+# Both readers are built everywhere so the tests cover them on every OS.
+zip = { version = "2", default-features = false, features = ["deflate"] }
+flate2 = "1"
+tar = "0.4"
 dirs = { workspace = true }

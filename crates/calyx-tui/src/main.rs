@@ -31,6 +31,7 @@ mod ui_lists;
 mod ui_lyrics;
 mod ui_picker;
 mod ui_player;
+mod update_install;
 mod version_badge;
 
 use anyhow::{Context, Result};
@@ -57,6 +58,8 @@ async fn main() -> Result<()> {
     }
     // Built before raw mode, so a startup error prints on a normal terminal.
     let mut app = app::TuiApp::new(&cli.storefront).context("Failed to initialize TuiApp")?;
+    // The binary replaced by the last update is no longer running.
+    calyx_core::self_update::remove_old_binary();
     if cli.update_check {
         version_badge::start_check();
     }
@@ -139,7 +142,7 @@ fn run_event_loop(
 
         match key_event.code {
             KeyCode::Char('q') => app.should_quit = true,
-            KeyCode::Char('V') => version_badge::open_release(app),
+            KeyCode::Char('V') => app.update_key(),
             KeyCode::Char('m') => app.open_playlist_picker(),
             KeyCode::Char('/') => app.is_editing = true,
             KeyCode::Char('a') => app.enqueue_selected_back(),
