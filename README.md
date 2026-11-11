@@ -5,13 +5,17 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-v0.1.12-blue.svg" alt="Version">
+  <a href="https://github.com/hector-horta/calyx/releases/latest"><img src="https://img.shields.io/github/v/release/hector-horta/calyx?label=version&color=blue" alt="Version"></a>
   <img src="https://img.shields.io/badge/language-Rust-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Platforms">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License">
 </p>
 
 > **A sleek, distraction-free Apple Music terminal player.**
+
+<p align="center">
+  <img src="docs/screenshots/calyx.gif" alt="Calyx playing a song in the terminal: library list, pixel cover art, big title, spectrum visualizer and a dancing figure" width="800">
+</p>
 
 Calyx lets you stream your entire Apple Music catalog and library directly from the command line, featuring ASCII cover art, a real-time analog spectrum visualizer, syllable-synced lyrics, and complete keyboard-driven controls.
 
