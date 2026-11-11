@@ -130,15 +130,4 @@ impl TuiApp {
             BgEvent::AlbumAddedToLibrary(track.album, res)
         });
     }
-
-    pub fn start_login(&mut self) {
-        if self.login_in_progress {
-            return;
-        }
-        self.login_in_progress = true;
-        let backend = self.backend.clone();
-        self.spawn_event(async move {
-            BgEvent::LoginDone(backend.login().await.map_err(|e| e.to_string()))
-        });
-    }
 }

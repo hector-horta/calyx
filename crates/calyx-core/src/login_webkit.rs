@@ -90,6 +90,8 @@ pub fn find_webkit_cookie_files() -> Vec<PathBuf> {
     if let Ok(home) = std::env::var("HOME") {
         let h = PathBuf::from(home);
         for sub in [
+            // Safari 13+ keeps its cookies in its sandbox container.
+            "Library/Containers/com.apple.Safari/Data/Library/Cookies/Cookies.binarycookies",
             "Library/Cookies/Cookies.binarycookies",
             "Library/Application Support/Orion/Defaults/Cookies/Cookies.binarycookies",
         ] {
@@ -128,7 +130,7 @@ pub fn extract_token_from_webkit() -> Option<String> {
 }
 
 pub async fn wait_for_webkit_login(timeout: Duration) -> CalyxResult<String> {
-    crate::login_firefox::open_url_in_system_browser("https://music.apple.com")?;
+    crate::browser_choice::open_login_page("https://music.apple.com")?;
 
     let start = Instant::now();
     while start.elapsed() < timeout {

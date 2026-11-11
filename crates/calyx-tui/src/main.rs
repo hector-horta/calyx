@@ -9,6 +9,7 @@ mod hints;
 mod labels;
 mod list_actions;
 mod list_kind;
+mod login;
 mod messages;
 mod messages_picker;
 mod navigation;
@@ -57,10 +58,20 @@ async fn main() -> Result<()> {
     if cli.check {
         return Ok(());
     }
+    if let Some(name) = &cli.login {
+        let Some(browser) = calyx_core::browser_choice::named(name) else {
+            let known = calyx_core::browser_choice::known_names().join(", ");
+            anyhow::bail!("browser '{name}' is unknown or not installed (options: {known})");
+        };
+        calyx_core::browser_choice::prefer(browser);
+    }
     // Built before raw mode, so a startup error prints on a normal terminal.
     let mut app = app::TuiApp::new(&cli.storefront).context("Failed to initialize TuiApp")?;
     // The binary replaced by the last update is no longer running.
     calyx_core::self_update::remove_old_binary();
+    if cli.login.is_some() {
+        app.begin_login();
+    }
     if cli.update_check {
         version_badge::start_check();
     }
@@ -183,18 +194,7 @@ fn run_event_loop(
             KeyCode::Char('>') | KeyCode::Char('.') => app.skip_next(),
             KeyCode::Char('<') | KeyCode::Char(',') => app.play_previous(),
             KeyCode::Tab => app.toggle_view(),
-            KeyCode::Char('u') if !app.login_in_progress => {
-                let browser = calyx_core::browser_discovery::discover_browser();
-                app.status_message = if matches!(
-                    browser,
-                    Some(calyx_core::browser_discovery::BrowserType::WebKit(_))
-                ) {
-                    app.language.msg_login_safari_alert().to_string()
-                } else {
-                    app.language.msg_login_opening().to_string()
-                };
-                app.start_login();
-            }
+            KeyCode::Char('u') => app.begin_login(),
             KeyCode::Down | KeyCode::Char('j') => app.next_track(),
             KeyCode::Up | KeyCode::Char('k') => app.previous_track(),
             KeyCode::Enter => app.play_selected(),

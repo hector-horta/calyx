@@ -12,6 +12,8 @@ pub mod audio_cache;
 pub mod auth;
 /// Pluggable Service Facade contract and native backend providers.
 pub mod backend;
+/// The login browser picked with `calyx -u <browser>`.
+pub mod browser_choice;
 /// Multi-browser dynamic discovery (Chromium & Firefox/Gecko).
 pub mod browser_discovery;
 /// Tracks of the catalog album a song belongs to.

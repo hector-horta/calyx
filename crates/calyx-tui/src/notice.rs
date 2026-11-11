@@ -86,7 +86,13 @@ impl Notice {
         // The countdown goes right after the tag so a cut text never hides it.
         let countdown = match (self.tone, self.hold) {
             (Tone::Action, Hold::Timed) => {
-                let left = self.tone.ttl().saturating_sub(self.at.elapsed()).as_secs() + 1;
+                // Rounded up: 3.2 s left shows "4s", and a fresh notice "4s", not "5s".
+                let left_ms = self
+                    .tone
+                    .ttl()
+                    .saturating_sub(self.at.elapsed())
+                    .as_millis();
+                let left = left_ms.div_ceil(1000);
                 format!(" ({left}s)")
             }
             _ => String::new(),
