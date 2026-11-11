@@ -5,13 +5,17 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/versión-v0.1.12-blue.svg" alt="Versión">
+  <a href="https://github.com/hector-horta/calyx/releases/latest"><img src="https://img.shields.io/github/v/release/hector-horta/calyx?label=versi%C3%B3n&color=blue" alt="Versión"></a>
   <img src="https://img.shields.io/badge/lenguaje-Rust-orange.svg" alt="Rust">
   <img src="https://img.shields.io/badge/plataformas-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg" alt="Plataformas">
   <img src="https://img.shields.io/badge/licencia-MIT-green.svg" alt="Licencia">
 </p>
 
 > **Un reproductor de Apple Music elegante, rápido y sin distracciones para tu terminal.**
+
+<p align="center">
+  <img src="docs/screenshots/calyx.gif" alt="Calyx reproduciendo una canción en la terminal: biblioteca, carátula pixelada, título grande, visualizador de espectro y un bailarín" width="800">
+</p>
 
 Calyx te permite escuchar todo el catálogo y tu biblioteca personal de Apple Music directamente desde la consola, con carátulas en arte ASCII, visualizador de audio en tiempo real, letras animadas sincronizadas y control total con el teclado.
 
