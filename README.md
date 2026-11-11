@@ -57,7 +57,14 @@ To unlock full-length playback, your personal library, and your playlists:
 2. Your default web browser will open to the official Apple Music page.
 3. Sign in to your account. Calyx will automatically capture your session and return to the terminal ready to play.
 
-To pick the browser, start with `-u`: `calyx -u firefox` opens Calyx and signs in right away with that browser. Options: `chrome`, `chromium`, `edge`, `brave`, `arc`, `firefox`, `librewolf`, `zen`, `safari`, `orion`, `epiphany`. Handy when the browser Calyx picks on its own does not work (for example, Safari showing a blank page).
+> [!WARNING]
+> **Safari on macOS: sign in with another browser.** Safari hands `music.apple.com` links to the Music app, so the tab stays blank and the sign-in never happens. If Safari is your default browser, start Calyx with another browser you have installed:
+>
+> ```bash
+> calyx -u chrome     # or firefox, edge, brave…
+> ```
+
+**Picking the browser:** `calyx -u <browser>` opens Calyx and signs in right away with that browser, even if it is not your default. Options: `chrome`, `chromium`, `edge`, `brave`, `arc`, `firefox`, `librewolf`, `zen`, `safari`, `orion`, `epiphany`.
 
 *(For headless servers or SSH environments without a browser, press <kbd>?</kbd> inside Calyx for manual token setup instructions).*
 

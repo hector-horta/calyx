@@ -57,7 +57,14 @@ Para escuchar tus canciones completas, tus playlists y tu biblioteca personal:
 2. Se abrirá automáticamente tu navegador habitual con la página oficial de Apple Music.
 3. Inicia sesión normalmente. Calyx detectará tu cuenta y volverá a la terminal listo para reproducir.
 
-Para elegir el navegador, ábrelo con `-u`: `calyx -u firefox` abre Calyx e inicia sesión de inmediato en ese navegador. Opciones: `chrome`, `chromium`, `edge`, `brave`, `arc`, `firefox`, `librewolf`, `zen`, `safari`, `orion`, `epiphany`. Útil si el navegador que Calyx elige solo no funciona (por ejemplo, si Safari muestra una página en blanco).
+> [!WARNING]
+> **Safari en macOS: usa otro navegador para iniciar sesión.** Safari envía los enlaces de `music.apple.com` a la app Música: la pestaña queda en blanco y el inicio de sesión nunca ocurre. Si Safari es tu navegador predeterminado, inicia Calyx con otro navegador que tengas instalado:
+>
+> ```bash
+> calyx -u chrome     # o firefox, edge, brave…
+> ```
+
+**Elegir el navegador:** `calyx -u <navegador>` abre Calyx e inicia sesión de inmediato en ese navegador, aunque no sea el predeterminado. Opciones: `chrome`, `chromium`, `edge`, `brave`, `arc`, `firefox`, `librewolf`, `zen`, `safari`, `orion`, `epiphany`.
 
 *(Si necesitas configurarlo en servidores remotos o entornos SSH sin navegador gráfico, presiona <kbd>?</kbd> dentro de Calyx para ver la guía de configuración manual).*
 
