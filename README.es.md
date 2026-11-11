@@ -1,4 +1,6 @@
-# Calyx 🎵
+<h1 align="center">
+  <img src="docs/logo.svg" alt="Calyx" width="400">
+</h1>
 
 <p align="center">
   <a href="README.md">English</a> · <b>Español</b>
