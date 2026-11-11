@@ -114,7 +114,7 @@ To unlock full-length playback, your personal library, and your playlists:
 - **Can I run Calyx portably (e.g., from a USB drive)?**
   Yes. Set the environment variable `CALYX_HOME=/path/to/folder` to keep all configurations, databases, and caches in a single custom location without touching system folders.
 - **How do I know there is a new version?**
-  The top bar shows your version (`Calyx v0.1.13`). Once a day Calyx asks GitHub for the latest release in the background; when there is a newer one it adds `→ v0.1.14 available`. Press `V` to open its download page. It never updates itself. Run with `--no-update-check` to never contact GitHub.
+  The top bar shows your version (`Calyx v0.1.15`). Once a day Calyx asks GitHub for the latest release in the background; when there is a newer one it adds `→ v0.1.16 available`. Press `V` twice to install it: Calyx downloads the release, checks its SHA-256 and replaces its own executable; the new version runs after a restart. When it cannot (installed with cargo, scoop, winget, Homebrew or Nix, or no write access to its folder), it opens the download page instead. It never updates without you asking. Run with `--no-update-check` to never contact GitHub.
 
 ---
 
