@@ -114,7 +114,7 @@ Para escuchar tus canciones completas, tus playlists y tu biblioteca personal:
 - **¿Puedo usarlo en modo portátil?**
   Sí, si defines la variable de entorno `CALYX_HOME=/ruta/carpeta`, Calyx guardará todos sus datos en esa ubicación sin tocar el resto de tu equipo.
 - **¿Cómo sé si hay una versión nueva?**
-  La barra superior muestra tu versión (`Calyx v0.1.13`). Una vez al día Calyx consulta en segundo plano la última versión publicada en GitHub; si hay una más nueva, agrega `→ v0.1.14 disponible`. Presiona `V` para abrir su página de descarga. Nunca se actualiza sola. Usa `--no-update-check` para que no se conecte nunca a GitHub.
+  La barra superior muestra tu versión (`Calyx v0.1.15`). Una vez al día Calyx consulta en segundo plano la última versión publicada en GitHub; si hay una más nueva, agrega `→ v0.1.16 disponible`. Presiona `V` dos veces para instalarla: Calyx descarga la release, verifica su SHA-256 y reemplaza su propio ejecutable; la nueva versión corre al reiniciar. Si no puede (instalado con cargo, scoop, winget, Homebrew o Nix, o sin permiso de escritura en su carpeta), abre la página de descarga. Nunca se actualiza sin que se lo pidas. Usa `--no-update-check` para que no se conecte nunca a GitHub.
 
 ---
 
