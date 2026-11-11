@@ -2,8 +2,6 @@
 //! result. They live apart from routine progress messages and are drawn in
 //! reverse video with an ASCII tag, so a later "Loading..." never hides them.
 
-use crate::messages::Msg;
-use crate::messages_picker::PickerMsg;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::time::{Duration, Instant};
@@ -43,10 +41,22 @@ impl Tone {
     }
 }
 
+/// How long a notice stays up.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Hold {
+    /// The tone's time to live.
+    Timed,
+    /// Until the next key press (e.g. "installed: restart").
+    UntilKey,
+    /// Until another notice replaces it (e.g. "downloading…").
+    Pinned,
+}
+
 pub struct Notice {
     pub text: String,
     pub tone: Tone,
     pub at: Instant,
+    pub hold: Hold,
 }
 
 impl Notice {
@@ -55,18 +65,27 @@ impl Notice {
             text,
             tone,
             at: Instant::now(),
+            hold: Hold::Timed,
+        }
+    }
+
+    /// A notice that does not expire on its own (see `Hold`).
+    pub fn held(text: String, tone: Tone, hold: Hold) -> Self {
+        Self {
+            hold,
+            ..Self::new(text, tone)
         }
     }
 
     pub fn is_live(&self) -> bool {
-        self.at.elapsed() < self.tone.ttl()
+        self.hold != Hold::Timed || self.at.elapsed() < self.tone.ttl()
     }
 
     /// Returns a Line representing the notice's text in reverse video style, padded to `width` columns.
     pub fn line(&self, width: usize) -> Line<'static> {
         // The countdown goes right after the tag so a cut text never hides it.
-        let countdown = match self.tone {
-            Tone::Action => {
+        let countdown = match (self.tone, self.hold) {
+            (Tone::Action, Hold::Timed) => {
                 let left = self.tone.ttl().saturating_sub(self.at.elapsed()).as_secs() + 1;
                 format!(" ({left}s)")
             }
@@ -82,47 +101,15 @@ impl Notice {
     }
 }
 
-impl Msg<'_> {
-    /// Returns which notices must stand out (None = routine progress/info).
-    pub fn tone(&self) -> Option<Tone> {
-        match self {
-            Msg::Enqueued { .. }
-            | Msg::EnqueuedNext { .. }
-            | Msg::RemovedFromQueue(..)
-            | Msg::RemovedFromRecent(..)
-            | Msg::QueueCleared
-            | Msg::RecentCleared
-            | Msg::ListEnqueued(..)
-            | Msg::AlbumAddedToLibrary(..)
-            | Msg::LoginOk => Some(Tone::Result),
-            Msg::ListError { .. }
-            | Msg::PlaylistsError(..)
-            | Msg::PlaylistError { .. }
-            | Msg::PlaylistPlayFailed(..)
-            | Msg::AlbumError(..)
-            | Msg::AlbumAddError { .. }
-            | Msg::LoginError(..)
-            | Msg::AudioError(..) => Some(Tone::Error),
-            Msg::Picker(p) => p.tone(),
-            _ => None,
-        }
-    }
-}
-
-impl PickerMsg<'_> {
-    /// Returns the tone for this picker message.
-    pub fn tone(&self) -> Option<Tone> {
-        match self {
-            PickerMsg::ConfirmRemove { .. } => Some(Tone::Action),
-            PickerMsg::PlaylistCreated { .. }
-            | PickerMsg::AddedToPlaylist { .. }
-            | PickerMsg::Removed { .. } => Some(Tone::Result),
-            PickerMsg::PlaylistCreateError { .. }
-            | PickerMsg::AddToPlaylistError { .. }
-            | PickerMsg::RemoveError { .. }
-            | PickerMsg::NotEditable(..)
-            | PickerMsg::NoLibraryId(..) => Some(Tone::Error),
-            _ => None,
+impl crate::app::TuiApp {
+    /// A key was pressed: drops a notice held until then.
+    pub fn dismiss_key_notice(&mut self) {
+        if self
+            .notice
+            .as_ref()
+            .is_some_and(|n| n.hold == Hold::UntilKey)
+        {
+            self.notice = None;
         }
     }
 }

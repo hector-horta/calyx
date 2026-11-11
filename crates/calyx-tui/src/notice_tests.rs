@@ -1,4 +1,6 @@
 use super::*;
+use crate::messages::Msg;
+use crate::messages_picker::PickerMsg;
 
 fn text(line: &Line<'_>) -> String {
     line.spans.iter().map(|s| s.content.as_ref()).collect()
@@ -38,4 +40,19 @@ fn messages_are_classified() {
         .tone(),
         Some(Tone::Action)
     );
+}
+
+#[test]
+fn held_notices_do_not_expire_or_count_down() {
+    let mut n = Notice::held(
+        "Descargando v9.0.0…".to_string(),
+        Tone::Action,
+        Hold::Pinned,
+    );
+    n.at -= Duration::from_secs(60);
+    assert!(n.is_live());
+    assert!(!text(&n.line(60)).contains("s)"));
+    let mut timed = Notice::new("Presiona d otra vez".to_string(), Tone::Action);
+    timed.at -= Duration::from_secs(60);
+    assert!(!timed.is_live());
 }

@@ -55,10 +55,7 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp) {
 
     let top_block = Block::default()
         .borders(Borders::ALL)
-        .title_top(crate::version_badge::title(
-            app.language,
-            app.update == crate::update_install::UpdateState::Installed,
-        ))
+        .title_top(crate::version_badge::title(app.language, app.update))
         .title_top(help_line);
 
     frame.render_widget(
