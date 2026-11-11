@@ -14,9 +14,9 @@ use ratatui::{
 };
 
 /// Columns of every pose line.
-pub const DANCER_WIDTH: u16 = 9;
-/// Notes line + 5 pose lines + blank + caption.
-pub const DANCER_HEIGHT: u16 = 8;
+pub const DANCER_WIDTH: u16 = crate::dancer_figure::WIDTH as u16;
+/// Notes line + the figure + blank + caption.
+pub const DANCER_HEIGHT: u16 = crate::dancer_figure::HEIGHT as u16 / 2 + 3;
 /// One dance step every this many milliseconds.
 const STEP_MS: u64 = 400;
 /// Bass level (1..=24) from which the arms go up.
@@ -28,51 +28,6 @@ const FIGURE: Style = Style::new().fg(Color::Rgb(0, 240, 180));
 const NOTES: Style = Style::new().fg(Color::Rgb(255, 215, 0));
 const CAPTION: Style = Style::new().fg(Color::DarkGray);
 
-/// 0 idle, 1-2 sway, 3-4 arms up, 5 jump.
-const POSES: [[&str; 5]; 6] = [
-    [
-        r"    O    ",
-        r"   /|\   ",
-        r"    |    ",
-        r"   / \   ",
-        r"  /   \  ",
-    ],
-    [
-        r"  \ O    ",
-        r"   \|\   ",
-        r"    |    ",
-        r"   / >   ",
-        r"  /      ",
-    ],
-    [
-        r"    O /  ",
-        r"   /|/   ",
-        r"    |    ",
-        r"   < \   ",
-        r"      \  ",
-    ],
-    [
-        r"  \ O /  ",
-        r"   \|/   ",
-        r"    |    ",
-        r"   / \   ",
-        r"  /   \  ",
-    ],
-    [
-        r"  \ O /  ",
-        r"   \|/   ",
-        r"    |    ",
-        r"   / \_  ",
-        r"  /      ",
-    ],
-    [
-        r"  \ O /  ",
-        r"   \|/   ",
-        r"   _|_   ",
-        r"  |   |  ",
-        r"         ",
-    ],
-];
 /// Picks the pose for this moment: idle when not playing; otherwise sway,
 /// raise the arms or jump depending on how strong the bass is.
 pub fn pose_index(bass: u8, step: u64, playing: bool) -> usize {
@@ -91,9 +46,9 @@ pub fn pose_index(bass: u8, step: u64, playing: bool) -> usize {
 
 fn notes(step: u64, playing: bool) -> &'static str {
     match (playing, step % 2) {
-        (false, _) => "         ",
-        (true, 0) => "♪       ♫",
-        (true, _) => "  ♫   ♪  ",
+        (false, _) => "           ",
+        (true, 0) => "♪         ♫",
+        (true, _) => "   ♫   ♪   ",
     }
 }
 
@@ -109,9 +64,9 @@ pub fn dancer_lines(
     let mut lines = Vec::with_capacity(DANCER_HEIGHT as usize);
     lines.push(Line::from(Span::styled(notes(step, playing), NOTES)));
     lines.extend(
-        POSES[pose]
-            .iter()
-            .map(|row| Line::from(Span::styled(*row, FIGURE))),
+        crate::dancer_figure::pose_lines(pose)
+            .into_iter()
+            .map(|row| Line::from(Span::styled(row, FIGURE))),
     );
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(caption, CAPTION)));
@@ -150,13 +105,9 @@ mod tests {
 
     #[test]
     fn every_pose_line_has_the_same_width() {
-        for pose in POSES.iter() {
-            for row in pose.iter() {
-                assert_eq!(
-                    Span::raw(*row).width(),
-                    DANCER_WIDTH as usize,
-                    "bad row {row:?}"
-                );
+        for pose in 0..crate::dancer_figure::POSE_COUNT {
+            for row in crate::dancer_figure::pose_lines(pose) {
+                assert_eq!(Span::raw(row.as_str()).width(), DANCER_WIDTH as usize);
             }
         }
         assert_eq!(Span::raw(notes(0, true)).width(), DANCER_WIDTH as usize);

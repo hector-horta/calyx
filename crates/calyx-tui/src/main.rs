@@ -5,6 +5,7 @@ mod artwork;
 mod audio_pipeline;
 mod bg_events;
 mod cli;
+mod dancer_figure;
 mod hints;
 mod labels;
 mod list_actions;
