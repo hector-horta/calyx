@@ -81,12 +81,7 @@ impl PlaybackQueue {
         }
 
         if self.shuffle && self.upcoming.len() > 1 {
-            let nanos = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.subsec_nanos() as usize)
-                .unwrap_or(0);
-            let idx = nanos % self.upcoming.len();
-            self.upcoming.remove(idx)
+            self.upcoming.remove(random_index(self.upcoming.len()))
         } else {
             self.upcoming.pop_front()
         }
@@ -137,9 +132,33 @@ impl PlaybackQueue {
     }
 }
 
+/// A random index below `len` (0 for an empty list). Seeded by the standard
+/// library's per-hasher random keys: the clock is not random enough (on
+/// Windows its nanoseconds are always a multiple of 100).
+fn random_index(len: usize) -> usize {
+    use std::hash::{BuildHasher, Hasher};
+    let random = std::collections::hash_map::RandomState::new()
+        .build_hasher()
+        .finish();
+    (random % len.max(1) as u64) as usize
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn random_index_reaches_every_position() {
+        // Lengths that divide 100 always gave 0 with the old clock-based pick.
+        for len in [2usize, 4, 10] {
+            let mut seen = vec![false; len];
+            for _ in 0..2_000 {
+                seen[random_index(len)] = true;
+            }
+            assert!(seen.iter().all(|s| *s), "len {len}: {seen:?}");
+        }
+        assert_eq!(random_index(0), 0);
+    }
 
     fn dummy_track(id: &str) -> Track {
         Track {
