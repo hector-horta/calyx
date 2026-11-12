@@ -41,17 +41,31 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Linux ALSA dependencies (if runner.os == 'Linux')
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev pkg-config
-
       - name: Install Rust toolchain
+        if: runner.os != 'Linux'
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
       - name: Build release binary
+        if: runner.os != 'Linux'
         run: cargo build --release --target ${{ matrix.target }}
+
+      # A binary links against the glibc it was built with and refuses to run
+      # on older ones, so build in Ubuntu 22.04 (glibc 2.35) instead of the
+      # runner's own Ubuntu: it then runs on Debian 12, Ubuntu 22.04 and newer.
+      - name: Build release binary (Linux, glibc 2.35)
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -v "$PWD":/src -w /src ubuntu:22.04 bash -euc '
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends               build-essential pkg-config libasound2-dev curl ca-certificates
+            curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
+            . "$HOME/.cargo/env"
+            cargo build --release --target ${{ matrix.target }}
+          '
+          echo "Newest glibc symbol needed:"
+          objdump -T "target/${{ matrix.target }}/release/calyx" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
 
       - name: Package asset (Windows)
         if: matrix.os == 'windows-latest'
