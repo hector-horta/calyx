@@ -80,7 +80,7 @@ const KNOWN: &[Known] = &[
         "zen",
         BrowserType::Firefox,
         &["zen", "zen-browser"],
-        &["Zen.app/Contents/MacOS/zen"],
+        &[r"Zen Browser\zen.exe", "Zen.app/Contents/MacOS/zen"],
     ),
     (
         "safari",
