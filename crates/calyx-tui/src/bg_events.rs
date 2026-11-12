@@ -8,6 +8,9 @@ use crate::messages_picker::PickerMsg;
 use calyx_core::{AudioSource, DecodedTrack, LyricLine, ResolvedAudio, Track, UserPlaylist};
 
 pub enum BgEvent {
+    /// A result for the track list, tagged with its request number
+    /// (see `spawn_list_event`); an outdated one is dropped.
+    List(u64, Box<BgEvent>),
     AudioReady(Track, Result<ResolvedAudio, String>, Vec<LyricLine>),
     AudioDecoded(Track, Result<DecodedTrack, String>, Vec<LyricLine>, String),
     ArtworkReady(String, TerminalCoverArt),
@@ -93,6 +96,11 @@ impl TuiApp {
             self.activity.finish(job);
         }
         match ev {
+            BgEvent::List(seq, inner) => {
+                if seq == self.list_seq {
+                    self.handle_bg_event(*inner);
+                }
+            }
             BgEvent::AudioReady(track, res, lyrics) if self.is_current(&track.id) => match res {
                 Ok(audio) => {
                     let hint = audio_hint(&audio, self.language);

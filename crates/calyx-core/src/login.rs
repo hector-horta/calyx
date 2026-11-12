@@ -60,30 +60,27 @@ pub async fn interactive_apple_login(
         CalyxError::Auth("No se encontró un navegador compatible (Chromium o Firefox). Presiona '?' en Calyx para ver la guía manual.".to_string())
     })?;
 
-    if let crate::browser_discovery::BrowserType::Firefox(_) = browser {
-        info!("Iniciando flujo de login para navegador Gecko / Firefox...");
-        let token = crate::login_firefox::wait_for_firefox_login(Duration::from_secs(180)).await?;
-        return Ok((
-            None,
-            token,
-            LoginBrowserGuard {
-                ws_url: String::new(),
-                child: None,
-            },
-        ));
-    }
-
-    if let crate::browser_discovery::BrowserType::WebKit(_) = browser {
-        info!("Iniciando flujo de login para navegador WebKit / Safari...");
-        let token = crate::login_webkit::wait_for_webkit_login(Duration::from_secs(180)).await?;
-        return Ok((
-            None,
-            token,
-            LoginBrowserGuard {
-                ws_url: String::new(),
-                child: None,
-            },
-        ));
+    // Firefox and WebKit: no debugging port, the token is read from disk.
+    let cookie_store: Option<(crate::login_cookies::TokenReader, &str)> = match &browser {
+        crate::browser_discovery::BrowserType::Firefox(_) => Some((
+            crate::login_firefox::extract_media_user_token_from_firefox_profiles,
+            "Timeout esperando inicio de sesión en Firefox o fork compatible",
+        )),
+        crate::browser_discovery::BrowserType::WebKit(_) => Some((
+            crate::login_webkit::extract_token_from_webkit,
+            "Timeout en Safari/WebKit. Si macOS bloqueó permisos, usa '?' para modo manual.",
+        )),
+        crate::browser_discovery::BrowserType::Chromium(_) => None,
+    };
+    if let Some((read, timeout_msg)) = cookie_store {
+        info!("Iniciando flujo de login por cookies del navegador...");
+        let token =
+            crate::login_cookies::wait_for_live_token(http, dev_token, read, timeout_msg).await?;
+        let guard = LoginBrowserGuard {
+            ws_url: String::new(),
+            child: None,
+        };
+        return Ok((None, token, guard));
     }
 
     let browser_bin = match browser {

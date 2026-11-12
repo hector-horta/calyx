@@ -5,7 +5,7 @@ use crate::messages::Msg;
 
 impl TuiApp {
     pub fn enqueue_selected_back(&mut self) {
-        if let Some(track) = self.tracks.get(self.selected_index).cloned() {
+        if let Some(track) = self.selected_track() {
             self.say(Msg::Enqueued {
                 artist: &track.artist,
                 title: &track.title,
@@ -15,7 +15,7 @@ impl TuiApp {
     }
 
     pub fn enqueue_selected_next(&mut self) {
-        if let Some(track) = self.tracks.get(self.selected_index).cloned() {
+        if let Some(track) = self.selected_track() {
             self.say(Msg::EnqueuedNext {
                 artist: &track.artist,
                 title: &track.title,

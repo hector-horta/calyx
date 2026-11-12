@@ -42,6 +42,8 @@ pub mod library;
 mod library_write;
 /// Interactive zero-friction Apple Music Sign-In.
 pub mod login;
+/// Login that waits for a live token in a browser's cookie store.
+mod login_cookies;
 /// Gecko/Firefox family cookie extraction and login support.
 pub mod login_firefox;
 /// WebKit/Safari family binary cookies parsing and login support.

@@ -52,6 +52,23 @@ impl SessionConfig {
         cfg
     }
 
+    /// Session for a start with `calyx [storefront]`. A storefront typed on
+    /// the command line wins over the saved one, except when logged in: the
+    /// account's own storefront (verified at login) is the one that plays.
+    pub fn load(cli_storefront: Option<&str>) -> Self {
+        let mut cfg = Self::load_or_default(cli_storefront.unwrap_or("us"));
+        cfg.apply_cli_storefront(cli_storefront);
+        cfg
+    }
+
+    fn apply_cli_storefront(&mut self, cli_storefront: Option<&str>) {
+        if let Some(sf) = cli_storefront
+            && !self.is_logged_in()
+        {
+            self.storefront = sf.to_string();
+        }
+    }
+
     pub fn save(&self) -> CalyxResult<()> {
         let serialized = serde_json::to_string_pretty(self)?;
         let auth_file = crate::paths::auth_file();
@@ -191,6 +208,22 @@ pub fn extract_jwt_from_bundle(js: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_cli_storefront_wins_unless_logged_in() {
+        let mut cfg = SessionConfig {
+            storefront: "us".into(),
+            ..Default::default()
+        };
+        cfg.apply_cli_storefront(None);
+        assert_eq!(cfg.storefront, "us");
+        cfg.apply_cli_storefront(Some("mx"));
+        assert_eq!(cfg.storefront, "mx");
+
+        cfg.media_user_token = Some("token".into());
+        cfg.apply_cli_storefront(Some("jp"));
+        assert_eq!(cfg.storefront, "mx", "the account's storefront is kept");
+    }
 
     #[test]
     fn test_extract_js_and_jwt() {
