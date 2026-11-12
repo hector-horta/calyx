@@ -153,8 +153,12 @@ impl NativeAudioEngine {
     /// True once, when a playing track runs out; the engine then stops.
     pub fn is_finished(&self) -> bool {
         let mut st = self.lock();
-        let finished =
-            st.status == PlaybackStatus::Playing && st.sink.as_ref().is_some_and(|s| s.empty());
+        // Without an audio device there is no sink to drain: go by the clock.
+        let ran_out = match st.sink.as_ref() {
+            Some(sink) => sink.empty(),
+            None => st.elapsed() >= st.duration,
+        };
+        let finished = st.status == PlaybackStatus::Playing && ran_out;
         if finished {
             st.started_at = None;
             st.status = PlaybackStatus::Stopped;
@@ -226,6 +230,21 @@ mod tests {
         assert_eq!(engine.status(), PlaybackStatus::Stopped);
         assert_eq!(engine.current_spectrum(), [0; SPECTRUM_BANDS]);
         assert_eq!(engine.progress().0, Duration::ZERO);
+    }
+
+    #[test]
+    fn headless_playback_finishes_when_the_time_runs_out() {
+        let engine = headless();
+        engine.play_decoded(one_second_track()).unwrap();
+        assert!(!engine.is_finished());
+
+        // Shorter than a second: its whole-second duration is zero.
+        let mut short = one_second_track();
+        short.pcm.truncate(100);
+        engine.play_decoded(short).unwrap();
+        assert!(engine.is_finished());
+        assert_eq!(engine.status(), PlaybackStatus::Stopped);
+        assert!(!engine.is_finished(), "reported only once");
     }
 
     #[test]

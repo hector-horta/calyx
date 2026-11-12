@@ -208,8 +208,9 @@ impl AppleMusicClient {
                 "Stream URL must use HTTPS".to_string(),
             ));
         }
-        let bytes = self.http.get(url).send().await?.bytes().await?;
-        Ok(bytes.to_vec())
+        // An error page must never be taken for audio (and cached as such).
+        let resp = self.http.get(url).send().await?.error_for_status()?;
+        Ok(resp.bytes().await?.to_vec())
     }
 }
 
