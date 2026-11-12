@@ -14,11 +14,12 @@ impl TuiApp {
         }
         let browser = discover_browser();
         let safari = matches!(browser, Some(BrowserType::WebKit(_)));
-        self.status_message = if safari {
-            self.language.msg_login_safari_alert().to_string()
+        let text = if safari {
+            self.language.msg_login_safari_alert()
         } else {
-            self.language.msg_login_opening().to_string()
+            self.language.msg_login_opening()
         };
+        self.zones.player.set_status(text.to_string());
         self.start_login();
     }
 

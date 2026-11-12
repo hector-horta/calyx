@@ -45,7 +45,7 @@ impl TuiApp {
                 Ok(()) => {
                     self.audio.set_volume(self.volume);
                     self.audio_hint = hint;
-                    self.status_message.clear(); // "Loading audio..." is done
+                    self.zones.player.clear_status(); // "Loading audio..." is done
                     self.current_track = Some(track);
                     self.trigger_prefetch_next();
                 }

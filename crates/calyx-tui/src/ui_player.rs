@@ -66,13 +66,16 @@ fn render_meters_box(frame: &mut Frame<'_>, area: Rect, app: &TuiApp) {
     frame.render_widget(Paragraph::new(lines).alignment(Alignment::Center), body);
 }
 
-/// A live action/error/result in reverse video; otherwise the routine
-/// progress message (with the activity spinner and counter), plain.
+/// The player zone's live action/error/result in reverse video; otherwise
+/// its progress message (with the spinner while the audio loads), plain.
 fn notice_line(app: &TuiApp, width: usize) -> Line<'static> {
-    if let Some(notice) = app.notice.as_ref().filter(|n| n.is_live()) {
+    let slot = &app.zones.player;
+    if let Some(notice) = slot.notice.as_ref().filter(|n| n.is_live()) {
         return notice.line(width);
     }
-    let progress = app.activity.decorate(&app.status_message);
+    let progress = app
+        .activity
+        .decorate_jobs(&[crate::activity::Job::Audio], &slot.status);
     let style = INFO.add_modifier(Modifier::ITALIC);
     Line::from(Span::styled(
         truncate(&progress, width.saturating_sub(1)),

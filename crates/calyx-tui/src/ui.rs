@@ -121,10 +121,13 @@ fn render_central_with_lyrics(
             hint_bar_fit(&items, area.width.saturating_sub(2) as usize)
         }
     };
+    // List messages replace the key hints while they are relevant.
+    let width = area.width.saturating_sub(2) as usize;
+    let bottom = crate::zones::list_line(&app.zones.list, &app.activity, width);
     let outer = Block::default()
         .borders(Borders::ALL)
         .title_top(nav_line)
-        .title_bottom(bottom_bar);
+        .title_bottom(bottom.unwrap_or(bottom_bar));
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
     let cols = Layout::default()
