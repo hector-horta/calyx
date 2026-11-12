@@ -1,13 +1,15 @@
-//! Whether a newer calyx release exists on GitHub. Asked at most once a day:
-//! the answer is cached next to the catalog, and any network or parse error
-//! just means "no update known" (calyx never waits on this).
+//! Whether a newer calyx release exists on GitHub. Asked on every start with
+//! a conditional request: the last answer and its ETag are cached next to
+//! the catalog, and while nothing changed GitHub answers "304 Not Modified"
+//! with no body. One request per start is far below GitHub's 60 per hour.
+//! Offline, the last answer is used; with none, no update is known (calyx
+//! never waits on this).
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const LATEST_URL: &str = "https://api.github.com/repos/hector-horta/calyx/releases/latest";
-const DAY_SECS: u64 = 24 * 60 * 60;
 const TIMEOUT: Duration = Duration::from_secs(5);
 
 /// "v0.1.14" or "0.1.14" as (major, minor, patch); `None` if it is not that.
@@ -37,15 +39,44 @@ pub fn release_url(tag: &str) -> Option<String> {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 struct Cache {
-    /// Unix seconds of the last successful check.
+    /// Unix seconds of the last answer with a body.
     checked_at: u64,
     /// Tag of the latest release then, e.g. "v0.1.14".
     latest: String,
+    /// GitHub's ETag for that answer, sent back as If-None-Match.
+    #[serde(default)]
+    etag: Option<String>,
 }
 
-/// The cached tag when it was checked less than a day before `now`.
-fn fresh(cache: &Cache, now: u64) -> Option<String> {
-    (now.saturating_sub(cache.checked_at) < DAY_SECS).then(|| cache.latest.clone())
+/// GitHub's answer to the latest-release request.
+#[derive(Debug, PartialEq)]
+enum Answer {
+    /// 304: the cached tag is still the latest.
+    Unchanged,
+    Latest {
+        tag: String,
+        etag: Option<String>,
+    },
+}
+
+/// The latest tag known after asking, and the cache to write (if any).
+/// No answer (offline, rate limited, bad JSON) keeps the last known tag.
+fn resolve(
+    cached: Option<Cache>,
+    answer: Option<Answer>,
+    now: u64,
+) -> (Option<String>, Option<Cache>) {
+    match answer {
+        Some(Answer::Latest { tag, etag }) => {
+            let cache = Cache {
+                checked_at: now,
+                latest: tag.clone(),
+                etag,
+            };
+            (Some(tag), Some(cache))
+        }
+        Some(Answer::Unchanged) | None => (cached.map(|c| c.latest), None),
+    }
 }
 
 fn cache_file() -> PathBuf {
@@ -64,53 +95,52 @@ struct Release {
     tag_name: String,
 }
 
-/// Tag of the latest GitHub release, validated as a version.
-async fn fetch_latest() -> Option<String> {
+/// Asks GitHub for the latest release, sending `etag` when there is one;
+/// `None` on any network, HTTP or parse error.
+async fn fetch_latest(etag: Option<&str>) -> Option<Answer> {
     let client = reqwest::Client::builder()
         .timeout(TIMEOUT)
         .user_agent(concat!("calyx/", env!("CARGO_PKG_VERSION")))
         .build()
         .ok()?;
-    let release: Release = client
+    let mut request = client
         .get(LATEST_URL)
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await
-        .ok()?
-        .error_for_status()
-        .ok()?
-        .json()
-        .await
-        .ok()?;
-    parse_version(&release.tag_name).map(|_| release.tag_name)
+        .header("Accept", "application/vnd.github+json");
+    if let Some(etag) = etag {
+        request = request.header(reqwest::header::IF_NONE_MATCH, etag);
+    }
+    let response = request.send().await.ok()?;
+    if response.status() == reqwest::StatusCode::NOT_MODIFIED {
+        return Some(Answer::Unchanged);
+    }
+    let response = response.error_for_status().ok()?;
+    let etag = response
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let release: Release = response.json().await.ok()?;
+    parse_version(&release.tag_name)?;
+    Some(Answer::Latest {
+        tag: release.tag_name,
+        etag,
+    })
 }
 
 /// The latest release tag when it is newer than `current`, else `None`.
-/// Uses the day-old cache when there is one; otherwise asks GitHub and
-/// caches the answer (a failed request is not cached, so it is retried on
-/// the next start).
 pub async fn newer_release(current: &str) -> Option<String> {
     let path = cache_file();
-    let now = now_secs();
     let cached = std::fs::read_to_string(&path)
         .ok()
-        .and_then(|s| serde_json::from_str::<Cache>(&s).ok())
-        .and_then(|c| fresh(&c, now));
-    let latest = match cached {
-        Some(tag) => tag,
-        None => {
-            let tag = fetch_latest().await?;
-            let cache = Cache {
-                checked_at: now,
-                latest: tag.clone(),
-            };
-            if let Ok(json) = serde_json::to_string(&cache) {
-                let _ = std::fs::create_dir_all(crate::paths::data_dir());
-                let _ = std::fs::write(&path, json);
-            }
-            tag
-        }
-    };
+        .and_then(|s| serde_json::from_str::<Cache>(&s).ok());
+    let etag = cached.as_ref().and_then(|c| c.etag.clone());
+    let answer = fetch_latest(etag.as_deref()).await;
+    let (latest, to_save) = resolve(cached, answer, now_secs());
+    if let Some(json) = to_save.and_then(|c| serde_json::to_string(&c).ok()) {
+        let _ = std::fs::create_dir_all(crate::paths::data_dir());
+        let _ = std::fs::write(&path, json);
+    }
+    let latest = latest?;
     is_newer(&latest, current).then_some(latest)
 }
 
