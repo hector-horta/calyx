@@ -54,7 +54,6 @@ pub struct TuiApp {
     pub current_track: Option<Track>,
     pub current_artwork: Option<TerminalCoverArt>,
     pub current_lyrics: Vec<calyx_core::LyricLine>,
-    pub status_message: String,
     pub language: calyx_core::Language,
     pub phonetic_mode: PhoneticMode,
     pub volume: f32,
@@ -81,8 +80,8 @@ pub struct TuiApp {
     pub(crate) pending_remove: Option<(String, std::time::Instant)>,
     /// Self-update driven by 'V' (ask, installing, installed).
     pub(crate) update: crate::update_install::UpdateState,
-    /// Action/error/result shown in reverse video; progress never overwrites it.
-    pub(crate) notice: Option<crate::notice::Notice>,
+    /// Messages of the list and the player, each shown in its own place.
+    pub(crate) zones: crate::zones::Zones,
     /// Quality/source of the playing audio ("[AAC 256k | Cache]"), always visible.
     pub(crate) audio_hint: String,
 }
@@ -133,7 +132,6 @@ impl TuiApp {
             current_track: None,
             current_artwork: None,
             current_lyrics: Vec::new(),
-            status_message: String::new(),
             language,
             phonetic_mode: PhoneticMode::default(),
             volume: 0.85,
@@ -152,7 +150,7 @@ impl TuiApp {
             open_playlist: None,
             pending_remove: None,
             update: Default::default(),
-            notice: None,
+            zones: Default::default(),
             audio_hint: String::new(),
         })
     }
@@ -183,7 +181,7 @@ impl TuiApp {
 
     pub fn toggle_phonetic_mode(&mut self) {
         self.phonetic_mode = self.phonetic_mode.next();
-        self.status_message = match (self.language, self.phonetic_mode) {
+        let text = match (self.language, self.phonetic_mode) {
             (calyx_core::Language::Es, PhoneticMode::Dual) => {
                 "Modo Fonética: Dual (Original + Romaji/Pinyin)"
             }
@@ -202,8 +200,8 @@ impl TuiApp {
             (calyx_core::Language::En, PhoneticMode::Original) => {
                 "Phonetic Mode: Off (Original Only)"
             }
-        }
-        .to_string();
+        };
+        self.zones.player.set_status(text.to_string());
     }
 
     pub fn toggle_language(&mut self) {
@@ -212,15 +210,16 @@ impl TuiApp {
         self.say(Msg::LanguageSet);
     }
 
-    /// Shows `msg` in the status line, in the current language.
-    /// Actions, errors and results become a notice (reverse video, own slot);
-    /// everything else is routine progress in `status_message`.
+    /// Shows `msg` in the current language, in the zone it is about (the
+    /// list or the player, see zones.rs). Actions, errors and results become
+    /// that zone's notice (reverse video); the rest is routine progress.
     pub fn say<'m>(&mut self, msg: impl Into<Msg<'m>>) {
         let msg = msg.into();
         let text = msg.text(self.language);
+        let slot = self.zones.get_mut(msg.zone());
         match msg.tone() {
-            Some(tone) => self.notice = Some(crate::notice::Notice::new(text, tone)),
-            None => self.status_message = text,
+            Some(tone) => slot.notice = Some(crate::notice::Notice::new(text, tone)),
+            None => slot.set_status(text),
         }
     }
 

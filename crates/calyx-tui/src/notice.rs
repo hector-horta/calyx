@@ -41,22 +41,10 @@ impl Tone {
     }
 }
 
-/// How long a notice stays up.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Hold {
-    /// The tone's time to live.
-    Timed,
-    /// Until the next key press (e.g. "installed: restart").
-    UntilKey,
-    /// Until another notice replaces it (e.g. "downloading…").
-    Pinned,
-}
-
 pub struct Notice {
     pub text: String,
     pub tone: Tone,
     pub at: Instant,
-    pub hold: Hold,
 }
 
 impl Notice {
@@ -65,27 +53,18 @@ impl Notice {
             text,
             tone,
             at: Instant::now(),
-            hold: Hold::Timed,
-        }
-    }
-
-    /// A notice that does not expire on its own (see `Hold`).
-    pub fn held(text: String, tone: Tone, hold: Hold) -> Self {
-        Self {
-            hold,
-            ..Self::new(text, tone)
         }
     }
 
     pub fn is_live(&self) -> bool {
-        self.hold != Hold::Timed || self.at.elapsed() < self.tone.ttl()
+        self.at.elapsed() < self.tone.ttl()
     }
 
     /// Returns a Line representing the notice's text in reverse video style, padded to `width` columns.
     pub fn line(&self, width: usize) -> Line<'static> {
         // The countdown goes right after the tag so a cut text never hides it.
-        let countdown = match (self.tone, self.hold) {
-            (Tone::Action, Hold::Timed) => {
+        let countdown = match self.tone {
+            Tone::Action => {
                 // Rounded up: 3.2 s left shows "4s", and a fresh notice "4s", not "5s".
                 let left_ms = self
                     .tone
@@ -104,19 +83,6 @@ impl Notice {
             text.push_str(&" ".repeat(width - len));
         }
         Line::from(Span::styled(text, self.tone.style()))
-    }
-}
-
-impl crate::app::TuiApp {
-    /// A key was pressed: drops a notice held until then.
-    pub fn dismiss_key_notice(&mut self) {
-        if self
-            .notice
-            .as_ref()
-            .is_some_and(|n| n.hold == Hold::UntilKey)
-        {
-            self.notice = None;
-        }
     }
 }
 

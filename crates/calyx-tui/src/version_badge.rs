@@ -28,8 +28,8 @@ pub fn newer() -> Option<&'static str> {
     NEWER.get().map(String::as_str)
 }
 
-/// " Calyx v0.1.13 ", " Calyx v0.1.13 → v0.1.14 disponible [V] ", and while
-/// `update` runs, "… → v0.1.14 descargando…" / "… instalada, reinicia".
+/// " Calyx v0.1.13 ", or with a newer release " Calyx v0.1.13 → v0.1.14
+/// disponible [V] ", where each step of the update replaces "disponible".
 pub fn title(lang: Language, update: UpdateState) -> Line<'static> {
     title_with(lang, newer(), update)
 }
@@ -41,21 +41,14 @@ fn title_with(lang: Language, newer: Option<&str>, update: UpdateState) -> Line<
         Span::styled(format!("v{VERSION} "), dim),
     ];
     if let Some(tag) = newer {
-        let busy = matches!(update, UpdateState::Installing | UpdateState::Installed);
-        let state = match (lang, update) {
-            (Language::Es, UpdateState::Installing) => "descargando…",
-            (Language::En, UpdateState::Installing) => "downloading…",
-            (Language::Es, UpdateState::Installed) => "instalada, reinicia",
-            (Language::En, UpdateState::Installed) => "installed, restart",
-            (Language::Es, _) => "disponible",
-            (Language::En, _) => "available",
-        };
-        let style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
-        spans.push(Span::styled(format!("→ {tag} {state} "), style));
-        if !busy {
+        let (state, style, key) = crate::update_install::badge(lang, update);
+        let tag_style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
+        spans.push(Span::styled(format!("→ {tag} "), tag_style));
+        spans.push(Span::styled(format!(" {state} "), style));
+        if key {
             spans.push(crate::hints::key_span("V", crate::hints::KEY_STYLE));
-            spans.push(Span::raw(" "));
         }
+        spans.push(Span::raw(" "));
     }
     Line::from(spans)
 }
@@ -71,37 +64,55 @@ pub fn open_release(app: &mut crate::app::TuiApp) {
         return;
     };
     if let Err(e) = calyx_core::login_firefox::open_url_in_system_browser(&url) {
-        app.status_message = e.to_string();
+        app.zones.player.set_status(e.to_string());
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     fn text(line: &Line) -> String {
         line.spans.iter().map(|s| s.content.as_ref()).collect()
     }
 
     #[test]
-    fn shows_the_version_and_a_newer_release_when_known() {
+    fn shows_the_version_and_each_update_step() {
         let plain = text(&title_with(Language::Es, None, UpdateState::Idle));
         assert_eq!(plain, format!(" Calyx v{VERSION} "));
-        let es = text(&title_with(Language::Es, Some("v9.0.0"), UpdateState::Idle));
-        assert!(es.ends_with("→ v9.0.0 disponible [V] "));
-        let en = text(&title_with(Language::En, Some("v9.0.0"), UpdateState::Idle));
-        assert!(en.ends_with("→ v9.0.0 available [V] "));
-        let busy = text(&title_with(
+        let tag = Some("v9.0.0");
+        let es = text(&title_with(Language::Es, tag, UpdateState::Idle));
+        assert!(es.ends_with("→ v9.0.0  disponible [V] "), "{es}");
+        let en = text(&title_with(Language::En, tag, UpdateState::Idle));
+        assert!(en.ends_with("→ v9.0.0  available [V] "), "{en}");
+        let asked = text(&title_with(
             Language::Es,
-            Some("v9.0.0"),
-            UpdateState::Installing,
+            tag,
+            UpdateState::Asked(Instant::now()),
         ));
-        assert!(busy.ends_with("→ v9.0.0 descargando… "));
-        let done = text(&title_with(
-            Language::Es,
-            Some("v9.0.0"),
-            UpdateState::Installed,
-        ));
-        assert!(done.ends_with("→ v9.0.0 instalada, reinicia "));
+        assert!(
+            asked.contains("presiona V otra vez para instalar (4s)"),
+            "{asked}"
+        );
+        let now = Instant::now();
+        let busy = text(&title_with(Language::Es, tag, UpdateState::Installing(now)));
+        assert!(
+            busy.contains("descargando…") && !busy.contains("[V]"),
+            "{busy}"
+        );
+        let done = text(&title_with(Language::Es, tag, UpdateState::Installed));
+        assert!(done.contains("instalada: reinicia calyx"), "{done}");
+        let failed = text(&title_with(Language::En, tag, UpdateState::Failed(now)));
+        assert!(failed.contains("could not install"), "{failed}");
+    }
+
+    #[test]
+    fn an_old_question_or_failure_goes_back_to_available() {
+        let long_ago = Instant::now() - std::time::Duration::from_secs(60);
+        for state in [UpdateState::Asked(long_ago), UpdateState::Failed(long_ago)] {
+            let t = text(&title_with(Language::Es, Some("v9.0.0"), state));
+            assert!(t.ends_with(" disponible [V] "), "{t}");
+        }
     }
 }

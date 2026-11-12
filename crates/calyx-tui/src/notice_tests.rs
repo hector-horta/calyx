@@ -43,16 +43,9 @@ fn messages_are_classified() {
 }
 
 #[test]
-fn held_notices_do_not_expire_or_count_down() {
-    let mut n = Notice::held(
-        "Descargando v9.0.0…".to_string(),
-        Tone::Action,
-        Hold::Pinned,
-    );
-    n.at -= Duration::from_secs(60);
-    assert!(n.is_live());
-    assert!(!text(&n.line(60)).contains("s)"));
+fn notices_expire_after_their_tone_ttl() {
     let mut timed = Notice::new("Presiona d otra vez".to_string(), Tone::Action);
+    assert!(timed.is_live());
     timed.at -= Duration::from_secs(60);
     assert!(!timed.is_live());
 }

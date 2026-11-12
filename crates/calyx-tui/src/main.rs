@@ -36,6 +36,7 @@ mod ui_picker;
 mod ui_player;
 mod update_install;
 mod version_badge;
+mod zones;
 
 use anyhow::{Context, Result};
 use calyx_core::SectionType;
@@ -131,7 +132,6 @@ fn run_event_loop(
         if key_event.kind != KeyEventKind::Press {
             continue;
         }
-        app.dismiss_key_notice();
 
         if app.is_editing {
             match key_event.code {
