@@ -45,7 +45,7 @@ impl TuiApp {
         self.say(Msg::LoadingAlbum(&track.title));
         self.activity.start(Job::List);
         let backend = self.backend.clone();
-        self.spawn_event(async move {
+        self.spawn_list_event(async move {
             BgEvent::AlbumOpened(
                 backend
                     .fetch_album_of(&track)

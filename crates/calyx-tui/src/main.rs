@@ -68,7 +68,8 @@ async fn main() -> Result<()> {
         calyx_core::browser_choice::prefer(browser);
     }
     // Built before raw mode, so a startup error prints on a normal terminal.
-    let mut app = app::TuiApp::new(&cli.storefront).context("Failed to initialize TuiApp")?;
+    let mut app =
+        app::TuiApp::new(cli.storefront.as_deref()).context("Failed to initialize TuiApp")?;
     // The binary replaced by the last update is no longer running.
     calyx_core::self_update::remove_old_binary();
     if cli.login.is_some() {

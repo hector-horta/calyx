@@ -5,6 +5,9 @@ use reqwest::Client;
 use serde::Deserialize;
 use tracing::info;
 
+/// Time allowed for one audio or artwork download.
+const DOWNLOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
+
 #[derive(Clone)]
 pub struct AppleMusicClient {
     pub(crate) http: Client,
@@ -209,7 +212,10 @@ impl AppleMusicClient {
             ));
         }
         // An error page must never be taken for audio (and cached as such).
-        let resp = self.http.get(url).send().await?.error_for_status()?;
+        // Downloads get their own limit: the client's 18 s is for API calls
+        // and would cut a whole track short on a slow connection.
+        let resp = self.http.get(url).timeout(DOWNLOAD_TIMEOUT).send().await?;
+        let resp = resp.error_for_status()?;
         Ok(resp.bytes().await?.to_vec())
     }
 }
