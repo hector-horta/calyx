@@ -8,6 +8,9 @@ use crate::fmp4::decrypt_apple_fmp4_stream;
 use crate::hls::HlsStreamPlan;
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 
+/// Most segments one track may list (hours of audio); a sanity bound only.
+const MAX_SEGMENTS: usize = 4_000;
+
 impl AppleMusicClient {
     pub async fn fetch_full_track_stream(
         &self,
@@ -58,12 +61,19 @@ impl AppleMusicClient {
             .await?;
         let track_key = wvd.extract_content_key_from_license(&lic_b64, &lic_req)?;
 
+        // Never cache a cut-off track: refuse playlists beyond the bound.
+        if plan.media_segment_urls.len() > MAX_SEGMENTS {
+            return Err(CalyxError::Audio(format!(
+                "Stream HLS con demasiados segmentos ({})",
+                plan.media_segment_urls.len()
+            )));
+        }
         let mut full_audio = Vec::new();
         let mut seen_urls = Vec::new();
         for seg_url in plan
             .init_segment_url
             .iter()
-            .chain(plan.media_segment_urls.iter().take(64))
+            .chain(plan.media_segment_urls.iter())
         {
             if !seen_urls.contains(seg_url) {
                 seen_urls.push(seg_url.clone());

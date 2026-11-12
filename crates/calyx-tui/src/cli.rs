@@ -3,8 +3,8 @@
 
 #[derive(Debug, PartialEq)]
 pub struct Cli {
-    /// Two-letter Apple Music storefront ("us" when none is given).
-    pub storefront: String,
+    /// Two-letter Apple Music storefront, when one was typed.
+    pub storefront: Option<String>,
     /// `--version` / `-V`: print the version and exit.
     pub version: bool,
     /// `--check`: packaging smoke test, start and exit cleanly.
@@ -34,8 +34,7 @@ impl Cli {
                 .iter()
                 .enumerate()
                 .find(|(i, a)| !a.starts_with('-') && Some(*i) != value_at)
-                .map(|(_, a)| a.clone())
-                .unwrap_or_else(|| "us".to_string()),
+                .map(|(_, a)| a.clone()),
             version: has("--version") || has("-V"),
             check: has("--check"),
             update_check: !has("--no-update-check"),
@@ -53,16 +52,16 @@ mod tests {
     }
 
     #[test]
-    fn defaults_to_the_us_storefront_with_the_update_check() {
+    fn defaults_to_no_storefront_with_the_update_check() {
         let cli = parse(&[]);
-        assert_eq!(cli.storefront, "us");
+        assert_eq!(cli.storefront, None);
         assert!(cli.update_check && !cli.version && !cli.check);
     }
 
     #[test]
     fn flags_do_not_take_the_storefront_slot() {
         let cli = parse(&["--no-update-check", "mx"]);
-        assert_eq!(cli.storefront, "mx");
+        assert_eq!(cli.storefront.as_deref(), Some("mx"));
         assert!(!cli.update_check);
         assert!(parse(&["-V"]).version);
     }
@@ -71,11 +70,11 @@ mod tests {
     fn login_takes_the_next_argument_as_the_browser() {
         let cli = parse(&["-u", "firefox", "mx"]);
         assert_eq!(cli.login.as_deref(), Some("firefox"));
-        assert_eq!(cli.storefront, "mx");
+        assert_eq!(cli.storefront.as_deref(), Some("mx"));
         let cli = parse(&["jp", "--login", "safari"]);
         assert_eq!(
-            (cli.login.as_deref(), cli.storefront.as_str()),
-            (Some("safari"), "jp")
+            (cli.login.as_deref(), cli.storefront.as_deref()),
+            (Some("safari"), Some("jp"))
         );
         assert_eq!(parse(&["-u"]).login, None);
         assert_eq!(parse(&["mx"]).login, None);

@@ -19,6 +19,18 @@ impl TuiApp {
         });
     }
 
+    /// Like `spawn_event`, for work that replaces the visible track list:
+    /// only the latest request is shown, so a slow older one cannot
+    /// overwrite the list the user asked for afterwards.
+    pub(crate) fn spawn_list_event<F>(&mut self, fut: F)
+    where
+        F: std::future::Future<Output = BgEvent> + Send + 'static,
+    {
+        self.list_seq += 1;
+        let seq = self.list_seq;
+        self.spawn_event(async move { BgEvent::List(seq, Box::new(fut.await)) });
+    }
+
     pub fn start_search(&mut self) {
         let query = self.search_input.trim().to_string();
         if query.is_empty() {
@@ -27,7 +39,7 @@ impl TuiApp {
         self.say(Msg::Searching(&query));
         self.activity.start(Job::List);
         let backend = self.backend.clone();
-        self.spawn_event(async move {
+        self.spawn_list_event(async move {
             let res = backend.search(&query, 25).await.map_err(|e| e.to_string());
             BgEvent::TracksReady {
                 view: ActiveView::Home,
@@ -42,7 +54,7 @@ impl TuiApp {
         self.say(Msg::Loading(kind));
         self.activity.start(Job::List);
         let backend = self.backend.clone();
-        self.spawn_event(async move {
+        self.spawn_list_event(async move {
             let res = backend
                 .fetch_section(section)
                 .await
@@ -56,7 +68,7 @@ impl TuiApp {
         self.say(Msg::Loading(ListKind::Library));
         let progress = self.activity.start_counted();
         let backend = self.backend.clone();
-        self.spawn_event(async move {
+        self.spawn_list_event(async move {
             let res = backend
                 .fetch_user_library(progress)
                 .await
@@ -101,7 +113,7 @@ impl TuiApp {
         self.say(Msg::LoadingPlaylist(&pl.name));
         let progress = self.activity.start_counted();
         let backend = self.backend.clone();
-        self.spawn_event(async move {
+        self.spawn_list_event(async move {
             let res = backend
                 .fetch_playlist_tracks(&pl.id, progress)
                 .await

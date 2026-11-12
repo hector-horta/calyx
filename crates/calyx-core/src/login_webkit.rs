@@ -1,6 +1,4 @@
-use crate::error::{CalyxError, CalyxResult};
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
 
 pub fn parse_binary_cookies(data: &[u8]) -> Option<String> {
     if data.len() < 8 || &data[0..4] != b"cook" {
@@ -127,23 +125,6 @@ pub fn extract_token_from_webkit() -> Option<String> {
         }
     }
     None
-}
-
-pub async fn wait_for_webkit_login(timeout: Duration) -> CalyxResult<String> {
-    crate::browser_choice::open_login_page("https://music.apple.com")?;
-
-    let start = Instant::now();
-    while start.elapsed() < timeout {
-        if let Some(token) = extract_token_from_webkit() {
-            return Ok(token);
-        }
-        tokio::time::sleep(Duration::from_secs(1)).await;
-    }
-
-    Err(CalyxError::Auth(
-        "Timeout en Safari/WebKit. Si macOS bloqueó permisos, usa '?' para modo manual."
-            .to_string(),
-    ))
 }
 
 #[cfg(test)]

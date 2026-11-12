@@ -82,13 +82,15 @@ pub struct TuiApp {
     pub(crate) update: crate::update_install::UpdateState,
     /// Messages of the list and the player, each shown in its own place.
     pub(crate) zones: crate::zones::Zones,
+    /// Number of the latest request for the track list (older results are dropped).
+    pub(crate) list_seq: u64,
     /// Quality/source of the playing audio ("[AAC 256k | Cache]"), always visible.
     pub(crate) audio_hint: String,
 }
 
 impl TuiApp {
-    pub fn new(storefront: &str) -> CalyxResult<Self> {
-        let session = SessionConfig::load_or_default(storefront);
+    pub fn new(storefront: Option<&str>) -> CalyxResult<Self> {
+        let session = SessionConfig::load(storefront);
         let language = session
             .language
             .unwrap_or_else(calyx_core::Language::detect_system);
@@ -151,6 +153,7 @@ impl TuiApp {
             pending_remove: None,
             update: Default::default(),
             zones: Default::default(),
+            list_seq: 0,
             audio_hint: String::new(),
         })
     }
