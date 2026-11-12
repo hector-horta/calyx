@@ -13,7 +13,7 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Tag of a newer release, set once by the background check.
 static NEWER: OnceLock<String> = OnceLock::new();
 
-/// Asks GitHub (at most once a day, see `calyx_core::update_check`) on a
+/// Asks GitHub (on every start, see `calyx_core::update_check`) on a
 /// tokio task; the title shows the answer whenever it arrives.
 pub fn start_check() {
     tokio::spawn(async {
