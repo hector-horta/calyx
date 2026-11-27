@@ -35,6 +35,15 @@ impl Track {
         format!("{:02}:{:02}", minutes, seconds)
     }
 
+    /// The song's id in the user's library (`i.…`), when it came from there.
+    /// It keeps working when Apple drops the catalog id the library points
+    /// at (a replaced release): playback already relies on it.
+    pub fn library_id(&self) -> Option<&str> {
+        self.hls_manifest_url
+            .as_deref()
+            .filter(|id| id.starts_with("i."))
+    }
+
     /// True when `other` is very likely the same song: same normalized title,
     /// and one normalized artist contains the other (covers "feat." credits).
     pub fn is_same_song(&self, other: &Track) -> bool {
