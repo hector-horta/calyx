@@ -112,6 +112,7 @@ Para escuchar tus canciones completas, tus playlists y tu biblioteca personal:
 | **Tecla** | **Acción** |
 |:---:|:---|
 | <kbd>/</kbd> | **Buscar** canciones, artistas o álbumes en el catálogo |
+| <kbd>Esc</kbd> / <kbd>Ctrl</kbd>+<kbd>U</kbd> | **Limpiar la búsqueda** mientras escribes (<kbd>Esc</kbd> con la barra vacía sale de ella) |
 | <kbd>1</kbd> a <kbd>5</kbd> | **Secciones**: `1` Recientes, `2` Novedades, `3` Radio, `4` Tu Biblioteca, `5` Playlists |
 | <kbd>o</kbd> | **Ver Álbum**: Abre el álbum de la canción seleccionada (pulsar de nuevo para volver) |
 | <kbd>Tab</kbd> | **Alternar vista**: Cambia entre la lista que estás explorando y tu Cola activa |

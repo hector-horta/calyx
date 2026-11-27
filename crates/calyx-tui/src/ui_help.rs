@@ -23,6 +23,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from("  [1-5] Secciones   [/] Buscar   [Tab] Cola   [?] Ayuda"),
+            Line::from("  Al buscar: [Esc] limpia (otra vez: sale)   [Ctrl+U] limpia"),
             Line::from(""),
             Line::from(Span::styled(
                 "  📋 Gestión de Cola & Playlists",
@@ -65,6 +66,7 @@ pub fn render_help(frame: &mut Frame<'_>, area: Rect, app: &TuiApp, nav_line: Li
                     .add_modifier(Modifier::BOLD),
             )),
             Line::from("  [1-5] Sections    [/] Search   [Tab] Queue   [?] Help"),
+            Line::from("  While searching: [Esc] clears (again: leaves)   [Ctrl+U] clears"),
             Line::from(""),
             Line::from(Span::styled(
                 "  📋 Queue & Playlists Management",
