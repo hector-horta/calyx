@@ -24,7 +24,9 @@ souvlaki = { version = "0.9.3", default-features = false, features = ["use_zbus"
 
 [target.'cfg(windows)'.dependencies]
 # Hidden window that SMTC is registered against (calyx is a console app).
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_System_LibraryLoader"] }
+# Start Menu shortcut carrying calyx's app id (COM: IShellLinkW, IPropertyStore).
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Storage_EnhancedStorage", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_UI_Shell", "Win32_UI_Shell_PropertiesSystem"] }
 
 [target.'cfg(windows)'.build-dependencies]
 # Name and icon embedded in calyx.exe (build.rs).

@@ -55,7 +55,11 @@ fn due(
 /// Off by default (`--no-now-playing`); `start` turns it on.
 #[derive(Default)]
 pub struct Publisher {
+    /// Registered with the OS only while a song is loaded, so the media
+    /// overlay shows no empty calyx card before the first song.
     os: Option<crate::os_media::OsMedia>,
+    /// Whether to register; turned off when the OS has no media service.
+    os_wanted: bool,
     file: Option<PathBuf>,
     shown: Option<Shown>,
     os_at: Option<Instant>,
@@ -66,7 +70,8 @@ impl Publisher {
     /// On: the OS media controls when the OS has them, and the JSON file.
     pub fn start() -> Self {
         Self {
-            os: crate::os_media::OsMedia::start(),
+            os: None,
+            os_wanted: true,
             file: Some(now_playing::now_playing_file()),
             shown: None,
             os_at: None,
@@ -85,9 +90,8 @@ impl Publisher {
         let due = due(self.shown.as_ref(), key.as_ref(), self.os_at, self.file_at);
 
         if due.clear {
-            if let Some(os) = self.os.as_mut() {
-                os.show_stopped();
-            }
+            // Dropping the controls removes calyx's card from the overlay.
+            self.os = None;
             if let Some(path) = &self.file {
                 now_playing::clear(path);
             }
@@ -100,6 +104,10 @@ impl Publisher {
         };
 
         if due.os {
+            if self.os.is_none() && self.os_wanted {
+                self.os = crate::os_media::OsMedia::start();
+                self.os_wanted = self.os.is_some();
+            }
             if let Some(os) = self.os.as_mut() {
                 os.show(&np, due.new_song);
             }

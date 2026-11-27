@@ -22,6 +22,9 @@ impl OsMedia {
     /// Registers calyx with the OS media controls; `None` when the OS has
     /// none to offer (it is logged at debug level, never shown as an error).
     pub fn start() -> Option<Self> {
+        // The overlay names the session after this identity ("Calyx").
+        #[cfg(windows)]
+        crate::os_media_identity::register();
         #[cfg(windows)]
         let window = crate::os_media_window::HiddenWindow::create()?;
         #[cfg(windows)]
@@ -80,13 +83,6 @@ impl OsMedia {
             PlayState::Paused => MediaPlayback::Paused { progress },
         };
         if let Err(e) = self.controls.set_playback(playback) {
-            tracing::debug!(error = ?e, "failed to set playback state");
-        }
-    }
-
-    /// Nothing is playing any more.
-    pub fn show_stopped(&mut self) {
-        if let Err(e) = self.controls.set_playback(MediaPlayback::Stopped) {
             tracing::debug!(error = ?e, "failed to set playback state");
         }
     }
