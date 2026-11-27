@@ -19,6 +19,8 @@ mod notice_tone;
 mod now_playing_sync;
 mod os_media;
 #[cfg(windows)]
+mod os_media_identity;
+#[cfg(windows)]
 mod os_media_window;
 mod picker;
 mod picker_texts;
