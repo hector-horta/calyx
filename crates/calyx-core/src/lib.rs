@@ -38,6 +38,8 @@ pub mod hls;
 pub mod i18n;
 /// Personal Apple Music Library & Playlists synchronization.
 pub mod library;
+/// A library song's album from the library (when the catalog lost the song).
+mod library_album;
 /// Writes to the user's library (add album).
 mod library_write;
 /// Interactive zero-friction Apple Music Sign-In.

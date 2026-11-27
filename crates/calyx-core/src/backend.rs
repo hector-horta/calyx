@@ -162,7 +162,20 @@ impl StreamingBackend for AppleMusicBackend {
     }
 
     async fn fetch_album_of(&self, track: &Track) -> CalyxResult<(String, Vec<Track>)> {
-        crate::catalog_album::fetch_album_of(&self.client(), track).await
+        let err = match crate::catalog_album::fetch_album_of(&self.client(), track).await {
+            Ok(album) => return Ok(album),
+            Err(e) => e,
+        };
+        // A replaced release: the catalog no longer has the song, the library
+        // still has its album. On failure the catalog error is the one shown.
+        let Some(lib_id) = track.library_id() else {
+            return Err(err);
+        };
+        let (dev, usr, sf) = self.user_ctx();
+        let http = self.client().http().clone();
+        crate::library_album::fetch_library_album_of(&http, &dev, &usr, lib_id, &sf)
+            .await
+            .map_err(|_| err)
     }
 
     async fn add_album_to_library(&self, track: &Track) -> CalyxResult<()> {
@@ -176,7 +189,9 @@ impl StreamingBackend for AppleMusicBackend {
     async fn add_to_playlist(&self, playlist_id: &str, track: &Track) -> CalyxResult<()> {
         let (dev, usr, _) = self.user_ctx();
         let http = self.client().http().clone();
-        crate::library_write::add_track_to_playlist(&http, &dev, &usr, playlist_id, &track.id).await
+        // The library id keeps working when Apple drops the catalog id (500).
+        let song_id = track.library_id().unwrap_or(&track.id);
+        crate::library_write::add_track_to_playlist(&http, &dev, &usr, playlist_id, song_id).await
     }
 
     async fn remove_from_playlist(&self, playlist_id: &str, song_id: &str) -> CalyxResult<()> {
