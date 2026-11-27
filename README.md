@@ -32,6 +32,7 @@ Calyx lets you stream your entire Apple Music catalog and library directly from 
 - 🌈 **Analog Spectrum Visualizer**: Balanced two-box player with a 48-step illuminated frequency display responding to the music.
 - 📁 **Library & Playlist Management**: Browse saved songs, add tracks to playlists (<kbd>m</kbd>), save albums (<kbd>f</kbd>), or create new playlists on the fly.
 - 🌐 **Bilingual (English / Spanish)**: Auto-detects your system locale with hot-swapping via <kbd>L</kbd>.
+- 📡 **Now Playing & Media Keys**: Shows what you play in the OS media controls (Windows media overlay, Linux MPRIS, macOS Now Playing), so apps like [ListeningTo](https://github.com/hector-horta/ListeningTo) can share it on Discord. Your keyboard's play/pause, next and previous keys control Calyx.
 - 💻 **Cross-Platform**: Native performance on Windows, macOS, and Linux.
 
 ---
@@ -159,6 +160,8 @@ To unlock full-length playback, your personal library, and your playlists:
   Yes. Set the environment variable `CALYX_HOME=/path/to/folder` to keep all configurations, databases, and caches in a single custom location without touching system folders.
 - **How do I know there is a new version?**
   The top bar shows your version (`Calyx v0.1.15`). Every time it starts, Calyx asks GitHub for the latest release in the background; when there is a newer one it adds `→ v0.1.16 available`. Press `V` twice to install it: Calyx downloads the release, checks its SHA-256 and replaces its own executable; the new version runs after a restart. When it cannot (installed with cargo, scoop, winget, Homebrew or Nix, or no write access to its folder), it opens the download page instead. It never updates without you asking. Run with `--no-update-check` to never contact GitHub.
+- **How do other apps see what I am listening to?**
+  While a song plays or is paused, Calyx publishes it to the OS media controls and writes it to `now_playing.json` in its data folder (`%LOCALAPPDATA%\calyx`, `~/.local/share/calyx`, `~/Library/Application Support/calyx`): `schema`, `player`, `state` (`playing`/`paused`), `title`, `artist`, `album`, `artwork_url`, `duration_ms`, `position_ms` and `updated_at_ms`. The file is rewritten on every change and at least every 15 s, and removed when playback stops; treat it as gone when it is older than 45 s. Without a desktop session (e.g. over SSH) only the file is written. Run with `--no-now-playing` to turn both off.
 
 ---
 

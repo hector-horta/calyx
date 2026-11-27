@@ -1,5 +1,5 @@
 //! Command line: `calyx [storefront] [-u|--login <browser>] [--version|-V] [--check]
-//! [--no-update-check]`.
+//! [--no-update-check] [--no-now-playing]`.
 
 #[derive(Debug, PartialEq)]
 pub struct Cli {
@@ -11,6 +11,9 @@ pub struct Cli {
     pub check: bool,
     /// Ask GitHub for newer releases (off with `--no-update-check`).
     pub update_check: bool,
+    /// Publish what plays to the OS media controls and `now_playing.json`
+    /// (off with `--no-now-playing`).
+    pub now_playing: bool,
     /// `-u <browser>` / `--login <browser>`: log in with that browser at start.
     pub login: Option<String>,
 }
@@ -38,6 +41,7 @@ impl Cli {
             version: has("--version") || has("-V"),
             check: has("--check"),
             update_check: !has("--no-update-check"),
+            now_playing: !has("--no-now-playing"),
             login,
         }
     }
@@ -55,7 +59,8 @@ mod tests {
     fn defaults_to_no_storefront_with_the_update_check() {
         let cli = parse(&[]);
         assert_eq!(cli.storefront, None);
-        assert!(cli.update_check && !cli.version && !cli.check);
+        assert!(cli.update_check && cli.now_playing && !cli.version && !cli.check);
+        assert!(!parse(&["--no-now-playing"]).now_playing);
     }
 
     #[test]

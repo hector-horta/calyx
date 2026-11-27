@@ -19,3 +19,9 @@ ratatui = { workspace = true }
 crossterm = { workspace = true }
 image = { workspace = true }
 tui-big-text = "0.7.1"
+# OS media controls (SMTC / MPRIS / Now Playing). zbus: pure Rust D-Bus, no libdbus.
+souvlaki = { version = "0.9.3", default-features = false, features = ["use_zbus"] }
+
+[target.'cfg(windows)'.dependencies]
+# Hidden window that SMTC is registered against (calyx is a console app).
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader"] }

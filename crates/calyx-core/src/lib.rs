@@ -54,6 +54,8 @@ pub mod lyrics;
 pub mod lyrics_ttml;
 /// Data models for tracks, playlists, and metadata.
 pub mod models;
+/// What is playing, as a JSON file other apps (ListeningTo) can read.
+pub mod now_playing;
 /// Paginated GETs on the user-scoped API.
 mod paging;
 /// Per-platform locations for session, history and caches.
