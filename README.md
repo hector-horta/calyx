@@ -112,6 +112,7 @@ To unlock full-length playback, your personal library, and your playlists:
 | **Key** | **Action** |
 |:---:|:---|
 | <kbd>/</kbd> | **Search** songs, artists, or albums across Apple Music |
+| <kbd>Esc</kbd> / <kbd>Ctrl</kbd>+<kbd>U</kbd> | **Clear the search** while typing (<kbd>Esc</kbd> on an empty bar leaves it) |
 | <kbd>1</kbd> – <kbd>5</kbd> | **Sections**: `1` Recent, `2` New Releases, `3` Radio, `4` Library, `5` Playlists |
 | <kbd>o</kbd> | **View Album**: Open the album of the selected track (press again to return) |
 | <kbd>Tab</kbd> | **Toggle View**: Switch between active browser list and the Queue |

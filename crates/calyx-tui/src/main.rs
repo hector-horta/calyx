@@ -31,6 +31,7 @@ mod player_state;
 mod player_status;
 mod player_track;
 mod playlist_remove;
+mod search_input;
 mod spinner;
 mod tasks;
 mod ui;
@@ -146,17 +147,13 @@ fn run_event_loop(
         }
 
         if app.is_editing {
-            match key_event.code {
-                KeyCode::Enter => {
+            match search_input::edit(&mut app.search_input, key_event) {
+                search_input::SearchEdit::Submit => {
                     app.is_editing = false;
                     app.start_search();
                 }
-                KeyCode::Esc => app.is_editing = false,
-                KeyCode::Backspace => {
-                    app.search_input.pop();
-                }
-                KeyCode::Char(c) => app.search_input.push(c),
-                _ => {}
+                search_input::SearchEdit::Leave => app.is_editing = false,
+                search_input::SearchEdit::Typing => {}
             }
             continue;
         }
