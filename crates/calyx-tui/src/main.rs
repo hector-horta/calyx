@@ -16,6 +16,10 @@ mod messages_picker;
 mod navigation;
 mod notice;
 mod notice_tone;
+mod now_playing_sync;
+mod os_media;
+#[cfg(windows)]
+mod os_media_window;
 mod picker;
 mod picker_texts;
 mod playback;
@@ -78,6 +82,9 @@ async fn main() -> Result<()> {
     if cli.update_check {
         version_badge::start_check();
     }
+    if cli.now_playing {
+        app.now_playing = now_playing_sync::Publisher::start();
+    }
 
     install_panic_hook();
     enable_raw_mode().context("Failed to enable raw mode")?;
@@ -122,6 +129,8 @@ fn run_event_loop(
     while !app.should_quit {
         app.poll_bg_events();
         app.check_auto_advance();
+        app.handle_media_keys();
+        app.sync_now_playing();
         terminal.draw(|f| ui::render(f, app))?;
 
         if !event::poll(Duration::from_millis(50))? {

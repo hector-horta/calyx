@@ -84,6 +84,8 @@ pub struct TuiApp {
     pub(crate) zones: crate::zones::Zones,
     /// Number of the latest request for the track list (older results are dropped).
     pub(crate) list_seq: u64,
+    /// What is playing, published to the OS and `now_playing.json`.
+    pub(crate) now_playing: crate::now_playing_sync::Publisher,
     /// Quality/source of the playing audio ("[AAC 256k | Cache]"), always visible.
     pub(crate) audio_hint: String,
 }
@@ -154,6 +156,7 @@ impl TuiApp {
             update: Default::default(),
             zones: Default::default(),
             list_seq: 0,
+            now_playing: Default::default(),
             audio_hint: String::new(),
         })
     }

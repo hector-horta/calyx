@@ -32,6 +32,7 @@ Calyx te permite escuchar todo el catálogo y tu biblioteca personal de Apple Mu
 - 🌈 **Visualizador de Espectro**: Reproductor equilibrado de dos cajas con animación de frecuencias retroiluminada de 48 pasos.
 - 📁 **Biblioteca y Playlists**: Accede a tus listas guardadas, añade canciones (<kbd>m</kbd>), guarda álbumes (<kbd>f</kbd>) o crea listas nuevas al instante.
 - 🌐 **Bilingüe (Español / English)**: Detecta el idioma de tu sistema y permite alternar en caliente con la tecla <kbd>L</kbd>.
+- 📡 **Reproduciendo ahora y teclas multimedia**: Muestra lo que escuchas en los controles multimedia del sistema (el panel de Windows, MPRIS en Linux, "Reproduciendo" en macOS), para que apps como [ListeningTo](https://github.com/hector-horta/ListeningTo) lo compartan en Discord. Las teclas de reproducir/pausa, siguiente y anterior de tu teclado controlan Calyx.
 - 💻 **Multiplataforma**: Rendimiento nativo en Windows, macOS y Linux.
 
 ---
@@ -159,6 +160,8 @@ Para escuchar tus canciones completas, tus playlists y tu biblioteca personal:
   Sí, si defines la variable de entorno `CALYX_HOME=/ruta/carpeta`, Calyx guardará todos sus datos en esa ubicación sin tocar el resto de tu equipo.
 - **¿Cómo sé si hay una versión nueva?**
   La barra superior muestra tu versión (`Calyx v0.1.15`). Cada vez que arranca, Calyx consulta en segundo plano la última versión publicada en GitHub; si hay una más nueva, agrega `→ v0.1.16 disponible`. Presiona `V` dos veces para instalarla: Calyx descarga la release, verifica su SHA-256 y reemplaza su propio ejecutable; la nueva versión corre al reiniciar. Si no puede (instalado con cargo, scoop, winget, Homebrew o Nix, o sin permiso de escritura en su carpeta), abre la página de descarga. Nunca se actualiza sin que se lo pidas. Usa `--no-update-check` para que no se conecte nunca a GitHub.
+- **¿Cómo ven otras apps lo que estoy escuchando?**
+  Mientras una canción suena o está en pausa, Calyx la publica en los controles multimedia del sistema y la escribe en `now_playing.json`, en su carpeta de datos (`%LOCALAPPDATA%\calyx`, `~/.local/share/calyx`, `~/Library/Application Support/calyx`): `schema`, `player`, `state` (`playing`/`paused`), `title`, `artist`, `album`, `artwork_url`, `duration_ms`, `position_ms` y `updated_at_ms`. El archivo se reescribe con cada cambio y al menos cada 15 s, y se borra cuando se detiene la reproducción; si tiene más de 45 s, considéralo inexistente. Sin sesión de escritorio (por ejemplo, por SSH) solo se escribe el archivo. Usa `--no-now-playing` para desactivar ambas cosas.
 
 ---
 
