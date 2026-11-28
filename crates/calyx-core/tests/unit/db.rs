@@ -1,4 +1,3 @@
-
 use super::*;
 #[test]
 fn test_sqlite_store_upsert_and_search() {

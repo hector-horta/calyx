@@ -1,4 +1,3 @@
-
 use super::*;
 
 fn hex(bytes: &[u8]) -> String {

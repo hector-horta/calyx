@@ -1,4 +1,3 @@
-
 use super::Cli;
 
 fn parse(args: &[&str]) -> Cli {
