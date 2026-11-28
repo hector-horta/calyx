@@ -363,6 +363,7 @@ dependencies = [
  "calyx-core",
  "crossterm",
  "image",
+ "objc",
  "ratatui",
  "souvlaki",
  "tokio",
