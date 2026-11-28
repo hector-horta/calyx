@@ -10,6 +10,7 @@ mod hints;
 mod labels;
 mod list_actions;
 mod list_kind;
+mod logging;
 mod login;
 mod messages;
 mod messages_picker;
@@ -69,6 +70,14 @@ async fn main() -> Result<()> {
     if cli.check {
         return Ok(());
     }
+    if logging::init().is_some() {
+        tracing::info!(
+            version = env!("CARGO_PKG_VERSION"),
+            os = std::env::consts::OS,
+            pid = std::process::id(),
+            "calyx started"
+        );
+    }
     if let Some(name) = &cli.login {
         let Some(browser) = calyx_core::browser_choice::named(name) else {
             let known = calyx_core::browser_choice::known_names().join(", ");
@@ -105,8 +114,10 @@ async fn main() -> Result<()> {
     restore_terminal();
 
     if let Err(err) = res {
+        tracing::error!(error = ?err, "calyx stopped on an error");
         eprintln!("Calyx encountered an error: {err:?}");
     }
+    tracing::info!("calyx exiting");
     Ok(())
 }
 
@@ -121,6 +132,7 @@ fn install_panic_hook() {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         restore_terminal();
+        tracing::error!(%info, "panic");
         previous(info);
     }));
 }
