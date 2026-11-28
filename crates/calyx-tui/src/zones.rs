@@ -80,5 +80,5 @@ pub fn list_line(slot: &Slot, activity: &Activity, width: usize) -> Option<Line<
 }
 
 #[cfg(test)]
-#[path = "zones_tests.rs"]
+#[path = "../tests/unit/zones.rs"]
 mod tests;

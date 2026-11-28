@@ -109,5 +109,5 @@ pub fn compute_spectrum_frames(pcm: &[i16], channels: u16, sample_rate: u32) -> 
         .collect()
 }
 #[cfg(test)]
-#[path = "spectrum_tests.rs"]
+#[path = "../tests/unit/spectrum.rs"]
 mod tests;

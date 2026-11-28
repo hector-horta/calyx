@@ -173,14 +173,5 @@ fn decode_m4a_to_pcm(bytes: Vec<u8>) -> CalyxResult<(u16, u32, Vec<i16>)> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn empty_bytes_is_error() {
-        assert!(decode_track(Vec::new()).is_err());
-    }
-    #[test]
-    fn garbage_bytes_is_error() {
-        assert!(decode_track(vec![0u8; 64]).is_err());
-    }
-}
+#[path = "../tests/unit/decode.rs"]
+mod tests;

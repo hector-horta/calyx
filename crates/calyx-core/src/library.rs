@@ -231,5 +231,5 @@ pub async fn fetch_playlist_tracks(
 }
 
 #[cfg(test)]
-#[path = "library_tests.rs"]
+#[path = "../tests/unit/library.rs"]
 mod tests;

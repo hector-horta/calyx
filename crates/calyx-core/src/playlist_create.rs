@@ -79,5 +79,5 @@ pub(crate) async fn create_playlist_with_track(
 }
 
 #[cfg(test)]
-#[path = "playlist_create_tests.rs"]
+#[path = "../tests/unit/playlist_create.rs"]
 mod tests;

@@ -205,5 +205,5 @@ impl TuiApp {
 }
 
 #[cfg(test)]
-#[path = "now_playing_sync_tests.rs"]
+#[path = "../tests/unit/now_playing_sync.rs"]
 mod tests;

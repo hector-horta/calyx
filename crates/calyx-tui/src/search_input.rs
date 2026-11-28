@@ -43,5 +43,5 @@ pub fn edit(input: &mut String, key: KeyEvent) -> SearchEdit {
 }
 
 #[cfg(test)]
-#[path = "search_input_tests.rs"]
+#[path = "../tests/unit/search_input.rs"]
 mod tests;
