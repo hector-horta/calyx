@@ -87,5 +87,5 @@ impl Notice {
 }
 
 #[cfg(test)]
-#[path = "notice_tests.rs"]
+#[path = "../tests/unit/notice.rs"]
 mod tests;

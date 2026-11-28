@@ -145,5 +145,5 @@ pub async fn newer_release(current: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-#[path = "update_check_tests.rs"]
+#[path = "../tests/unit/update_check.rs"]
 mod tests;

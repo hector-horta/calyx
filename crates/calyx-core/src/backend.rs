@@ -271,5 +271,5 @@ impl StreamingBackend for AppleMusicBackend {
 }
 
 #[cfg(test)]
-#[path = "backend_tests.rs"]
+#[path = "../tests/unit/backend.rs"]
 mod tests;

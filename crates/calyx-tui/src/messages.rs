@@ -247,5 +247,5 @@ impl Msg<'_> {
 }
 
 #[cfg(test)]
-#[path = "messages_tests.rs"]
+#[path = "../tests/unit/messages.rs"]
 mod tests;

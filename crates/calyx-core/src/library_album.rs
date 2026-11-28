@@ -80,5 +80,5 @@ pub(crate) async fn fetch_library_album_of(
 }
 
 #[cfg(test)]
-#[path = "library_album_tests.rs"]
+#[path = "../tests/unit/library_album.rs"]
 mod tests;

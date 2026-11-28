@@ -143,5 +143,5 @@ fn plain(c: char) -> char {
 }
 
 #[cfg(test)]
-#[path = "player_big_title_tests.rs"]
+#[path = "../tests/unit/player_big_title.rs"]
 mod tests;

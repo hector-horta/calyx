@@ -90,5 +90,5 @@ pub(crate) async fn remove_from_playlist(
 }
 
 #[cfg(test)]
-#[path = "playlist_edit_tests.rs"]
+#[path = "../tests/unit/playlist_edit.rs"]
 mod tests;

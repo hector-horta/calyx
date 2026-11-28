@@ -105,5 +105,5 @@ pub fn spectrum_row(
     v
 }
 #[cfg(test)]
-#[path = "player_spectrum_tests.rs"]
+#[path = "../tests/unit/player_spectrum.rs"]
 mod tests;

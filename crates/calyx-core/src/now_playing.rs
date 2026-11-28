@@ -72,5 +72,5 @@ impl NowPlaying {
 }
 
 #[cfg(test)]
-#[path = "now_playing_tests.rs"]
+#[path = "../tests/unit/now_playing.rs"]
 mod tests;

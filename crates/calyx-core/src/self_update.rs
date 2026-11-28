@@ -198,5 +198,5 @@ pub async fn install(tag: &str) -> Result<()> {
 }
 
 #[cfg(test)]
-#[path = "self_update_tests.rs"]
+#[path = "../tests/unit/self_update.rs"]
 mod tests;
