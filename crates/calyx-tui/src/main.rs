@@ -20,6 +20,8 @@ mod now_playing_sync;
 mod os_media;
 #[cfg(windows)]
 mod os_media_identity;
+#[cfg(target_os = "macos")]
+mod os_media_macos;
 #[cfg(windows)]
 mod os_media_window;
 mod picker;

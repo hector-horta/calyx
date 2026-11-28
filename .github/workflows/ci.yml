@@ -63,3 +63,31 @@ jobs:
 
       - name: Binary starts
         run: cargo run -q -p calyx-tui -- --version
+
+  macos:
+    # The macOS-only code (Now Playing, media keys) is only compiled here; the
+    # binary is kept as an artifact so a PR can be tried on a Mac.
+    name: macOS (clippy + build)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy (warnings are errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --release -p calyx-tui
+
+      - name: Keep the binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: calyx-macos-arm64
+          path: target/release/calyx
+          retention-days: 14

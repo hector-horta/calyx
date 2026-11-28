@@ -25,6 +25,9 @@ impl OsMedia {
         // The overlay names the session after this identity ("Calyx").
         #[cfg(windows)]
         crate::os_media_identity::register();
+        // macOS only lists apps with an AppKit event loop in Now Playing.
+        #[cfg(target_os = "macos")]
+        crate::os_media_macos::start();
         #[cfg(windows)]
         let window = crate::os_media_window::HiddenWindow::create()?;
         #[cfg(windows)]
@@ -87,11 +90,13 @@ impl OsMedia {
         }
     }
 
-    /// The next media key pressed, if any. Pumps the hidden window first
-    /// on Windows, where SMTC talks to it through window messages.
+    /// The next media key pressed, if any. First pumps what the OS talks to:
+    /// the hidden window on Windows, the AppKit event queue on macOS.
     pub fn next_event(&self) -> Option<MediaControlEvent> {
         #[cfg(windows)]
         self.window.pump();
+        #[cfg(target_os = "macos")]
+        crate::os_media_macos::pump();
         self.events.try_recv().ok()
     }
 }
