@@ -4,6 +4,10 @@
 //! becomes a faceless NSApplication (no Dock icon, no window) and its events
 //! are pumped from calyx's own loop, like the hidden window on Windows.
 
+// objc 0.2's msg_send! expands to `cfg(feature = "cargo-clippy")`, which
+// newer compilers flag as an unknown cfg in every crate that uses it.
+#![allow(unexpected_cfgs)]
+
 use objc::runtime::{BOOL, Object, YES};
 use objc::{class, msg_send, sel, sel_impl};
 
