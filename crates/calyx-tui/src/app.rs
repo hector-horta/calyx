@@ -223,6 +223,10 @@ impl TuiApp {
         let msg = msg.into();
         let text = msg.text(self.language);
         let slot = self.zones.get_mut(msg.zone());
+        if msg.tone() == Some(crate::notice::Tone::Error) {
+            // Errors shown to the user also go to calyx.log, with their reason.
+            tracing::warn!(message = %text, "error shown to the user");
+        }
         match msg.tone() {
             Some(tone) => slot.notice = Some(crate::notice::Notice::new(text, tone)),
             None => slot.set_status(text),
